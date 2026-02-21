@@ -531,6 +531,27 @@ def get_equity():
     acc = mt5.account_info()
     return acc.equity if acc else 0.0
 
+def get_adaptive_risk_params(balance, conf, rsi_val, sym):
+    """ Protocolo v18.9.103: Gestión de Riesgo Adaptativa """
+    # 1. Definir Límite de Balas por Saldo
+    if balance < 50.0:
+        max_bullets = 1
+    elif balance < 100.0:
+        max_bullets = 2
+    else:
+        max_bullets = 3
+        
+    # 2. Definir Lotaje Inteligente según RULES.md
+    if balance < 50.0:
+        # Lote: 0.01 (máximo 0.03 si la IA tiene >90% conf)
+        smart_lot = 0.03 if (conf > 0.90 and 30 < rsi_val < 70) else 0.01
+    elif balance < 100.0:
+        smart_lot = 0.04 if conf > 0.85 else 0.02
+    else:
+        smart_lot = 0.06 if conf > 0.85 else 0.03
+        
+    return max_bullets, smart_lot
+
 def close_ticket(pos, reason="UNK"):
     # v18.5: LEY DE PROTECCIÓN DE CAPITAL - PROHIBIDO CERRAR EN NEGATIVO
     profit = pos.profit + getattr(pos, 'swap', 0.0) + getattr(pos, 'commission', 0.0)
@@ -1315,6 +1336,13 @@ def process_symbol_task(sym, active, mission_state):
         conf = conf_pred
         rsi_val = rsi_val_pred 
         curr_price = tick.bid
+
+        # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
+        balance = acc.balance if acc else 0
+        current_max_bullets, smart_lot = get_adaptive_risk_params(balance, conf, rsi_val, sym)
+        with state_lock:
+            # Actualizamos el lote global para este símbolo para que todos los bloques lo usen
+            ASSET_CONFIG[sym]["lot"] = smart_lot
         
         # TP Dinámico v11.2: SIN TP FIJO - El trailing stop del EA maneja la salida
         # INCIDENTE: TP de 2000 pts ($6) cerraba trades que podían dar $10+
@@ -1742,17 +1770,16 @@ def process_symbol_task(sym, active, mission_state):
         # 2. LIMITADOR DE CARGADOR DINÁMICO v18.9.35 (BASADO EN MARGEN)
         margin_level = acc.margin_level if acc else 0.0
         
-        # Regla del Comandante v18.9.37:
-        # > 350% Margen = 5 Balas
-        # > 200% Margen = 3 Balas
-        # < 200% Margen = 1 Bala (Máxima Seguridad)
+        # Regla del Comandante v18.9.37 (Margen) + v18.9.103 (Balance)
         if margin_level >= 350:
-            user_max_bullets = 5
+            user_max_bullets_margin = 5
         elif margin_level >= 200:
-            user_max_bullets = 3
+            user_max_bullets_margin = 3
         else:
-            user_max_bullets = 1
+            user_max_bullets_margin = 1
             
+        # El balance define el límite maestro (Constitución v18.9.103)
+        user_max_bullets = min(current_max_bullets, user_max_bullets_margin)
         effective_max = user_max_bullets
         
         # Ayuda de rescate tras 5 min atascado
@@ -2096,37 +2123,13 @@ def process_symbol_task(sym, active, mission_state):
                              else:
                                  should_fire = False
                                  log(f"🛑 LIMITE: {n_balas}/{MAX_BULLETS} balas activas.")
-                        # --- GESTIÓN ADAPTATIVA DE BALAS v18.9.102 ---
-                        balance = acc.balance if acc else 0
-                        
-                        # 1. Definir Límite de Balas por Saldo
-                        if balance < 50.0:
-                            current_max_bullets = 1
-                        elif balance < 100.0:
-                            current_max_bullets = 2
-                        else:
-                            # Sobre $100: 3 balas base + 2 de salvación
-                            current_max_bullets = 3
-                            # Si hay posiciones abiertas > 5 minutos sin profit, desbloquear salvación (4 y 5)
-                            if n_balas >= 3:
-                                oldest_pos_time = min(p.time for p in pos_list) if pos_list else now
-                                if (now - oldest_pos_time) > 300: # 5 minutos
-                                    current_max_bullets = 5
-                                    log(f"🆘 ACTIVANDO BALAS DE SALVACIÓN (n={n_balas+1}): Posiciones estancadas > 5m.")
-
-                        # 2. Definir Lotaje Inteligente (v18.9.103: Calibración Fina)
-                        if balance < 50.0:
-                            # 0.01 por defecto, 0.03 si la IA está MUY segura y equilibrada
-                            smart_lot = 0.03 if (conf > 0.88 and rsi_val > 30 and rsi_val < 70) else 0.01
-                        elif balance < 100.0:
-                            smart_lot = 0.04 if conf > 0.85 else 0.02
-                        else:
-                            # Sobre $100: libertad hasta 0.06
-                            smart_lot = 0.06 if conf > 0.85 else 0.03
-                        
-                        # Overwrite config temporalmente para este disparo
-                        with state_lock:
-                            ASSET_CONFIG[sym]["lot"] = smart_lot
+                        # --- GESTIÓN ADAPTATIVA DE BALAS v18.9.103 (Lógica de Salvación) ---
+                        # Si hay posiciones abiertas > 5 minutos sin profit, desbloquear salvación (4 y 5) sobre $100
+                        if balance >= 100.0 and n_balas >= 3:
+                            oldest_pos_time = min(p.time for p in pos_list) if pos_list else now
+                            if (now - oldest_pos_time) > 300: # 5 minutos
+                                current_max_bullets = 5
+                                log(f"🆘 ACTIVANDO BALAS DE SALVACIÓN (n={n_balas+1}): Posiciones estancadas > 5m.")
 
                         if n_balas >= current_max_bullets:
                             should_fire = False

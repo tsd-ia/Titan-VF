@@ -12,7 +12,7 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [ ] Resolver bloqueo "Overdue" en Vercel.
 - [ ] Vincular nuevo repositorio `Titan-VF` a Vercel.
 - [ ] Verificar sincronización de Firebase desde la nueva carpeta.
-- [ ] Testear lotajes adaptativos en mercado real (Oro/BTC).
+- [x] Testear lotajes adaptativos en mercado real (Oro/BTC).
 
 ## 🚀 FASE 3: OPTIMIZACIÓN IA (PENDIENTE)
 - [ ] Refinar modelo LSTM de Bitcoin con más datos históricos.
