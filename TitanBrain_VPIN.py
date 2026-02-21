@@ -2443,16 +2443,21 @@ def metralleta_loop():
                     m_speed_current = STATE.get("market_speed_val", 20.0)
                     is_fast = m_speed_current > 100 # Mercado volátil/rápido
                     
-                    # 0. MODO KAMIKAZE: TRAILING RELÁMPAGO (CUMPLEAÑOS)
-                    # En vez de cerrar de golpe, ajustamos un SL físico en +$0.20 apenas tocamos $0.50.
-                    # Así, si sube a $1, el trailing lo seguirá.
-                    if profit >= 0.50 and (now_loop - p.time) < 30:
+                    # 0. MODO KAMIKAZE: TRAILING RELÁMPAGO INTELIGENTE
+                    # A medida que sube la ganancia, vamos ajustando el SL de forma escalonada.
+                    # Mientras más sube, más agresivo es el cierre detrás del precio.
+                    if profit >= 0.50 and (now_loop - p.time) < 45: 
                         symbol_info = mt5.symbol_info(sym)
                         if symbol_info:
                             dist_sl = 1 / (lot * symbol_info.trade_contract_size)
-                            locked_p = profit - 0.20 # Dejamos $0.20 de oxígeno
-                            new_sl_kamikaze = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             
+                            # Trailing Inteligente Escalonado (Kamikaze Adaptativo)
+                            if profit >= 1.50: locked_p = profit - 0.40   # Si va muy arriba, damos $0.40 de espacio (para dejarlo volar)
+                            elif profit >= 1.00: locked_p = profit - 0.30 # Damos $0.30 de oxígeno
+                            elif profit >= 0.80: locked_p = profit - 0.20 # Damos $0.20 de oxígeno
+                            else: locked_p = profit - 0.15                # Entre $0.50 y $0.80, ajustamos a solo $0.15 de distancia
+                            
+                            new_sl_kamikaze = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
                             new_sl_kamikaze = round(new_sl_kamikaze, symbol_info.digits)
                             
@@ -2463,8 +2468,8 @@ def metralleta_loop():
                                 if curr_sl == 0 or (0 < new_sl_kamikaze < curr_sl - symbol_info.point * 10): is_better = True
                                 
                             if is_better:
-                                update_sl(p.ticket, new_sl_kamikaze, f"KAMI-TRAIL (${profit:.2f})")
-                                continue # Si modificamos SL, continuamos el loop para no pelear con otros cierres
+                                update_sl(p.ticket, new_sl_kamikaze, f"KAMI-TRL (${profit:.2f})")
+                                continue # Cortar el loop si ya le movimos el SL a nivel de ganancia
 
                     # 1. Trailing Dinámico para mercados rápidos
                     if is_fast and profit >= 1.05:
