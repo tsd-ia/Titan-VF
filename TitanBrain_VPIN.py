@@ -2804,7 +2804,9 @@ def metralleta_loop():
                         "alertas": alertas_list[-15:],
                         "health": {"mt5": True if acc else False, "ai": "FAILED" not in ai_status},
                         "active": mission_state.get("active", False),
-                        "market": get_market_warning() or "OPEN 🟢"
+                        "market": get_market_warning() or "OPEN 🟢",
+                        "oro_brain_on": STATE.get("oro_brain_on", True),
+                        "btc_brain_on": STATE.get("btc_brain_on", True)
                     }
                     push_firebase(fb_payload)
                 except Exception as fe:
