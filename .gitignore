@@ -1,0 +1,28 @@
+# Dependencias
+node_modules/
+.venv/
+__pycache__/
+*.pyc
+
+# Next.js
+.next/
+out/
+.env*.local
+
+# Android (Limpieza total)
+.gradle/
+build/
+*.apk
+*.iml
+.idea/
+
+# Bot Stats & Config local
+titan_settings.json
+titan_mission.json
+titan_command.txt
+*.log
+logs/
+titan_telemetry.csv
+
+# Keep models for portability
+!models/*.h5
