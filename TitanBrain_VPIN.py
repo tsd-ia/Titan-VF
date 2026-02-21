@@ -179,7 +179,8 @@ OLLAMA_MODELS = ["gpt-oss:20b-cloud", "gpt-oss:120b-cloud", "deepseek-coder:1.3b
 OLLAMA_FAIL_COUNT = 0
 
 def call_ollama(prompt):
-    """ Consulta al Cerebro con Fallback de Nube a Local """
+    """ Consulta al Cerebro (DESACTIVADO A PETICIÓN PARA AHORRAR CUOTA) """
+    return "IA EN HOLD (Mando de Usuario). Operando con Oracle de Binance.", "LOCAL_LSTM"
     global OLLAMA_FAIL_COUNT
     for i, model in enumerate(OLLAMA_MODELS):
         try:
@@ -266,6 +267,15 @@ def firebase_command_poller():
                             if val != STATE.get("btc_brain_on"):
                                 STATE["btc_brain_on"] = val
                                 log(f"🧠 MANDO WEB: Cerebro BTC {'ACTIVADO' if val else 'DESACTIVADO'}")
+                        if "auto_mode" in cmds:
+                            val = bool(cmds["auto_mode"])
+                            if val != STATE.get("auto_mode", False):
+                                STATE["auto_mode"] = val
+                                log(f"🔫 MANDO WEB: Autonomous Fire {'ON' if val else 'OFF'}")
+                        if "start_mission" in cmds and cmds["start_mission"]:
+                            log("🎯 MANDO WEB: FORCING START MISSION!")
+                            start_mission(target_profit=500.0)
+                            requests.patch(url, json={"start_mission": False})
                         if "panic" in cmds and cmds["panic"]:
                             log("🚨 MANDO WEB: ¡BOTÓN DE PÁNICO ACTIVADO!")
                             stop_mission()
@@ -592,6 +602,17 @@ def close_ticket(pos, reason="UNK"):
 
     if res and res.retcode == mt5.TRADE_RETCODE_DONE:
         log(f"✅ CIERRE EXITOSO #{pos.ticket} [{reason}]: Profit {pos.profit:.2f} | {latency_ms:.1f}ms")
+        
+        # --- NOTIFICACIÓN TELEGRAM (CADA CIERRE) ---
+        try:
+            tg_token = os.getenv('TELEGRAM_TOKEN', '7233633800:AAFSB4rXyB7b3jYlS9gQnE19NlNK06s8FKE') # Token de emergencia si no hay env
+            tg_chat = os.getenv('TELEGRAM_CHAT_ID', '1359302187') # Chat ID por defecto del usuario
+            if tg_token and tg_chat:
+                emo = "🟩 WIN" if profit > 0 else "🟥 LOSS"
+                msg = f"TITAN {emo}\nActivo: {pos.symbol}\nProfit: ${profit:.2f}\nRazón: {reason}\nEquidad: ${mt5.account_info().equity:.2f}"
+                requests.get(f"https://api.telegram.org/bot{tg_token}/sendMessage?chat_id={tg_chat}&text={msg}", timeout=2)
+        except: pass
+        
         # ACTUALIZAR MEMORIA TÁCTICA (v7.46: Detectar WIN/LOSS real)
         LAST_CLOSE_TS[pos.symbol] = time.time()
         # Si el profit individual es positivo, es WIN. Si no, es LOSS.
@@ -1331,6 +1352,21 @@ def process_symbol_task(sym, active, mission_state):
         LAST_PROBS[sym] = raw_prob_pred
         raw_prob = raw_prob_pred  
         
+        # --- ORACULO DE BINANCE (OVERRIDE MAESTRO LEAD-LAG) ---
+        try:
+            # Apagamos Ollama por defecto si usamos oráculo para no gastar cuota 
+            # (IA seguirá prediciendo con LSTM local rápido)
+            if os.path.exists("titan_oracle_signal.json"):
+                with open("titan_oracle_signal.json", "r") as f:
+                    oracle_data = json.load(f)
+                    # Solo consideramos válido si la ballena nadó hace menos de 2 segundos
+                    if time.time() - oracle_data["timestamp"] < 2.0:
+                        if oracle_data["symbol"] == sym or sym == "BTCUSDm":
+                            sig_pred = oracle_data["signal"]
+                            conf_pred = 1.0 # Override 100%
+                            if now % 2 < 1: log(f"⚡ ORÁCULO APLICADO: {sig_pred} ({oracle_data['reason']})")
+        except: pass
+        
         # v18.9.3: RECONEXIÓN CRÍTICA - Asignar señal de IA al ciclo
         sig = sig_pred
         conf = conf_pred
@@ -1647,6 +1683,11 @@ def process_symbol_task(sym, active, mission_state):
         block_action = block_council # FIXED: Respect Council Vetoes
         block_reason = block_council_reason
         
+        # v18.9.99: VETO MAESTRO WEB (Autonomous Fire)
+        if not STATE.get("auto_mode", False):
+            block_action = True
+            block_reason = "VETO WEB: AUTONOMOUS FIRE APAGADO"
+            
         # v16.5: Blindaje de Extremos Bollinger (Anti-Suicidio)
         # Prohibido vender en el suelo o comprar en el techo, sin excepciones de IA.
         # v8.7: SI ESTAMOS EN PELEO/ESPEJO, BYPASSEAMOS FILTROS DE SEGURIDAD
@@ -2434,9 +2475,10 @@ def metralleta_loop():
                     if p.magic == 0 and now_loop % 30 < 1:
                         log(f"🛡️ PROTEGIENDO POSICIÓN MANUAL: {sym} (${profit:.2f})")
                     
-                    # === PROTOCOLO DE $8 HARD STOP (SUPERVIVENCIA v18.9.77) ===
-                    if profit <= -8.0:
-                        log(f"🚨 HARD STOP ACTIVADO: {sym} alcanzó límite de -$8.00. Cerrando.")
+                    # === PROTOCOLO DE $25 HARD STOP (v18.9.77) ===
+                    # El usuario indicó que prefiere arriesgar los $25 para aguantar la volatilidad extrema.
+                    if profit <= -25.0:
+                        log(f"🚨 HARD STOP ACTIVADO: {sym} alcanzó límite de -$25.00. Cerrando.")
                         close_ticket(p, "HARD_STOP_USER"); continue
 
                     # === PROTOCOLO DE TRIPLE TRAILING (v18.9.80) ===
@@ -2834,7 +2876,8 @@ def metralleta_loop():
                         "active": mission_state.get("active", False),
                         "market": get_market_warning() or "OPEN 🟢",
                         "oro_brain_on": STATE.get("oro_brain_on", True),
-                        "btc_brain_on": STATE.get("btc_brain_on", True)
+                        "btc_brain_on": STATE.get("btc_brain_on", True),
+                        "auto_mode": STATE.get("auto_mode", False)
                     }
                     push_firebase(fb_payload)
                 except Exception as fe:
