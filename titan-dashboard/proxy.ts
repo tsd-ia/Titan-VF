@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-// Fallback robusto para el password en 2026
 const DASHBOARD_PASSWORD = process.env.DASHBOARD_PASSWORD || "TitanSentinel2026";
 
-export function middleware(request: NextRequest) {
+export default function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // 1. Permitir Login, API y archivos estáticos sin filtros
@@ -12,7 +11,7 @@ export function middleware(request: NextRequest) {
         pathname === "/login" ||
         pathname.startsWith("/api") ||
         pathname.startsWith("/_next") ||
-        pathname.includes(".") // Para archivos en public como favicon.ico, etc.
+        pathname.includes(".")
     ) {
         return NextResponse.next();
     }
@@ -31,13 +30,6 @@ export function middleware(request: NextRequest) {
 
 export const config = {
     matcher: [
-        /*
-         * Match all request paths except for the ones starting with:
-         * - api (API routes)
-         * - _next/static (static files)
-         * - _next/image (image optimization files)
-         * - favicon.ico (favicon file)
-         */
         "/((?!api|_next/static|_next/image|favicon.ico).*)",
     ],
 };
