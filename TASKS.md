@@ -10,7 +10,7 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 
 ## 🟡 FASE 2: DESPLIEGUE Y ESTABILIDAD (EN PROGRESO)
 - [ ] Resolver bloqueo "Overdue" en Vercel.
-- [ ] Vincular nuevo repositorio `Titan-VF` a Vercel.
+- [x] Vincular nuevo repositorio `Titan-VF` a Vercel.
 - [ ] Verificar sincronización de Firebase desde la nueva carpeta.
 - [x] Testear lotajes adaptativos en mercado real (Oro/BTC).
 
