@@ -2008,7 +2008,7 @@ def process_symbol_task(sym, active, mission_state):
                     # --- ENFRIAMIENTO DINÁMICO v18.9.12 (Ajuste Máxima Potencia) ---
                     close_time = LAST_CLOSE_TS.get(sym, 0)
                     is_last_win = LAST_CLOSE_DIR.get(sym) == "WIN"
-                    wait_time = 10 if is_last_win else 20 # v18.9.12: Ultra-Rápido
+                    wait_time = 1 if is_last_win else 3 # MODO URGENCIA CUMPLEAÑOS: Metralleta real (Sin demoras)
                     
                     if (now - close_time) < wait_time:
                         block_action = True
@@ -2055,11 +2055,11 @@ def process_symbol_task(sym, active, mission_state):
                         
                         # v12.1: DELAY REDUCIDO EN EXTREMOS RSI
                         rsi_extreme = (rsi_val < 35 or rsi_val > 65)
-                        base_delay = 20 if rsi_extreme else 45
+                        base_delay = 1 # KAMIKAZE
                         
                         # v9.9.1: En espejo, permitimos ráfaga rápida (3s) y proximidad
-                        req_delay = 3 if MIRROR_MODE else base_delay
-                        min_dist = 0.05 if MIRROR_MODE else 0.35 # v18.9.9: Distancia reducida para llenar las 5 balas
+                        req_delay = 1 # KAMIKAZE
+                        min_dist = 0.05 # KAMIKAZE
                         
                         # HEDGING INSTANTÁNEO
                         if is_contrarian: 
@@ -2443,6 +2443,12 @@ def metralleta_loop():
                     m_speed_current = STATE.get("market_speed_val", 20.0)
                     is_fast = m_speed_current > 100 # Mercado volátil/rápido
                     
+                    # 0. MODO KAMIKAZE: CIERRE RELÁMPAGO (CUMPLEAÑOS)
+                    if profit >= 0.50 and (now_loop - p.time) < 30: # Asegurar la moneda de inmediato
+                        log(f"⚡ KAMIKAZE EXIT: Micro-profit asegurado +${profit:.2f} en {(now_loop - p.time):.0f}s rapidísimo.")
+                        close_ticket(p, "KAMIKAZE_EXIT")
+                        continue
+
                     # 1. Trailing Dinámico para mercados rápidos
                     if is_fast and profit >= 1.05:
                         # Si es rápido y tenemos >$1, NO CERRAR. Dejar que PACMAN o el Trailing del EA lo gestionen.
@@ -2453,8 +2459,8 @@ def metralleta_loop():
                             log(f"🧠 GIRO IA RÁPIDO: Cerrando {sym} con ${profit:.2f} por señal contraria.")
                             close_ticket(p, "QUANTUM_FLIP"); continue
                     
-                    # 2. Cierre de Hierro Normal (Meta de $1.05)
-                    elif not is_fast and profit >= 1.05:
+                    # 2. Cierre de Hierro Normal (Meta de $0.85 en Kamikaze)
+                    elif not is_fast and profit >= 0.85:
                         adv = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
                         is_contrarian = (p.type == mt5.ORDER_TYPE_BUY and adv["sig"] == "SELL") or (p.type == mt5.ORDER_TYPE_SELL and adv["sig"] == "BUY")
                         if is_contrarian or (now_loop % 45 < 1):
@@ -2462,10 +2468,10 @@ def metralleta_loop():
                             close_ticket(p, "IRON_PROFIT_v21"); continue
                     
                     # 3. Cierre Micro en mercado estancado (Trailing Ultra-Corto)
-                    elif profit >= 0.45:
+                    elif profit >= 0.30:
                         trade_life = now_loop - p.time
-                        if trade_life > 60: # Más de 1 minuto sin avanzar
-                            log(f"🐜 MICRO-CIERRE (LENTO): Asegurando ${profit:.2f} por estancamiento.")
+                        if trade_life > 20: # Más de 20s sin avanzar -> Cortar rápido
+                            log(f"🐜 MICRO-CIERRE (LENTO): Asegurando ${profit:.2f} por estancamiento (20s).")
                             close_ticket(p, "SLOW_MARKET_EXIT"); continue
                     
                     symbol_info = mt5.symbol_info(sym)
