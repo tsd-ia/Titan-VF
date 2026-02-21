@@ -124,9 +124,9 @@ def global_health_check():
 
 # --- CONFIGURACIÓN DE GESTIÓN ---
 MAX_BULLETS = 3  # v18.9.94: 3 balas - bala 2 y 3 solo si anterior positiva
-MAX_DAILY_LOSS = -10.0  # v18.9.93: Ultra-conservador para recuperar $19
+MAX_DAILY_LOSS = 0.85 # -85% equidad = Stop loss global (Sobrevivencia = Mínimo $15.0)9
 MAX_SESSION_LOSS = -8.0  # v18.9.93: Máximo -$8 por sesión
-MIN_EQUITY_TO_TRADE = 18.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $18, bot se congela
+MIN_EQUITY_TO_TRADE = 10.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $10, bot se congela
 LAST_ENTRY_PRICE = {} # Memoria de precio para evitar apilar en el mismo punto
 LAST_HEARTBEAT = {} 
 LAST_SIGNALS = {} # Memoria para no repetir órdenes (RSI extremo)
@@ -1267,12 +1267,12 @@ def process_symbol_task(sym, active, mission_state):
         
         # v18.9.93: GUARDIA MÍNIMA DE CAPITAL - INQUEBRANTABLE
         if acc:
-            current_equity = acc.equity
-            if current_equity < MIN_EQUITY_TO_TRADE:
-                if now % 30 < 1:
-                    log(f"🚨 CUENTA CONGELADA: Equity ${current_equity:.2f} < mínimo ${MIN_EQUITY_TO_TRADE}. Bot en pausa total.")
-                return {"symbol": sym, "signal": "HOLD", "confidence": 0.0, "ai": 0.5, "rsi": 50,
-                        "lot": 0.01, "state": "❄️", "profit": 0.0, "bb_pos": 0.5, "m5_trend": "⚪", "h1_trend": "NONE"}
+        # --- FAILSAFE DE SUPERVIVENCIA (Equidad Mínima) ---
+            pnl = acc.equity - mission_state.get("start_equity", acc.equity)
+            if acc.equity < 10.0: # MODO DE SUPERVIVENCIA EXTREMA ACTIVADO (bajado a 10.0)
+                if now % 30 < 1: log(f"🚨 CUENTA CONGELADA: Equity ${acc.equity:.2f} < mínimo $10.0. Bot en pausa total.")
+                time.sleep(1); return {"symbol": sym, "signal": "HOLD", "confidence": 0.0, "ai": 0.5, "rsi": 50,
+                            "lot": 0.01, "state": "❄️", "profit": 0.0, "bb_pos": 0.5, "m5_trend": "⚪", "h1_trend": "NONE"}
         
         n_balas_reales = 0
         bb_pos = 0.5
