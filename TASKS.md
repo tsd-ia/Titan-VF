@@ -13,6 +13,7 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Vincular nuevo repositorio `Titan-VF` a Vercel.
 - [x] Verificar sincronización de Firebase desde la nueva carpeta.
 - [x] Testear lotajes adaptativos en mercado real (Oro/BTC).
+- [x] Implementar control independiente de cerebros (Oro/BTC) en Dashboard y VPIN.
 
 ## 🚀 FASE 3: OPTIMIZACIÓN IA (PENDIENTE)
 - [ ] Refinar modelo LSTM de Bitcoin con más datos históricos.
