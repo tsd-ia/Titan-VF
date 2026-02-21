@@ -2434,9 +2434,9 @@ def metralleta_loop():
                     if p.magic == 0 and now_loop % 30 < 1:
                         log(f"🛡️ PROTEGIENDO POSICIÓN MANUAL: {sym} (${profit:.2f})")
                     
-                    # === PROTOCOLO DE $25 HARD STOP (v18.9.77) ===
-                    if profit <= -25.0:
-                        log(f"🚨 HARD STOP ACTIVADO: {sym} alcanzó límite de -$25.00. Cerrando.")
+                    # === PROTOCOLO DE $8 HARD STOP (SUPERVIVENCIA v18.9.77) ===
+                    if profit <= -8.0:
+                        log(f"🚨 HARD STOP ACTIVADO: {sym} alcanzó límite de -$8.00. Cerrando.")
                         close_ticket(p, "HARD_STOP_USER"); continue
 
                     # === PROTOCOLO DE TRIPLE TRAILING (v18.9.80) ===
