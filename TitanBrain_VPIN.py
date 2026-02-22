@@ -1081,7 +1081,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.170 | INDEPENDENT BUCKETS (3-3-5) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.185 | STABILITY FIX | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1378,6 +1378,7 @@ def process_symbol_task(sym, active, mission_state):
         now_dt = datetime.fromtimestamp(now)
         acc = mt5.account_info() # v18.8.1: Definición externa proactiva
         
+        positions = mt5.positions_get() or []
         # v18.9.175: VIGILANCIA POR SÍMBOLO (No bloquea a los demás)
         pos_list = [p for p in positions if p.symbol == sym]
         sym_pnl = sum(p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0) for p in pos_list)
