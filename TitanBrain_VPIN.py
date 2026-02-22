@@ -1074,7 +1074,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.155 | GOD MODE 280K | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.160 | TRIPLE ORACLE (XAU/BTC/CRYPTO) | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1468,6 +1468,17 @@ def process_symbol_task(sym, active, mission_state):
                             is_oracle_signal = True
                             oracle_volume = c_sig.get("volume", 0) # Capturar volumen
                             log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
+
+            # 3. Oráculo Oro (XAUUSDm) - v18.9.160
+            if os.path.exists("titan_gold_signals.json") and ("XAU" in sym or "Gold" in sym):
+                with open("titan_gold_signals.json", "r") as f:
+                    gold_sig = json.load(f)
+                    if time.time() - gold_sig["timestamp"] < 10.0:
+                        sig_pred = gold_sig["signal"]
+                        conf_pred = 0.98
+                        is_oracle_signal = True
+                        oracle_volume = gold_sig.get("volume", 0)
+                        log(f"🔱 ORÁCULO ORO: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
         except Exception as e: 
             if random.random() < 0.01: log(f"⚠️ Error lectura oráculos: {e}")
         

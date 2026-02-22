@@ -25,11 +25,13 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Sincronización v18.9.150 (Triple Brain Fix).
 - [x] Ajustar umbral de ballenas BTC a $220k.
 
-## 🌐 FASE 5: CEREBRO TRIPLE (CRYPTO)
+## 🌐 FASE 5: CEREBRO TRIPLE (CRYPTO & GOLD)
 - [x] Crear Oráculo Crypto (`Titan_Oracle_Crypto.py`).
-- [x] Integrar 3er Cerebro en el Core (`v18.9.150`).
+- [x] Crear Oráculo de Oro (`Titan_Oracle_Gold.py`).
+- [x] Integrar 3er Cerebro en el Core (`v18.9.160`).
 - [x] Añadir control Crypto en Dashboard (v7.9).
 - [x] Configurar lotajes específicos para SOL/ETH.
+- [x] Regla de Oro $280k (God Mode) para todos los activos.
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*
