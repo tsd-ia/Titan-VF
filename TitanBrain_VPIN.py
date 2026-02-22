@@ -2011,12 +2011,12 @@ def process_symbol_task(sym, active, mission_state):
         if sig == "BUY" and df.iloc[-1]['close'] < df.iloc[-2]['close']:
             block_action = True; block_reason = "PRECIO CAYENDO (Veto M1)"
 
-        is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason
+        is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason or "SPREAD BALLENA" in block_reason or "SPREAD PROHIBITIVO" in block_reason or "ANTI-WHIPSAW" in block_reason
         
-        if block_action and not is_oracle_signal:
+        if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
         else:
-            if block_action and (super_conf or is_oracle_signal):
+            if block_action and (super_conf or (is_oracle_signal and not is_hard_blocked)):
                 log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
             target_sig = sig if sig != "HOLD" else "HOLD"
 
@@ -2092,7 +2092,7 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = True
                     block_reason = f"ANTI-WHIPSAW: Bloqueo re-entrada {target_sig} tras pérdida (180s)"
                 
-                if not block_action or super_conf or is_oracle_signal:
+                if not block_action or super_conf or (is_oracle_signal and not is_hard_blocked):
                     should_fire = True
                     trigger_type = "CAMBIO" if not super_conf else "IA-OVERRIDE"
                 elif now % 20 < 1:
@@ -2102,7 +2102,7 @@ def process_symbol_task(sym, active, mission_state):
                 log(f"📡 ESTATUS: IA en {sig} ({conf*100:.1f}%) pero BLOQUEADO por {block_reason}. Vigilando...")
             # Caso B: Acumular (Piramidación Inteligente v7.60)
             elif target_sig == LAST_SIGNALS.get(sym):
-                if not block_action or is_oracle_signal:
+                if not block_action or (is_oracle_signal and not is_hard_blocked):
                     # --- PIRAMIDACIÓN INTELIGENTE v7.60 ---
                     # Bala 1: Entrada normal (ya fue Caso A)
                     # Bala 2: Si la bala 1 ya va ganando O si hay momentum fuerte
@@ -2179,7 +2179,7 @@ def process_symbol_task(sym, active, mission_state):
                         if is_contrarian: 
                             req_delay = 0; min_dist = 0
                     
-                    if sig != "HOLD" and (not block_action or is_oracle_signal):
+                    if sig != "HOLD" and (not block_action or (is_oracle_signal and not is_hard_blocked)):
                         dist_val = abs(curr_price - last_price)
                         n_balas = len(pos_list)
                         
@@ -2230,7 +2230,7 @@ def process_symbol_task(sym, active, mission_state):
                         if n_balas == 0 and not is_urgent_continuation:
                              # v16.7: Solo entrar si NO hay bloqueos de Bollinger/Spread
                              # v18.9.120: ORACLE BYPASS total de bloqueos tácticos
-                             if (not block_action or is_oracle_signal) and conf >= 0.60:  
+                             if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= 0.60:  
                                  should_fire = True
                              else:
                                  should_fire = False
@@ -2378,7 +2378,7 @@ def process_symbol_task(sym, active, mission_state):
             # v18.1: Blindaje de Envío de Señal
             # Solo enviar si NO hay bloqueos o si es un refresco de una señal ya existente
             # v18.9.24: Liberación de Gatillo - IA 97%+ / Oracle ignora bloqueos tácticos (M5/Trend)
-            if target_sig in ["BUY", "SELL"] and (not block_action or super_conf or is_oracle_signal):
+            if target_sig in ["BUY", "SELL"] and (not block_action or super_conf or (is_oracle_signal and not is_hard_blocked)):
 
                 should_send = False
                 if should_fire: should_send = True # Disparo forzado (nuevo o stacking)
