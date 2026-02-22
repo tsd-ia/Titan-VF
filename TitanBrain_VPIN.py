@@ -1102,7 +1102,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.230 | ANTI-SPAM II | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.245 | PRECISION FIRE | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2132,9 +2132,8 @@ def process_symbol_task(sym, active, mission_state):
             LAST_OLLAMA_CACHE[sym] = {'rsi': rsi_val, 'bb': bb_pos, 'sig': target_sig, 'res': ai_reply, 'model': model_used}
             with state_lock: STATE["last_ollama_res"] = f"[{model_used}] {ai_reply}"
             
-            # v18.9.200: GOD MODE BYPASS - Si es señal institucional masiva, ignorar veto IA.
-            # Umbral de domingo reducido a $150k
-            is_god_mode = oracle_volume >= 150000 
+            # v18.9.240: GOD MODE BYPASS - Umbral Crypto adaptado a SOL ($80k)
+            is_god_mode = oracle_volume >= 80000 
             
             if "SI" in ai_reply.upper() or is_god_mode:
                 if is_god_mode: 
@@ -2354,22 +2353,17 @@ def process_symbol_task(sym, active, mission_state):
                                 should_fire = False
                                 if now % 20 < 1: log(f"🛑 LIMITE: {n_balas}/{current_max_bullets} balas activas.")
 
-                        # --- GESTIÓN ADAPTATIVA DE BALAS v18.9.225 (Blindaje Total) ---
-                        # v18.9.225: Limite Rígido de Seguridad (No más de 6 bajo ninguna circunstancia)
-                        hard_limit = min(6, current_max_bullets)
-                        
-                        if n_balas >= hard_limit:
-                            should_fire = False
-                            if now % 20 < 1: log(f"🛑 LIMITE RIGIDO: {n_balas}/{hard_limit} balas en {sym}. Bloqueando.")
-                        
-                        # --- VERIFICACIÓN ATÓMICA FINAL DE DISPARO ---
+                        # --- VERIFICACIÓN ATÓMICA FINAL DE DISPARO (v18.9.240) ---
                         if should_fire:
                             with state_lock:
-                                last_fire_ts = STATE.get(f"firing_{sym}", 0)
-                                if (now - last_fire_ts) < 8.0: # 8s de silencio total entre órdenes del mismo activo
+                                # Usar tiempo de alta precisión para evitar race conditions simultáneas
+                                now_precise = time.perf_counter()
+                                last_fire_precise = STATE.get(f"fire_precise_{sym}", 0)
+                                if (now_precise - last_fire_precise) < 8.0: 
                                     should_fire = False
                                 else:
-                                    STATE[f"firing_{sym}"] = now
+                                    STATE[f"fire_precise_{sym}"] = now_precise
+                                    STATE[f"firing_{sym}"] = time.time()
                                     # Conservar trigger_type asignado arriba
                                     pass
                         
@@ -2460,16 +2454,14 @@ def process_symbol_task(sym, active, mission_state):
                     stop_mission()
                     should_fire = False 
                     block_action = True
-                else:
-                    # Si no hay posiciones pero el mercado cerró, también nos aseguramos de apagar
-                    if mission_state.get("active"):
-                        stop_mission()
+                if is_market_closed(sym):
+                    # v18.9.245: NO detener la misión completa por un cierre diario de un símbolo.
                     block_action = True
-                    block_reason = "MERCADO CERRADO (18:45-20:05)"
-            elif bloqueo_entrada:
-                if len(pos_list) == 0:
-                    block_action = True
-                    block_reason = "RESTRICCIÓN PRE-CIERRE (18:30)"
+                    block_reason = "CIERRE DIARIO (19:00 - 20:00)"
+                elif bloqueo_entrada:
+                    if len(pos_list) == 0:
+                        block_action = True
+                        block_reason = "RESTRICCIÓN PRE-CIERRE (18:30)"
 
         # --- BOTÓN DE PÁNICO (Última defensa - SUBIDO A $150) ---
         if sym_pnl <= -150.0 and len(pos_list) > 0:
@@ -2486,24 +2478,26 @@ def process_symbol_task(sym, active, mission_state):
             time_since_last = now - LAST_HEARTBEAT.get(sym, 0)
             is_heartbeat = time_since_last > 5.0
             
-            # v18.1: Blindaje de Envío de Señal
-            # v18.9.175: Si está en vigilancia por pérdida, NO DISPARAR nuevas balas.
+            # v18.9.245: Si está en vigilancia por pérdida, NO DISPARAR nuevas balas.
             if is_vigilancia_blocked and not is_oracle_signal:
                 should_send = False
-            elif target_sig in ["BUY", "SELL"] and (not block_action or super_conf or (is_oracle_signal and not is_hard_blocked)):
-
-                should_send = False
-                if should_fire: should_send = True # Disparo forzado (nuevo o stacking)
-                elif is_heartbeat and target_sig == LAST_SIGNALS.get(sym): should_send = True # Heartbeat normal
+            elif target_sig in ["BUY", "SELL"]: 
+                # v18.9.245: Si es Oráculo, ignorar bloqueos suaves (Veto M1, etc)
+                can_pass_block = not block_action or super_conf or (is_oracle_signal and not is_hard_blocked)
                 
-                if should_send:
-                    # v18.9.45: VALIDACIÓN DE EXCLUSIÓN DE PRECIO (Anti-Metralleta)
-                    tick = mt5.symbol_info_tick(sym)
-                    price = tick.ask if target_sig == "BUY" else tick.bid
+                if can_pass_block:
+                    should_send = False
+                    if should_fire: should_send = True # Disparo forzado (nuevo o stacking)
+                    elif is_heartbeat and target_sig == LAST_SIGNALS.get(sym): should_send = True # Heartbeat normal
                     
-                    # Escanear precios de posiciones actuales
-                    too_close = False
-                    for p in pos_list:
+                    if should_send:
+                        # v18.9.45: VALIDACIÓN DE EXCLUSIÓN DE PRECIO (Anti-Metralleta)
+                        tick = mt5.symbol_info_tick(sym)
+                        price = tick.ask if target_sig == "BUY" else tick.bid
+                        
+                        # Escanear precios de posiciones actuales
+                        too_close = False
+                        for p in pos_list:
                         dist_to_pos = abs(price - p.price_open)
                         if dist_to_pos < 0.35: # 350 puntos de zona prohibida
                             too_close = True
