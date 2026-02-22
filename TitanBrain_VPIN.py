@@ -305,16 +305,17 @@ mission_state = {
     "max_profit": -9999.0  # Movido aquí para persistencia v15.20
 }
 
-# Configuración Dinámica (Lote) - v15.2 (CALIBRE RECUPERADO)
+# Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 1500, "tp": 999999}, # $15 stop individual | 0.01 lot recuperación
-    "BTCUSDm": {"lot": 0.06, "sl": 3000, "tp": 15000}, # Usuario: 0.06 LOT | SL=3000pts (fin de semana)
-    "GBPUSDm": {"lot": 0.02, "sl": 250, "tp": 1000},
-    "EURUSDm": {"lot": 0.02, "sl": 250, "tp": 1000},
-    "US30m": {"lot": 0.02, "sl": 2500, "tp": 10000},
-    "NAS100m": {"lot": 0.02, "sl": 2500, "tp": 10000}
+    "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
+    "BTCUSDm": {"lot": 0.01, "sl": 250000, "tp": 15000}, # Usuario: 0.01 LOT | MODO BUNKER
+    "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
+    "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
+    "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000},
+    "NAS100m": {"lot": 0.02, "sl": 12500, "tp": 10000}
 }
-DEFAULT_CONFIG = {"lot": 0.02, "sl": 500, "tp": 250}
+DEFAULT_CONFIG = {"lot": 0.01, "sl": 1000, "tp": 250}
+
 
 TIMEFRAME = mt5.TIMEFRAME_M1
 LOOKBACK_PERIOD = 120  # SYNC v5.5 Sniper
@@ -581,19 +582,35 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
         max_bullets = 1
     elif balance < 100.0:
         max_bullets = 2
-    else:
-        max_bullets = 3
-        
-    # 2. Definir Lotaje Inteligente según RULES.md
-    if balance < 50.0:
-        # Lote: 0.01 (máximo 0.03 si la IA tiene >90% conf)
-        smart_lot = 0.03 if (conf > 0.90 and 30 < rsi_val < 70) else 0.01
-    elif balance < 100.0:
-        smart_lot = 0.04 if conf > 0.85 else 0.02
-    else:
-        smart_lot = 0.06 if conf > 0.85 else 0.03
-        
     return max_bullets, smart_lot
+
+def get_bunker_sl_price(sym, lot, side, price):
+    """ v18.9.115: REGLA DE ORO DEL JEFE - SL FIJO A $25 USD """
+    try:
+        s_info = mt5.symbol_info(sym)
+        if not s_info: return 0.0
+        
+        # REGLA MAESTRA: $25 USD de pérdida permitida
+        target_loss = 25.0
+        
+        # Formula: PriceDelta = Loss / (Lot * ContractSize)
+        cs = s_info.trade_contract_size
+        if cs <= 0: cs = 1.0 # Seguridad para no dividir por cero
+        
+        # Delta es el cambio en el precio que produce la pérdida deseada
+        delta = target_loss / (lot * cs)
+        
+        if side == mt5.ORDER_TYPE_BUY or side == "BUY":
+            sl_final = price - delta
+        else:
+            sl_final = price + delta
+            
+        return round(sl_final, s_info.digits)
+    except Exception as e:
+        log(f"⚠️ Error get_bunker_sl: {e}")
+        # Fallback ultra-seguro (SL astronómico)
+        return round(price - 2000.0, 2) if side in [mt5.ORDER_TYPE_BUY, "BUY"] else round(price + 2000.0, 2)
+
 
 def close_ticket(pos, reason="UNK"):
     # v18.5: LEY DE PROTECCIÓN DE CAPITAL - PROHIBIDO CERRAR EN NEGATIVO
@@ -1947,18 +1964,22 @@ def process_symbol_task(sym, active, mission_state):
                 # v18.9.55: GATILLO ATÓMICO DIRECTO PARA BALA OBLIGATORIA
                 # Ya no usamos send_signal() lento con archivos, disparamos directo al broker.
                 tick = mt5.symbol_info_tick(sym)
-                price = tick.ask if sig == "BUY" else tick.bid # Changed rec_sig to sig
-                sl_val = ASSET_CONFIG[sym]["sl"]
-                # Calcular SL
-                sl_price = price - (sl_val * mt5.symbol_info(sym).point) if sig == "BUY" else price + (sl_val * mt5.symbol_info(sym).point) # Changed rec_sig to sig
+                price = tick.ask if sig == "BUY" else tick.bid 
+                final_lot = ASSET_CONFIG[sym]["lot"]
+                
+                # v18.9.115: GATILLO BUNKER $25 USD
+                side_mt5 = mt5.ORDER_TYPE_BUY if sig == "BUY" else mt5.ORDER_TYPE_SELL
+                sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
+
 
                 request = {
                     "action": mt5.TRADE_ACTION_DEAL,
                     "symbol": sym,
-                    "volume": ASSET_CONFIG[sym]["lot"],
-                    "type": mt5.ORDER_TYPE_BUY if sig == "BUY" else mt5.ORDER_TYPE_SELL, # Changed rec_sig to sig
+                    "volume": final_lot,
+                    "type": side_mt5,
                     "price": price,
                     "sl": sl_price,
+
                     "magic": 777,
                     "comment": "TITAN-START-ATOMIC",
                     "type_time": mt5.ORDER_TIME_GTC,
@@ -2373,16 +2394,18 @@ def process_symbol_task(sym, active, mission_state):
                         if now % 10 < 1: log(f"⏳ ZONA PROHIBIDA: Precio demasiado cerca de bala existente. Esperando espacio...")
                         return
                     
-                    # Proceder con el disparo si hay espacio
-                    sl_val = ASSET_CONFIG[sym]["sl"]
-                    sl_price = price - (sl_val * mt5.symbol_info(sym).point) if target_sig == "BUY" else price + (sl_val * mt5.symbol_info(sym).point)
+                    # v18.9.115: REGLA BUNKER $25 USD (Recuperación/Stacking)
+                    side_mt5 = mt5.ORDER_TYPE_BUY if target_sig == "BUY" else mt5.ORDER_TYPE_SELL
+                    final_lot = ASSET_CONFIG[sym]["lot"]
+                    sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
 
                     request = {
                         "action": mt5.TRADE_ACTION_DEAL,
-                        "symbol": sym, "volume": ASSET_CONFIG[sym]["lot"],
-                        "type": mt5.ORDER_TYPE_BUY if target_sig == "BUY" else mt5.ORDER_TYPE_SELL,
+                        "symbol": sym, "volume": final_lot,
+                        "type": side_mt5,
                         "price": price, "sl": sl_price, "magic": 777,
-                        "comment": f"TITAN-RECOVERY-{trigger_type}",
+                        "comment": f"TITAN-BUNKER-25USD",
+
                         "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC,
                     }
                     
