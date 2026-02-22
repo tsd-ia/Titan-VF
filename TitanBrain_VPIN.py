@@ -65,9 +65,11 @@ def kill_previous_instances():
         for proc in psutil.process_iter(['pid', 'cmdline']):
             try:
                 cmd = proc.info.get('cmdline', [])
-                if cmd and any('TitanBrain_VPIN' in s for s in cmd):
+                # v18.9.116: Purga total (Brain + Oracle)
+                if cmd and any(kw in str(cmd) for kw in ['TitanBrain_VPIN', 'Titan_Oracle']):
                     pid = proc.info['pid']
                     if pid != current_pid:
+
                         # No matar al padre (Runner)
                         try:
                             parent = psutil.Process(current_pid).parent()
@@ -577,12 +579,19 @@ def get_equity():
 
 def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     """ Protocolo v18.9.103: Gestión de Riesgo Adaptativa """
-    # 1. Definir Límite de Balas por Saldo
+    # v18.9.116: FIX NameError smart_lot
     if balance < 50.0:
         max_bullets = 1
+        smart_lot = 0.01 # Regla Bunker: Lote mínimo para cuentas <$50
     elif balance < 100.0:
         max_bullets = 2
+        smart_lot = 0.02
+    else:
+        max_bullets = 3
+        smart_lot = 0.03
+        
     return max_bullets, smart_lot
+
 
 def get_bunker_sl_price(sym, lot, side, price):
     """ v18.9.115: REGLA DE ORO DEL JEFE - SL FIJO A $25 USD """
@@ -1959,42 +1968,11 @@ def process_symbol_task(sym, active, mission_state):
         fresh_pos = mt5.positions_get(symbol=sym)
         n_balas_frescas = len(fresh_pos) if fresh_pos else 0
         
-        if n_balas_frescas == 0 and sig in ["BUY", "SELL"] and (now - last_perm_fire) > 60 and not is_firing_now:
-            if conf >= 0.70:
-                # v18.9.55: GATILLO ATÓMICO DIRECTO PARA BALA OBLIGATORIA
-                # Ya no usamos send_signal() lento con archivos, disparamos directo al broker.
-                tick = mt5.symbol_info_tick(sym)
-                price = tick.ask if sig == "BUY" else tick.bid 
-                final_lot = ASSET_CONFIG[sym]["lot"]
-                
-                # v18.9.115: GATILLO BUNKER $25 USD
-                side_mt5 = mt5.ORDER_TYPE_BUY if sig == "BUY" else mt5.ORDER_TYPE_SELL
-                sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
+        # v18.9.116: GATILLO ATÓMICO DESACTIVADO (Solo operar por señales IA/Oracle)
+        # if n_balas_frescas == 0 and sig in ["BUY", "SELL"] and (now - last_perm_fire) > 60 and not is_firing_now:
+        #    ... (Bloque desactivado para evitar entradas no deseadas sin señal Oráculo)
+        pass
 
-
-                request = {
-                    "action": mt5.TRADE_ACTION_DEAL,
-                    "symbol": sym,
-                    "volume": final_lot,
-                    "type": side_mt5,
-                    "price": price,
-                    "sl": sl_price,
-
-                    "magic": 777,
-                    "comment": "TITAN-START-ATOMIC",
-                    "type_time": mt5.ORDER_TIME_GTC,
-                    "type_filling": mt5.ORDER_FILLING_IOC,
-                }
-                
-                res = mt5.order_send(request)
-                if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                    log(f"✅ INICIO EXITOSO: {sig} (# {res.order}) - Gatillo Directo") # Changed rec_sig to sig
-                    with state_lock: STATE[f"firing_{sym}"] = now
-                    LAST_ENTRY[sym] = now
-                    time.sleep(10) # Cooldown inicial
-                else:
-                    log(f"⚠️ FALLO API INICIO: {res.comment if res else 'Error'}. Reintentando...")
-                STATE[f"last_perm_{sym}"] = now # Moved this line from the original block
                 # The original block had STATE[f"firing_{sym}"] = now and LAST_ENTRY[sym] = now here,
                 # but the new code already has them inside the 'if res' block.
                 # The instruction provided had them outside the 'if conf' block, which is incorrect.
