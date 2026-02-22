@@ -2085,7 +2085,7 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = True
                     block_reason = f"ANTI-WHIPSAW: Bloqueo re-entrada {target_sig} tras pérdida (180s)"
                 
-                if not block_action or super_conf:
+                if not block_action or super_conf or is_oracle_signal:
                     should_fire = True
                     trigger_type = "CAMBIO" if not super_conf else "IA-OVERRIDE"
                 elif now % 20 < 1:
@@ -2095,7 +2095,7 @@ def process_symbol_task(sym, active, mission_state):
                 log(f"📡 ESTATUS: IA en {sig} ({conf*100:.1f}%) pero BLOQUEADO por {block_reason}. Vigilando...")
             # Caso B: Acumular (Piramidación Inteligente v7.60)
             elif target_sig == LAST_SIGNALS.get(sym):
-                if not block_action:
+                if not block_action or is_oracle_signal:
                     # --- PIRAMIDACIÓN INTELIGENTE v7.60 ---
                     # Bala 1: Entrada normal (ya fue Caso A)
                     # Bala 2: Si la bala 1 ya va ganando O si hay momentum fuerte
@@ -2172,7 +2172,7 @@ def process_symbol_task(sym, active, mission_state):
                         if is_contrarian: 
                             req_delay = 0; min_dist = 0
                     
-                    if sig != "HOLD" and not block_action:
+                    if sig != "HOLD" and (not block_action or is_oracle_signal):
                         dist_val = abs(curr_price - last_price)
                         n_balas = len(pos_list)
                         
