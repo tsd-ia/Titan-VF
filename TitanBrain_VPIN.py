@@ -2954,7 +2954,15 @@ def metralleta_loop():
                 STATE["human_advice"] = human_text
                 STATE["last_best_sym"] = best_asset['symbol']
             else:
-                STATE["human_advice"] = f"⌛ [{datetime.now().strftime('%H:%M:%S')}] SENTINEL: Escaneando activos..."
+                # v18.9.155: Heartbeat Dinámico basado en Cerebros ON
+                brows = []
+                with state_lock:
+                    if STATE.get("oro_brain_on"): brows.append("ORO")
+                    if STATE.get("btc_brain_on"): brows.append("BTC")
+                    if STATE.get("crypto_brain_on"): brows.append("CRYPTO")
+                
+                active_str = " + ".join(brows) if brows else "STANDBY"
+                STATE["human_advice"] = f"⌛ [{datetime.now().strftime('%H:%M:%S')}] SCANNING: {active_str}..."
 
             # --- v7.8: SINCRONIZACIÓN DASHBOARD FINAL (ALWAYS RUN) ---
             if int(now_loop) % 2 == 0:
