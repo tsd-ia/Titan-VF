@@ -80,8 +80,10 @@ def kill_previous_instances():
         pass
 
 # EJECUTAR LIMPIEZA INMEDIATA
+print("🧹 [CONSOLE] LIMPIANDO PROCESOS FANTASMA...")
 kill_port_process(8000)
 kill_previous_instances() # v15.20: Limpieza profunda de procesos huérfanos
+print("✅ LIMPIEZA COMPLETA.")
 
 # ================= CONFIG =================
 PORT = 8000
@@ -104,6 +106,7 @@ from concurrent.futures import ThreadPoolExecutor
 executor_octopus = ThreadPoolExecutor(max_workers=len(SYMBOLS) + 2)
 
 def global_health_check():
+    print("🩺 [CONSOLE] EJECUTANDO HEALTH CHECK...")
     """ Verifica la alineación de la IA y el set de features (v18.9.84) """
     try:
         if modelo_lstm:
@@ -147,6 +150,8 @@ LAST_NOTIF_CONF = {} # Memoria de alertas v7.15
 LAST_NOTIF_TIME = {} # Memoria de tiempo alertas v7.15
 LAST_CLOSE_PRICE = {} 
 LAST_CLOSE_DIR = {} 
+LAST_CLOSE_REASON = {} # v18.9.106: Para re-entrada inmediata
+LAST_CLOSE_TYPE_REAL = {} # v18.9.106: BUY/SELL real de la posicion cerrada
 GLOBAL_ADVICE = {} # NEW v7.99: Para sincronizar Cerebro y PACMAN
 MIRROR_MODE = False # v18.9.32: BLOQUEADO EN FALSE PERMANENTE (Causa de pérdidas críticas)
 
@@ -634,7 +639,11 @@ def close_ticket(pos, reason="UNK"):
             if CONSECUTIVE_LOSSES[pos.symbol] >= 2:
                 COOL_DOWN_UNTIL[pos.symbol] = time.time() + 180 
         
-        log(f"✂️ CIERRE EXITOSO #{pos.ticket} [{reason}]: Profit {pos.profit:.2f}")
+        log(f"✅ CIERRE EXITOSO #{pos.ticket} [{reason}]: Profit {pos.profit:.2f} | {latency_ms:.1f}ms")
+        
+        # Guardar razón para re-entrada inmediata v18.9.106
+        LAST_CLOSE_REASON[pos.symbol] = reason
+        LAST_CLOSE_TYPE_REAL[pos.symbol] = "BUY" if pos.type == mt5.POSITION_TYPE_BUY else "SELL"
     else:
         log(f"⚠️ Error cerrando #{pos.ticket}: {res.comment if res else 'None'}")
     return res
@@ -2145,9 +2154,21 @@ def process_symbol_task(sym, active, mission_state):
                                 if now % 30 < 1:
                                     log(f"🔴 BALA {n_balas+1} BLOQUEADA: Anterior en ${lp.profit:.2f} (necesita >$0). Esperando...")
 
-                        time_val = now - LAST_ENTRY.get(sym, 0)
-                            
-                        if n_balas == 0:
+                        # --- LÓGICA DE RE-ENTRADA INMEDIATA (ANTI-NOISE) v18.9.106 ---
+                        # Si cerramos por Trailing (SUIZO) pero la señal sigue siendo BRUTAL (>88%), 
+                        # abrimos de nuevo ignorando el cooldown de 15s.
+                        just_closed_trailing = "SUIZO" in LAST_CLOSE_REASON.get(sym, "")
+                        same_direction = target_sig == LAST_CLOSE_TYPE_REAL.get(sym, "")
+                        is_urgent_continuation = just_closed_trailing and same_direction and conf > 0.88
+                        
+                        if is_urgent_continuation and active and n_balas == 0:
+                            log(f"🔄 RE-ENTRADA INMEDIATA: La señal sigue fuerte ({conf*100:.0f}%) tras cierre por ruido. Continuando cacería...")
+                            should_fire = True
+                            trigger_type = "CONTINUACIÓN-PRO"
+                            # Limpiamos la razón para no loopear infinitamente
+                            LAST_CLOSE_REASON[sym] = "RE-ENTERED"
+
+                        if n_balas == 0 and not is_urgent_continuation:
                              # v16.7: Solo entrar si NO hay bloqueos de Bollinger/Spread
                              if not block_action and conf >= 0.60:  # v18.9.91: Bajado a 60% para modo autonomo nocturno
                                  should_fire = True
@@ -2358,6 +2379,7 @@ def metralleta_loop():
     global LAST_LATENCY, LAST_LATENCY_UPDATE # v15.53: Fix Scope Error
     log("======================================================")
     log("🚀 OCTOPUS 2.0 INITIALIZING... (Parallel Mode)")
+    print("🚀 [CONSOLE] OCTOPUS STARTING... CHECKING MT5...")
     log("======================================================")
     while not init_mt5():
         log("❌ MT5 Connection Failed. Retrying in 5s...")
