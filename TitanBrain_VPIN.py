@@ -2498,10 +2498,10 @@ def process_symbol_task(sym, active, mission_state):
                         # Escanear precios de posiciones actuales
                         too_close = False
                         for p in pos_list:
-                        dist_to_pos = abs(price - p.price_open)
-                        if dist_to_pos < 0.35: # 350 puntos de zona prohibida
-                            too_close = True
-                            break
+                            dist_to_pos = abs(price - p.price_open)
+                            if dist_to_pos < 0.35: # 350 puntos de zona prohibida
+                                too_close = True
+                                break
                     
                     if too_close:
                         if now % 10 < 1: log(f"⏳ ZONA PROHIBIDA: Precio demasiado cerca de bala existente. Esperando espacio...")
