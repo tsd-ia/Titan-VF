@@ -1065,7 +1065,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.27 | VIGILIA EXTREMA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.141 | VIGILIA EXTREMA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2721,10 +2721,9 @@ def metralleta_loop():
 
                 # v18.9.28: BOTÓN DE PÁNICO GLOBAL (REACTIVADO)
                 if current_open_pnl <= MAX_SESSION_LOSS:
-                    # v18.9.44: CIERRE POR PÁNICO DESACTIVADO (Decisión del Comandante)
-                    log(f"🧘 VIGILANCIA VANGUARDIA: PnL {current_open_pnl:.2f}. Manteniendo posiciones por potencial de profit.")
-                    # for p in open_positions: close_ticket(p, "PANIC_GLOBAL")
-                    # stop_mission()
+                    # v18.9.141: Throttling de log para no saturar consola
+                    if now_loop % 60 < 0.1:
+                        log(f"🧘 VIGILANCIA VANGUARDIA: PnL {current_open_pnl:.2f}. Manteniendo posiciones.")
                     continue
 
             # --- 2. PROCESAMIENTO PARALELO (THE OCTOPUS) ---
@@ -2895,7 +2894,8 @@ def metralleta_loop():
                     
                 # 2. Verificar si el mercado está abierto
                 if is_market_closed(sym):
-                    if time.time() % 300 < 1: log(f"🛑 MERCADO {sym} CERRADO - Durmiendo octopus...")
+                    if now_loop % 300 < 0.1: # v18.9.141: Solo avisar cada 5 minutos
+                        log(f"🛑 MERCADO {sym} CERRADO - Durmiendo octopus...")
                     continue
                 
                 futures.append(executor_octopus.submit(process_symbol_task, sym, active, mission_state))
