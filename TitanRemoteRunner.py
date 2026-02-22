@@ -3,30 +3,54 @@ import time
 import requests
 import os
 
-# --- TITAN REMOTE RUNNER 2026 ---
-# Este script se queda escuchando a Firebase y lanza el .bat si recibe la orden
+# --- TITAN REMOTE RUNNER 2026 v2.0 ---
+# Sincronización Selectiva: Solo lanza lo que está ON en el Dashboard.
 
-FIREBASE_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/commands.json"
+FIREBASE_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live"
+
+def get_flag(name):
+    try:
+        res = requests.get(f"{FIREBASE_URL}/{name}.json", timeout=10)
+        if res.status_code == 200:
+            return bool(res.json())
+    except:
+        return False
+    return False
 
 print("==================================================")
-print("  🚀 TITAN REMOTE RUNNER 2026")
+print("  🚀 TITAN REMOTE RUNNER v2.0 (SELECTIVE)")
 print("  Esperando señal del Dashboard para TRABAJAR...")
 print("==================================================")
 
 while True:
     try:
-        res = requests.get(FIREBASE_URL, timeout=10)
-        if res.status_code == 200:
-            cmds = res.json()
-            if cmds and cmds.get("remote_launch"):
-                print("🎯 SEÑAL RECIBIDA: ¡A TRABAJAR!")
-                # Ejecutar el .bat que abre los otros dos
-                subprocess.Popen(["cmd", "/c", "TRABAJAR.bat"], creationflags=subprocess.CREATE_NEW_CONSOLE)
-                
-                # Resetear la señal en Firebase para no loopear
-                requests.patch(FIREBASE_URL, json={"remote_launch": False})
-                print("✅ Motores lanzados. Volviendo a modo escucha...")
+        # 1. Escuchar comando maestro (remote_launch)
+        res = requests.get(f"{FIREBASE_URL}/commands/remote_launch.json", timeout=10)
+        if res.status_code == 200 and res.json() == True:
+            print("🎯 SEÑAL RECIBIDA: Iniciando Motores Selectivos...")
+            
+            # 2. Verificar cada activo antes de lanzar
+            if get_flag("btc_brain_on"):
+                print("🔥 Lanzando ORÁCULO BTC...")
+                subprocess.Popen(["cmd", "/c", 'start "TITAN_ORACLE" python Titan_Oracle_Binance.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            
+            if get_flag("oro_brain_on"):
+                print("🔥 Lanzando ORÁCULO ORO...")
+                subprocess.Popen(["cmd", "/c", 'start "TITAN_ORACLE_GOLD" python Titan_Oracle_Gold.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            
+            if get_flag("crypto_brain_on"):
+                print("🔥 Lanzando ORÁCULO CRYPTO...")
+                subprocess.Popen(["cmd", "/c", 'start "TITAN_ORACLE_CRYPTO" python Titan_Oracle_Crypto.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+
+            # 3. Lanzar el Cerebro Core siempre si hubo comando
+            print("🧠 Lanzando CORE ENGINE...")
+            subprocess.Popen(["cmd", "/c", 'start "TITAN_BRAIN" python TitanBrain_VPIN.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            
+            # Resetear la señal en Firebase
+            requests.patch(f"{FIREBASE_URL}/commands.json", json={"remote_launch": False})
+            print("✅ Despliegue completado. Volviendo a escucha...")
                 
         time.sleep(5)
     except Exception as e:
+        print(f"⚠️ Error Runner: {e}")
         time.sleep(10)

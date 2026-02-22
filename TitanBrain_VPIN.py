@@ -853,14 +853,17 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
     # v18.9.92: CALIBRACIÓN CORRECTA POR ACTIVO
     # Cada activo usa su propio spread actual (ya calculado arriba)
     # BTC tiene spreads normales de 200-500pts en fin de semana, umbral en 2000pts
+    # v18.9.200: CALIBRACIÓN DOMINGO (Sunday Resilience)
     if "BTC" in symbol:
-        skew_limit = 2000  # BTC: solo reducir si spread es anormal (>2000pts)
+        skew_limit = 3500  # BTC domingo: permitir hasta 3500pts antes de nuclear
+    elif "XAU" in symbol:
+        skew_limit = 1000  # Oro domingo: permitir spreads de 10.00 pips
     else:
-        skew_limit = 350   # Forex/Indices: umbral normal
+        skew_limit = 500   # SOL/ETH: permitir 500pts
     
     if spread > skew_limit:
         final_lot = 0.01
-        log(f"\u26a0\ufe0f PROTECCIÓN SPREAD NUCLEAR ({spread:.1f} pts > {skew_limit}): Usando 0.01")
+        log(f"🛡️ SPREAD ALTO ({spread:.1f} > {skew_limit}): Lote 0.01 por seguridad.")
     else:
         final_lot = cfg['lot']  # Respetar lote configurado por el usuario
     payload = f"{mode}|{final_lot}|{sl_to_use}|{tp_to_use}|{ts}"
@@ -951,7 +954,7 @@ def predecir(symbol):
     
     # Seleccionar modelo por activo
     modelo = modelo_lstm_btc if "BTC" in symbol else modelo_lstm
-    if modelo is None: return "NONE", 0.0, 0, 0.5, 0.0
+    if modelo is None: return "NONE", 0.0, 50, 0.5, 0.0
     
     try:
         # 1. Cargar Scaler
@@ -968,10 +971,10 @@ def predecir(symbol):
         
         # 3. Datos y Features
         df = obtener_datos(symbol, 350)
-        if df.empty or len(df) < LOOKBACK_PERIOD + 10: return "NONE", 0.0, 0, 0.5, 0.0
+        if df.empty or len(df) < LOOKBACK_PERIOD + 10: return "NONE", 0.0, 50, 0.5, 0.0
         
         df = calculate_features(df)
-        if len(df) < LOOKBACK_PERIOD: return "NONE", 0.0, 0, 0.5, 0.0
+        if len(df) < LOOKBACK_PERIOD: return "NONE", 0.0, 50, 0.5, 0.0
 
         # 4. Inferencia Protegida
         last_features = df[MASTER_FEATURES].tail(LOOKBACK_PERIOD)
@@ -1047,7 +1050,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
         active = mission_state.get("active", False)
         if active:
             st_line = f" ESTADO:  🟢 ACTIVA ({mission_state.get('symbol', 'MIX')}) | ⏱️ {elapsed_str}"
-        elif STATE.get("auto_pilot", False):
+        elif STATE.get("auto_pilot", False) or STATE.get("auto_mode", False):
             st_line = f" ESTADO:  🚁 STANDBY (AUTO) | ⏱️ 00:00:00"
         else:
             st_line = f" ESTADO:   READY 🛰️ | ⏱️ 00:00:00"
@@ -1446,7 +1449,9 @@ def process_symbol_task(sym, active, mission_state):
         # Assuming `predecir` is the function that provides these values.
         # The user's snippet implies `get_advice` but the original code uses `predecir`.
         # I will keep `predecir` as it's in the original code, but ensure `sig`, `conf`, `raw_prob` are updated.
-        sig_pred, conf_pred, rsi_val_pred, raw_prob_pred, adx_val = predecir(sym)
+        # v18.9.200: FIX RSI 0 - Asegurar que tenemos suficientes velas para el cálculo
+        # La función predecir ya calcula RSI, pero lo re-validamos aquí para el display
+        rsi_val = rsi_val_pred if rsi_val_pred > 0 else 50.0
         LAST_PROBS[sym] = raw_prob_pred
         raw_prob = raw_prob_pred  
         
@@ -2097,7 +2102,7 @@ def process_symbol_task(sym, active, mission_state):
         # Throttling inteligente: Si use_cache es True, no llamamos aunque pasen 3m.
         # v18.9.103: Reducimos a 180s (3m) el refresco forzado para scalping minuto a minuto.
         # v18.9.123: Salto de IA si es señal de Oráculo (Confianza ciega en ballenas)
-        if not is_oracle_signal and conf >= 0.70 and not active and (not use_cache or (time.time() - last_call_ts > 180)):
+        if conf >= 0.70 and not active and (not use_cache or (time.time() - last_call_ts > 180)):
 
             LAST_OLLAMA_CALL[sym] = time.time()
             bb_txt = "TOPE" if bb_pos > 0.8 else "SUELO" if bb_pos < 0.2 else "CENTRO"
@@ -2107,11 +2112,20 @@ def process_symbol_task(sym, active, mission_state):
             LAST_OLLAMA_CACHE[sym] = {'rsi': rsi_val, 'bb': bb_pos, 'sig': target_sig, 'res': ai_reply, 'model': model_used}
             with state_lock: STATE["last_ollama_res"] = f"[{model_used}] {ai_reply}"
             
-            if "SI" in ai_reply.upper():
+            # v18.9.200: GOD MODE BYPASS - Si es señal institucional masiva, ignorar veto IA.
+            # Umbral de domingo reducido a $150k
+            is_god_mode = oracle_volume >= 150000 
+            
+            if "SI" in ai_reply.upper() or is_god_mode:
+                if is_god_mode: 
+                    log(f"⚡ GOD MODE ACTIVADO: Ignorando veto IA por volumen masivo (${oracle_volume/1000:.0f}k)")
+                    conf = 1.0 # Fuerza total
                 log(f"🧠 OLLAMA CONFIRMA ({model_used}): {ai_reply}")
             else:
-                log(f"🛡️ OLLAMA VETO ({model_used}): {ai_reply}. Reduciendo confianza.")
-                conf *= 0.8
+                # v18.9.200: Si es Oráculo, el veto solo quita 5% (Amortiguación). Si es IA pura, quita 20%.
+                penalty = 0.95 if is_oracle_signal else 0.8
+                log(f"🛡️ OLLAMA VETO ({model_used}): {ai_reply}. {'Amortiguado' if is_oracle_signal else 'Aplicado'}.")
+                conf *= penalty
             
             msg = f"🎯 OPORTUNIDAD VALIDADA IA: {sym} en {target_sig} ({conf*100:.1f}%)"
             log(f"🚨 {msg}"); send_ntfy(msg)
@@ -2426,8 +2440,8 @@ def process_symbol_task(sym, active, mission_state):
         # (Lógica simplificada para el hilo)
 
         # --- ENVÍO DE SEÑAL OPTIMIZADA (ANTI-LAG) ---
-        # v16.0: Blindaje Total - Solo enviamos señales si hay una misión ACTIVA.
-        if active:
+        # v16.0: Blindaje Total - Solo enviamos señales si hay una misión ACTIVA o Fuego Autónomo.
+        if active or STATE.get("auto_mode", False):
             time_since_last = now - LAST_HEARTBEAT.get(sym, 0)
             is_heartbeat = time_since_last > 5.0
             
