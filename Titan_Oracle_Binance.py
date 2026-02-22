@@ -16,8 +16,10 @@ FILE_SIGNAL = "titan_oracle_signal.json"
 STATE = {
     "recent_buys": 0.0,
     "recent_sells": 0.0,
-    "last_reset": time.time()
+    "last_reset": time.time(),
+    "last_heartbeat": time.time() # v18.9.117
 }
+
 
 def write_signal(signal, side, volume):
     data = {
@@ -66,6 +68,12 @@ def on_message(ws, message):
             STATE["recent_buys"] += volume_usd
             if volume_usd > WHALE_VOLUME_USD:
                 write_signal("BUY", "COMPRA", volume_usd)
+                
+        # v18.9.117: Heartbeat visual cada 10s para confirmar vida
+        if now - STATE["last_heartbeat"] > 10.0:
+            print(f"[{time.strftime('%H:%M:%S')}] 💓 ORACLE VIVE | Vigilando Binance...")
+            STATE["last_heartbeat"] = now
+
                 
     except Exception as e:
         print(f"⚠️ Error en stream: {e}")

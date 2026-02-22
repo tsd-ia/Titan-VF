@@ -64,11 +64,12 @@ def kill_previous_instances():
         purged = 0
         for proc in psutil.process_iter(['pid', 'cmdline']):
             try:
+                # v18.9.117: Solo matar instancias de BRAIN. (Bat limpia el resto)
                 cmd = proc.info.get('cmdline', [])
-                # v18.9.116: Purga total (Brain + Oracle)
-                if cmd and any(kw in str(cmd) for kw in ['TitanBrain_VPIN', 'Titan_Oracle']):
+                if cmd and any('TitanBrain_VPIN' in s for s in cmd):
                     pid = proc.info['pid']
                     if pid != current_pid:
+
 
                         # No matar al padre (Runner)
                         try:
