@@ -237,8 +237,9 @@ def push_firebase(data):
             data["last_update"] = datetime.now().strftime("%H:%M:%S")
             # Forzar conversión a tipos nativos para que requests.put no falle
             clean_data = json.loads(json.dumps(data, cls=NumpyEncoder))
-            res = requests.put(url, json=clean_data, timeout=5)
-            if res.status_code != 200:
+            # v18.9.100: CAMBIO A PATCH para no borrar el nodo /commands enviado por la WEB
+            res = requests.patch(url, json=clean_data, timeout=5)
+            if res.status_code not in [200, 201, 204]:
                 print(f"⚠️ Firebase Error: {res.status_code}")
         except Exception as e:
             # print(f"⚠️ Firebase Crash: {e}")
@@ -391,7 +392,9 @@ STATE = {
     "last_ollama_res": "Ollama Sentinel Active",
     "price_history": [],
     "oro_brain_on": True,   # v18.9.95: Control Manual vía Web
-    "btc_brain_on": True    # v18.9.95: Control Manual vía Web
+    "btc_brain_on": True,    # v18.9.95: Control Manual vía Web
+    "auto_mode": False,      # v18.9.99: Control de Autofuego por Defecto OFF
+    "start_mission": False
 }
 
 LOG_BUFFER = deque(maxlen=10)
@@ -605,8 +608,8 @@ def close_ticket(pos, reason="UNK"):
         
         # --- NOTIFICACIÓN TELEGRAM (CADA CIERRE) ---
         try:
-            tg_token = os.getenv('TELEGRAM_TOKEN', '7233633800:AAFSB4rXyB7b3jYlS9gQnE19NlNK06s8FKE') # Token de emergencia si no hay env
-            tg_chat = os.getenv('TELEGRAM_CHAT_ID', '1359302187') # Chat ID por defecto del usuario
+            tg_token = os.getenv('TELEGRAM_TOKEN', '8217691336:AAFWduUGkO_f-QRF6MN338HY-MA46CjzHMg')
+            tg_chat = os.getenv('TELEGRAM_CHAT_ID', '8339882349')
             if tg_token and tg_chat:
                 emo = "🟩 WIN" if profit > 0 else "🟥 LOSS"
                 msg = f"TITAN {emo}\nActivo: {pos.symbol}\nProfit: ${profit:.2f}\nRazón: {reason}\nEquidad: ${mt5.account_info().equity:.2f}"
