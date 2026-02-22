@@ -1035,16 +1035,19 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.27 | VIGILIA EXTREMA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
-    # v18.9.110: SPREAD DINÁMICO (Priorizar Oro, fallback a BTC)
-    tick = mt5.symbol_info_tick("XAUUSDm")
+    # v18.9.113: FIX ATRIBUTO SYMBOL
+    target_tick_sym = "XAUUSDm"
+    tick = mt5.symbol_info_tick(target_tick_sym)
     if not tick or (time.time() - tick.time > 60):
-        tick = mt5.symbol_info_tick("BTCUSDm")
+        target_tick_sym = "BTCUSDm"
+        tick = mt5.symbol_info_tick(target_tick_sym)
     
     current_spread = tick.ask - tick.bid if tick else 0.0
-    s_info_disp = mt5.symbol_info(tick.symbol) if tick else None
+    s_info_disp = mt5.symbol_info(target_tick_sym) if tick else None
     spread_pts = 0
     if tick and s_info_disp and hasattr(s_info_disp, 'point') and s_info_disp.point > 0:
         spread_pts = current_spread / s_info_disp.point
+
 
 
     
@@ -2737,13 +2740,15 @@ def metralleta_loop():
                 STATE["bullets"] = bullet_count
                 active = mission_state["active"]
 
-            # --- v18.9.110: PULSO ADAPTATIVO (Oro -> BTC) ---
+            # --- v18.9.113: PULSO ADAPTATIVO FIX ---
             ping_start = time.perf_counter()
-            tick_gold = mt5.symbol_info_tick("XAUUSDm")
-            # Si el oro no tiene ticks frescos, es fin de semana: usamos BTC para el pulso
+            target_pulse_sym = "XAUUSDm"
+            tick_gold = mt5.symbol_info_tick(target_pulse_sym)
             if not tick_gold or (time.time() - tick_gold.time > 60):
-                tick_gold = mt5.symbol_info_tick("BTCUSDm")
+                target_pulse_sym = "BTCUSDm"
+                tick_gold = mt5.symbol_info_tick(target_pulse_sym)
             ping_end = time.perf_counter()
+
 
             
             # Solo actualizar si el dato de latencia es muy viejo (> 5s)
@@ -2768,8 +2773,9 @@ def metralleta_loop():
                     if not os.path.exists(t_path):
                         with open(t_path, "w") as f: f.write("Timestamp,Equity,PnL,Floating,Spread,Latency,Bullets\n")
                     
-                    s_info = mt5.symbol_info(tick_gold.symbol) if tick_gold else None
+                    s_info = mt5.symbol_info(target_pulse_sym) if tick_gold else None
                     spread_val = (tick_gold.ask - tick_gold.bid) / s_info.point if tick_gold and s_info else 0
+
 
                     
                     row = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{current_equity:.2f},{pnl:.2f},{current_open_pnl:.2f},{spread_val:.1f},{LAST_LATENCY:.0f},{bullet_count}\n"
