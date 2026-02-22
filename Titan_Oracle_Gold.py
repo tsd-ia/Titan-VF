@@ -2,98 +2,93 @@ import asyncio
 import json
 import time
 import os
+import requests
 from datetime import datetime
 try:
     import websockets
-    import requests
 except ImportError:
     os.system("pip install websockets requests")
     import websockets
-    import requests
 
-# CONFIGURACIÓN DEL ORÁCULO ORO (PAXG/USDT como Proxy institucional)
-SYMBOL_BINANCE = "paxgusdt" # El Oro de Binance que mueve al mercado Spot
-WHALE_THRESHOLD = 220000    # Ajustado para Oro (Menos volumen que BTC)
-GOD_MODE_THRESHOLD = 280000 # Regla de Oro del Comandante
-
+# CONFIGURACIÓN DEL ORÁCULO ORO (PAXG/USDT)
+SYMBOL_BINANCE = "paxgusdt"
+WHALE_THRESHOLD = 220000    
+GOD_MODE_THRESHOLD = 280000 
 FILE_SIGNAL = "titan_gold_signals.json"
+FIREBASE_FLAG_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/oro_brain_on.json"
 
 STATE = {
     "window": {"buys": [], "sells": [], "price": 0.0},
     "last_signal_time": 0.0
 }
 
-def write_signal(sig, vol, price):
+def is_brain_on():
     try:
-        data = {
-            "symbol": "XAUUSDm",
-            "binance_sym": SYMBOL_BINANCE,
-            "signal": sig,
-            "volume": vol,
-            "price": price,
-            "timestamp": time.time(),
-            "god_mode": vol >= GOD_MODE_THRESHOLD
-        }
-        with open(FILE_SIGNAL, "w") as f:
-            json.dump(data, f)
+        res = requests.get(FIREBASE_FLAG_URL, timeout=2)
+        if res.status_code == 200:
+            return bool(res.json())
     except:
-        pass
+        return True # Default ON si falla internet
+    return True
 
 async def gold_oracle():
-    url = f"wss://stream.binance.com:9443/ws/{SYMBOL_BINANCE}@aggTrade"
+    print(f"🔱 ORÁCULO ORO v18.9.190 [DYNAMO]")
     
-    print(f"🔱 ORÁCULO ORO ONLINE: Monitoreando {SYMBOL_BINANCE} (Proxy XAUUSD)")
-    
-    async with websockets.connect(url) as ws:
-        while True:
-            try:
-                msg = await ws.recv()
-                data = json.loads(msg)
-                
-                price = float(data['p'])
-                col = float(data['q']) * price
-                side = "SELL" if data['m'] else "BUY"
-                ts = data['T'] / 1000.0
-                
-                STATE["window"]["price"] = price
-                win = STATE["window"]["buys"] if side == "BUY" else STATE["window"]["sells"]
-                win.append((ts, col))
-                
-                # Ventana de 2 segundos para Oro (es más lento que BTC)
-                now = time.time()
-                STATE["window"]["buys"] = [x for x in STATE["window"]["buys"] if now - x[0] < 2.0]
-                STATE["window"]["sells"] = [x for x in STATE["window"]["sells"] if now - x[0] < 2.0]
-                
-                vol_buy = sum(x[1] for x in STATE["window"]["buys"])
-                vol_sell = sum(x[1] for x in STATE["window"]["sells"])
-                
-                # --- v18.9.180: SENSOR DINÁMICO (Ahorro de Energía) ---
-                if now % 10 < 0.1:
-                    try:
-                        res = requests.get("https://titan-sentinel-default-rtdb.firebaseio.com/live/oro_brain_on.json", timeout=2)
-                        if res.status_code == 200 and res.json() == False:
-                            print("💤 CEREBRO ORO OFFLINE (Dashboard): Entrando en hibernación...")
-                            await asyncio.sleep(10)
-                            continue
-                    except: pass
-                
-                sig = "HOLD"
-                vol = 0
-                if vol_buy > WHALE_THRESHOLD:
-                    sig = "BUY"
-                    vol = vol_buy
-                elif vol_sell > WHALE_THRESHOLD:
-                    sig = "SELL"
-                    vol = vol_sell
-                
-                if sig != "HOLD" and (now - STATE["last_signal_time"]) > 5:
-                    STATE["last_signal_time"] = now
-                    write_signal(sig, vol, price)
-                    print(f"🔱 BALLENA ORO: {sig} | Vol: ${vol/1000:.1f}k {'[GOD MODE]' if vol >= GOD_MODE_THRESHOLD else ''}")
+    while True:
+        if not is_brain_on():
+            print(f"💤 [{datetime.now().strftime('%H:%M:%S')}] CEREBRO ORO EN DESCANSO... (Esperando Dashboard)")
+            await asyncio.sleep(15)
+            continue
 
-            except Exception as e:
-                print(f"⚠️ Error Oráculo Oro: {e}")
-                await asyncio.sleep(1)
+        try:
+            url = f"wss://stream.binance.com:9443/ws/{SYMBOL_BINANCE}@aggTrade"
+            async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+                print(f"⚡ CONECTADO A BINANCE (ORO) - Scaneando...")
+                while True:
+                    # Check de bandera cada 30 segundos sin bloquear el websocket
+                    if int(time.time()) % 30 == 0:
+                        if not is_brain_on(): break
+
+                    try:
+                        msg = await asyncio.wait_for(ws.recv(), timeout=1.0)
+                        data = json.loads(msg)
+                        
+                        price = float(data['p'])
+                        col = float(data['q']) * price
+                        side = "SELL" if data['m'] else "BUY"
+                        ts = data['T'] / 1000.0
+                        
+                        STATE["window"]["price"] = price
+                        win = STATE["window"]["buys"] if side == "BUY" else STATE["window"]["sells"]
+                        win.append((ts, col))
+                        
+                        now = time.time()
+                        STATE["window"]["buys"] = [x for x in STATE["window"]["buys"] if now - x[0] < 2.0]
+                        STATE["window"]["sells"] = [x for x in STATE["window"]["sells"] if now - x[0] < 2.0]
+                        
+                        vol_buy = sum(x[1] for x in STATE["window"]["buys"])
+                        vol_sell = sum(x[1] for x in STATE["window"]["sells"])
+                        
+                        sig = "HOLD"
+                        vol = 0
+                        if vol_buy > WHALE_THRESHOLD:
+                            sig = "BUY"; vol = vol_buy
+                        elif vol_sell > WHALE_THRESHOLD:
+                            sig = "SELL"; vol = vol_sell
+                        
+                        if sig != "HOLD" and (now - STATE["last_signal_time"]) > 5:
+                            STATE["last_signal_time"] = now
+                            data_sig = {
+                                "symbol": "XAUUSDm", "signal": sig, "volume": vol,
+                                "price": price, "timestamp": now, "god_mode": vol >= GOD_MODE_THRESHOLD
+                            }
+                            with open(FILE_SIGNAL, "w") as f: json.dump(data_sig, f)
+                            print(f"🔱 BALLENA ORO: {sig} | Vol: ${vol/1000:.1f}k {'[GOD MODE]' if vol >= GOD_MODE_THRESHOLD else ''}")
+                    except asyncio.TimeoutError:
+                        continue 
+        except Exception as e:
+            print(f"⚠️ Error Oro: {e}")
+            await asyncio.sleep(5)
 
 if __name__ == "__main__":
     asyncio.run(gold_oracle())
