@@ -171,8 +171,8 @@ SMOOTH_CONF = {} # NEW v8.2: Memoria de suavizado de confianza
 # --- v15.6 VANGUARDIA (TITANIUM SHIELD) ---
 # MAX_BULLETS ya definido arriba (3 para recuperación)
 MIN_MARGIN_LEVEL = 30.0    # Aggresión máxima para recuperación
-MAX_SKEW_SPREAD = 300      
-MAX_EXPLORATION_SPREAD = 400 
+MAX_SKEW_SPREAD = 2500      # Ajustado para BTC Fin de Semana
+MAX_EXPLORATION_SPREAD = 3000 # Ajustado para BTC Fin de Semana
 VANGUARDIA_LOCK = False    
 
 # --- v18.9.78: MEMORIA DE ACCIÓN ---
@@ -191,8 +191,8 @@ OLLAMA_MODELS = ["gpt-oss:20b-cloud", "gpt-oss:120b-cloud", "deepseek-coder:1.3b
 OLLAMA_FAIL_COUNT = 0
 
 def call_ollama(prompt):
-    """ Consulta al Cerebro (DESACTIVADO A PETICIÓN PARA AHORRAR CUOTA) """
-    return "IA EN HOLD (Mando de Usuario). Operando con Oracle de Binance.", "LOCAL_LSTM"
+    """ Consulta al Cerebro (Sincronización v18.9.123) """
+
     global OLLAMA_FAIL_COUNT
     for i, model in enumerate(OLLAMA_MODELS):
         try:
@@ -1876,9 +1876,13 @@ def process_symbol_task(sym, active, mission_state):
             spread = (tick.ask - tick.bid) / mt5.symbol_info(sym).point
             n_balas_actuales = len(pos_list)
             
-            if spread > MAX_EXPLORATION_SPREAD:
+            if spread > MAX_EXPLORATION_SPREAD and not is_oracle_signal:
                 block_action = True
                 block_reason = f"SPREAD PROHIBITIVO ({spread:.1f} pts)"
+            elif is_oracle_signal and spread > 5000: # Límite extremo para ballenas
+                block_action = True
+                block_reason = f"SPREAD BALLENA EXTREMO ({spread:.1f})"
+
             elif spread > MAX_SKEW_SPREAD:
                 if n_balas_actuales < MAX_BULLETS: # v18.9.13: Permitir las 5 balas incluso con spread alto
                     is_exploring = (n_balas_actuales == 0) # La primera es 0.01 si es spread alto
@@ -2024,7 +2028,9 @@ def process_symbol_task(sym, active, mission_state):
         
         # Throttling inteligente: Si use_cache es True, no llamamos aunque pasen 3m.
         # v18.9.103: Reducimos a 180s (3m) el refresco forzado para scalping minuto a minuto.
-        if conf >= 0.70 and not active and (not use_cache or (time.time() - last_call_ts > 180)):
+        # v18.9.123: Salto de IA si es señal de Oráculo (Confianza ciega en ballenas)
+        if not is_oracle_signal and conf >= 0.70 and not active and (not use_cache or (time.time() - last_call_ts > 180)):
+
             LAST_OLLAMA_CALL[sym] = time.time()
             bb_txt = "TOPE" if bb_pos > 0.8 else "SUELO" if bb_pos < 0.2 else "CENTRO"
             prompt = f"Trader HFT: {sym} en {target_sig}. RSI:{rsi_val:.1f}, BB:{bb_txt}, Momentum:{delta:.2f}. ¿Confirmas entrada? Responde solo SI o NO y breve por qué."
