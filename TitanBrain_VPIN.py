@@ -603,11 +603,11 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     
     # 2. Definir Lotaje según Balance
     if balance < 50.0:
-        smart_lot = 0.05 if is_btc else (0.1 if is_crypto else 0.01)
+        smart_lot = 0.03 if is_btc else (0.1 if is_crypto else 0.01)
     elif balance < 100.0:
-        smart_lot = 0.08 if is_btc else (0.2 if is_crypto else 0.02)
+        smart_lot = 0.05 if is_btc else (0.2 if is_crypto else 0.02)
     else:
-        smart_lot = 0.10 if is_btc else (0.3 if is_crypto else 0.03)
+        smart_lot = 0.06 if is_btc else (0.3 if is_crypto else 0.03)
         
     return max_bullets, smart_lot
 
@@ -1378,14 +1378,16 @@ def process_symbol_task(sym, active, mission_state):
         now_dt = datetime.fromtimestamp(now)
         acc = mt5.account_info() # v18.8.1: Definición externa proactiva
         
-        # v18.9.93: GUARDIA MÍNIMA DE CAPITAL - INQUEBRANTABLE
-        if acc:
-        # --- FAILSAFE DE SUPERVIVENCIA (Equidad Mínima) ---
-            pnl = acc.equity - mission_state.get("start_equity", acc.equity)
-            if acc.equity < 10.0: # MODO DE SUPERVIVENCIA EXTREMA ACTIVADO (bajado a 10.0)
-                if now % 30 < 1: log(f"🚨 CUENTA CONGELADA: Equity ${acc.equity:.2f} < mínimo $10.0. Bot en pausa total.")
-                time.sleep(1); return {"symbol": sym, "signal": "HOLD", "confidence": 0.0, "ai": 0.5, "rsi": 50,
-                            "lot": 0.01, "state": "❄️", "profit": 0.0, "bb_pos": 0.5, "m5_trend": "⚪", "h1_trend": "NONE"}
+        # v18.9.175: VIGILANCIA POR SÍMBOLO (No bloquea a los demás)
+        pos_list = [p for p in positions if p.symbol == sym]
+        sym_pnl = sum(p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0) for p in pos_list)
+
+        if sym_pnl <= MAX_SESSION_LOSS and len(pos_list) > 0:
+            if now % 120 < 1: log(f"🧘 VIGILANCIA {sym}: PnL {sym_pnl:.2f}. Esperando recuperación o Shield.")
+            # Permitimos pasar para que el dashboard se actualice, pero bloquearemos el disparo abajo
+            is_vigilancia_blocked = True
+        else:
+            is_vigilancia_blocked = False
         
         n_balas_reales = 0
         bb_pos = 0.5
@@ -2429,9 +2431,10 @@ def process_symbol_task(sym, active, mission_state):
             is_heartbeat = time_since_last > 5.0
             
             # v18.1: Blindaje de Envío de Señal
-            # Solo enviar si NO hay bloqueos o si es un refresco de una señal ya existente
-            # v18.9.24: Liberación de Gatillo - IA 97%+ / Oracle ignora bloqueos tácticos (M5/Trend)
-            if target_sig in ["BUY", "SELL"] and (not block_action or super_conf or (is_oracle_signal and not is_hard_blocked)):
+            # v18.9.175: Si está en vigilancia por pérdida, NO DISPARAR nuevas balas.
+            if is_vigilancia_blocked and not is_oracle_signal:
+                should_send = False
+            elif target_sig in ["BUY", "SELL"] and (not block_action or super_conf or (is_oracle_signal and not is_hard_blocked)):
 
                 should_send = False
                 if should_fire: should_send = True # Disparo forzado (nuevo o stacking)
@@ -2771,14 +2774,13 @@ def metralleta_loop():
                 #         if p.profit >= 1.20: close_ticket(p, "COSECHA_TACTICA")
                 #     continue
 
-                # v18.9.28: BOTON DE PANICO GLOBAL (REACTIVADO)
-                if current_open_pnl <= MAX_SESSION_LOSS:
-                    # v18.9.145: Throttling real compatible con loop de 0.05s
-                    if not hasattr(metralleta_loop, "last_vigilancia"): metralleta_loop.last_vigilancia = 0
-                    if (now_loop - metralleta_loop.last_vigilancia) > 60:
-                        metralleta_loop.last_vigilancia = now_loop
-                        log(f"🧘 VIGILANCIA VANGUARDIA: PnL {current_open_pnl:.2f}. Manteniendo posiciones.")
-                    continue
+                # v18.9.175: VIGILANCIA GLOBAL DESHABILITADA (Movida a nivel de símbolo)
+                # if current_open_pnl <= MAX_SESSION_LOSS:
+                #     if not hasattr(metralleta_loop, "last_vigilancia"): metralleta_loop.last_vigilancia = 0
+                #     if (now_loop - metralleta_loop.last_vigilancia) > 60:
+                #         metralleta_loop.last_vigilancia = now_loop
+                #         log(f"🧘 VIGILANCIA VANGUARDIA: PnL {current_open_pnl:.2f}. Manteniendo posiciones.")
+                #     continue
 
             # --- 2. PROCESAMIENTO PARALELO (THE OCTOPUS) ---
             # ... (resto del loop) ...
