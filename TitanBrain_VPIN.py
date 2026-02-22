@@ -2619,11 +2619,12 @@ def metralleta_loop():
                             close_ticket(p, "IRON_PROFIT_v21"); continue
                     
                     # 3. Cierre Micro en mercado estancado (Trailing Ultra-Corto)
-                    elif profit >= 0.30:
-                        trade_life = now_loop - p.time
-                        if trade_life > 20: # Más de 20s sin avanzar -> Cortar rápido
-                            log(f"🐜 MICRO-CIERRE (LENTO): Asegurando ${profit:.2f} por estancamiento (20s).")
-                            close_ticket(p, "SLOW_MARKET_EXIT"); continue
+                    # v18.9.129: DESACTIVADO. Generaba cierres fantasma en BTC que se comían ganancias por slippage.
+                    # elif profit >= 0.30:
+                    #     trade_life = now_loop - p.time
+                    #     if trade_life > 20: # Más de 20s sin avanzar -> Cortar rápido
+                    #         log(f"🐜 MICRO-CIERRE (LENTO): Asegurando ${profit:.2f} por estancamiento (20s).")
+                    #         close_ticket(p, "SLOW_MARKET_EXIT"); continue
                     
                     symbol_info = mt5.symbol_info(sym)
                     if not symbol_info: continue
@@ -2661,16 +2662,16 @@ def metralleta_loop():
                     if profit < min_p: STATE[f"min_p_{p.ticket}"] = profit # Guardamos el punto más bajo
                     
                     # Lógica: Si estuvimos en -$15 o peor, y recuperamos hasta -$5, evaluamos salida digna
-                    if not MIRROR_MODE and min_p < -15.0 and profit > -5.0:
-                        advice = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
-                        t_sig = advice["sig"]
-                        # Si la recuperación se estanca o hay señal contraria, cerramos para salvar el capital
-                        recover_pct = abs(profit - min_p) / abs(min_p)
-                        is_contrarian = (p.type == mt5.ORDER_TYPE_BUY and t_sig == "SELL") or (p.type == mt5.ORDER_TYPE_SELL and t_sig == "BUY")
+                    # v18.9.129: DESACTIVADO para Bitcoin. Se necesita dejar que respire más y esperar Oráculo o Meta Fija.
+                    # if not MIRROR_MODE and min_p < -15.0 and profit > -5.0:
+                    #     advice = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
+                    #     t_sig = advice["sig"]
+                    #     recover_pct = abs(profit - min_p) / abs(min_p)
+                    #     is_contrarian = (p.type == mt5.ORDER_TYPE_BUY and t_sig == "SELL") or (p.type == mt5.ORDER_TYPE_SELL and t_sig == "BUY")
                         
-                        if recover_pct > 0.70 and (is_contrarian or now_loop % 30 < 1):
-                            log(f"✂️ SALIDA ESTRATÉGICA: Reduciendo daño de {min_p:.2f} a {profit:.2f} ({recover_pct:.1%})")
-                            close_ticket(p, "STRATEGIC_REAVE"); continue
+                    #     if recover_pct > 0.70 and (is_contrarian or now_loop % 30 < 1):
+                    #         log(f"✂️ SALIDA ESTRATÉGICA: Reduciendo daño de {min_p:.2f} a {profit:.2f} ({recover_pct:.1%})")
+                    #         close_ticket(p, "STRATEGIC_REAVE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
                     if MIRROR_MODE:
