@@ -2011,7 +2011,14 @@ def process_symbol_task(sym, active, mission_state):
         if sig == "BUY" and df.iloc[-1]['close'] < df.iloc[-2]['close']:
             block_action = True; block_reason = "PRECIO CAYENDO (Veto M1)"
 
-        is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason or "SPREAD BALLENA" in block_reason or "SPREAD PROHIBITIVO" in block_reason or "ANTI-WHIPSAW" in block_reason
+        # v18.9.138: PROHIBICIÓN GLOBAL DE HEDGE CONCURRENTE
+        if len(pos_list) > 0 and sig in ["BUY", "SELL"]:
+            real_dir = "BUY" if pos_list[0].type == mt5.POSITION_TYPE_BUY else "SELL"
+            if sig != real_dir:
+                block_action = True
+                block_reason = f"HEDGE PROHIBIDO ({sig} vs {real_dir})"
+
+        is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason or "SPREAD BALLENA" in block_reason or "SPREAD PROHIBITIVO" in block_reason or "ANTI-WHIPSAW" in block_reason or "HEDGE PROHIBIDO" in block_reason
         
         if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
@@ -2175,9 +2182,12 @@ def process_symbol_task(sym, active, mission_state):
                         req_delay = 1 # KAMIKAZE
                         min_dist = 0.05 # KAMIKAZE
                         
-                        # HEDGING INSTANTÁNEO
+                        # v18.9.138: PROHIBICIÓN DE HEDGE CONCURRENTE
+                        # Si ya hay una posición BUY, un SELL no es acumulación, es Hedge. Y gasta doble margen.
                         if is_contrarian: 
-                            req_delay = 0; min_dist = 0
+                            block_action = True
+                            block_reason = f"HEDGE PROHIBIDO ({target_sig} vs {real_dir})"
+                            is_hard_blocked = True
                     
                     if sig != "HOLD" and (not block_action or (is_oracle_signal and not is_hard_blocked)):
                         dist_val = abs(curr_price - last_price)
