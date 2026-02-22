@@ -127,4 +127,15 @@ def start_oracle():
     ws.run_forever()
 
 if __name__ == "__main__":
+    # --- v18.9.195: ACTIVACIÓN SELECTIVA (Solo si el Jefe dice ON) ---
+    import requests
+    FIREBASE_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/btc_brain_on.json"
+    try:
+        res = requests.get(FIREBASE_URL, timeout=5)
+        if res.status_code == 200 and res.json() == False:
+            print("💤 CEREBRO BTC APAGADO EN DASHBOARD. Abortando lanzamiento...")
+            time.sleep(2)
+            exit(0)
+    except: pass
+    
     start_oracle()

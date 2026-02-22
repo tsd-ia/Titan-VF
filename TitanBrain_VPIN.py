@@ -1081,7 +1081,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.185 | STABILITY FIX | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.195 | SELECTIVE ACTIVATION | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL

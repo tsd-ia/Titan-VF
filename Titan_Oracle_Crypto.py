@@ -100,4 +100,9 @@ async def crypto_oracle():
             await asyncio.sleep(5)
 
 if __name__ == "__main__":
+    # v18.9.195: ACTIVACIÓN SELECTIVA
+    if not is_brain_on():
+        print("💤 CEREBRO CRYPTO APAGADO EN DASHBOARD. Abortando lanzamiento...")
+        time.sleep(2)
+        exit(0)
     asyncio.run(crypto_oracle())

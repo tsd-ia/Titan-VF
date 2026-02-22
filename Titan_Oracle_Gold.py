@@ -91,4 +91,9 @@ async def gold_oracle():
             await asyncio.sleep(5)
 
 if __name__ == "__main__":
+    # v18.9.195: ACTIVACIÓN SELECTIVA
+    if not is_brain_on():
+        print("💤 CEREBRO ORO APAGADO EN DASHBOARD. Abortando lanzamiento...")
+        time.sleep(2)
+        exit(0)
     asyncio.run(gold_oracle())
