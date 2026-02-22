@@ -514,16 +514,18 @@ if 'MinMaxScaler' in globals(): scaler_lstm = MinMaxScaler(feature_range=(0, 1))
 def log(msg):
     try:
         ts = time.strftime("%H:%M:%S")
-        formatted_msg = f"[{ts}] {msg}"
+        thread_name = threading.current_thread().name
+        # Acortar nombre de hilo para el log
+        t_name = "MAIN" if thread_name == "MainThread" else thread_name[:4].upper()
+        formatted_msg = f"[{ts}][{t_name}] {msg}"
         LOG_BUFFER.append(formatted_msg)
-        # Escribir en stderr para no interferir con el Dashboard que usa stdout
         sys.stderr.write(formatted_msg + "\n")
         sys.stderr.flush()
-        # v18.9.107: Log de Persistencia Física (Diagnóstico remoto)
         with open("titan_vanguardia.log", "a", encoding="utf-8") as f:
             f.write(formatted_msg + "\n")
     except:
         pass
+
 
 
 def atomic_write(path, content):
@@ -1229,11 +1231,10 @@ def start_mission(symbol="ORO/VANGUARDIA", target_profit=50.0):
     # --- RESET ATÓMICO v15.37 ---
     global mission_state, MISSION_LATENCIES
     MISSION_LATENCIES = [] # v15.43: Limpiar rastro de ms al iniciar
-    log("🔄 PREPARANDO MESA: Limpiando residuos y archivos de misión...")
-    
-    # Limpiar terminal para frescura visual
-    try: os.system('cls' if os.name == 'nt' else 'clear')
-    except: pass
+    # log("🔄 PREPARANDO MESA: Limpiando residuos...")
+    # Limpiar terminal de forma suave sin os.system que bloquee hilos
+    print("\033[H\033[J", end="") 
+
 
     # Borrar archivo físico para evitar resurrecciones de PnL
     if os.path.exists(MISSION_FILE_PATH):
@@ -1935,12 +1936,19 @@ def process_symbol_task(sym, active, mission_state):
                 
                 res = mt5.order_send(request)
                 if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                    log(f"✅ INICIO EXITOSO: {sig} (# {res.order}) - Gatillo Directo") # Changed rec_sig to sig
+                    log(f"✅ INICIO EXITOSO: {sig} (# {res.order}) - Gatillo Directo")
                     with state_lock: STATE[f"firing_{sym}"] = now
                     LAST_ENTRY[sym] = now
                     time.sleep(10) # Cooldown inicial
                 else:
-                    log(f"⚠️ FALLO API INICIO: {res.comment if res else 'Error'}. Reintentando...")
+                    err_msg = res.comment if res else "Unknown Error"
+                    if "AutoTrading" in err_msg:
+                        if not hasattr(process_symbol_task, "last_at_warn") or (now - process_symbol_task.last_at_warn > 60):
+                            log(f"❌ ALGO-TRADING DESACTIVADO EN MT5: Por favor, pulse el botón 'Algo Trading' en el terminal.")
+                            process_symbol_task.last_at_warn = now
+                    else:
+                        log(f"⚠️ FALLO API INICIO: {err_msg}. Reintentando...")
+
                 STATE[f"last_perm_{sym}"] = now # Moved this line from the original block
                 # The original block had STATE[f"firing_{sym}"] = now and LAST_ENTRY[sym] = now here,
                 # but the new code already has them inside the 'if res' block.
