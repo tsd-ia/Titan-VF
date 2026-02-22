@@ -5,9 +5,11 @@ import os
 from datetime import datetime
 try:
     import websockets
+    import requests
 except ImportError:
-    os.system("pip install websockets")
+    os.system("pip install websockets requests")
     import websockets
+    import requests
 
 # CONFIGURACIÓN DEL ORÁCULO ORO (PAXG/USDT como Proxy institucional)
 SYMBOL_BINANCE = "paxgusdt" # El Oro de Binance que mueve al mercado Spot
@@ -64,6 +66,16 @@ async def gold_oracle():
                 
                 vol_buy = sum(x[1] for x in STATE["window"]["buys"])
                 vol_sell = sum(x[1] for x in STATE["window"]["sells"])
+                
+                # --- v18.9.180: SENSOR DINÁMICO (Ahorro de Energía) ---
+                if now % 10 < 0.1:
+                    try:
+                        res = requests.get("https://titan-sentinel-default-rtdb.firebaseio.com/live/oro_brain_on.json", timeout=2)
+                        if res.status_code == 200 and res.json() == False:
+                            print("💤 CEREBRO ORO OFFLINE (Dashboard): Entrando en hibernación...")
+                            await asyncio.sleep(10)
+                            continue
+                    except: pass
                 
                 sig = "HOLD"
                 vol = 0

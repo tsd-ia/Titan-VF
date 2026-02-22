@@ -6,9 +6,11 @@ import threading
 from datetime import datetime
 try:
     import websockets
+    import requests
 except ImportError:
-    os.system("pip install websockets")
+    os.system("pip install websockets requests")
     import websockets
+    import requests
 
 # CONFIGURACIÓN DEL ORÁCULO CRYPTO
 SYMBOLS_BINANCE = ["solusdt", "ethusdt", "mstrusdt", "opnusdt"]
@@ -66,6 +68,16 @@ async def binance_oracle():
                 total_buy = sum(x[1] for x in STATE["windows"][sym]["buys"])
                 total_sell = sum(x[1] for x in STATE["windows"][sym]["sells"])
                 
+                # --- v18.9.180: SENSOR DINÁMICO (Ahorro de Energía) ---
+                if now % 10 < 0.1:
+                    try:
+                        res = requests.get("https://titan-sentinel-default-rtdb.firebaseio.com/live/crypto_brain_on.json", timeout=2)
+                        if res.status_code == 200 and res.json() == False:
+                            print("💤 CEREBRO CRYPTO OFFLINE (Dashboard): Entrando en hibernación...")
+                            await asyncio.sleep(10)
+                            continue
+                    except: pass
+                
                 conf = WHALES_CONFIG[sym]
                 
                 all_signals = {}
@@ -93,7 +105,8 @@ async def binance_oracle():
                 
                 if all_signals:
                     write_signals(all_signals)
-                    print(f"🐋 SEÑAL CRYPTO: {all_signals}")
+                    for s, details in all_signals.items():
+                        print(f"💎 [{s.upper()}] BALLENA {details['signal']}: ${details['volume']/1000:.1f}k | Precio: {details['price']} | {datetime.now().strftime('%H:%M:%S')}")
 
             except Exception as e:
                 print(f"⚠️ Error Oráculo: {e}")
