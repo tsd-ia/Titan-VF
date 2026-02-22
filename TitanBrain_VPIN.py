@@ -112,6 +112,7 @@ CRYPTO_SIGNAL_FILE = "titan_crypto_signals.json" # v18.9.150
 # --- CONFIGURACIÓN DE PARALELIZACIÓN (OCTOPUS 2.0) ---
 from concurrent.futures import ThreadPoolExecutor
 executor_octopus = ThreadPoolExecutor(max_workers=len(SYMBOLS) + 2)
+ACTIVE_TASKS_VPIN = set() # v18.9.220
 
 def global_health_check():
     print("🩺 [CONSOLE] EJECUTANDO HEALTH CHECK...")
@@ -534,8 +535,22 @@ scaler_lstm = None
 if 'MinMaxScaler' in globals(): scaler_lstm = MinMaxScaler(feature_range=(0, 1))
 
 # ============ HELPERS ============
+# v18.9.220: SISTEMA DE THROTTLING DE LOGS (Anti-Spam)
+LOG_THROTTLE_CACHE = {}
+
 def log(msg):
+    """ v18.9.220: Registro con Throttling Inteligente """
+    global LOG_THROTTLE_CACHE
     try:
+        now = time.time()
+        # Throttling de mensajes técnicos repetitivos (Evita el spam de 4x Latencia/Escudo)
+        is_repetitive = any(x in msg for x in ["LATENCIA", "BLOQUEO", "VIGILANCIA", "ESCUDO", "CEREBRO", "MERCADO", "BALLENA", "IA-OVERRIDE"])
+        if is_repetitive:
+            cache_key = msg.split(":")[0] # Throttling por tipo de mensaje (ej: VIGILANCIA)
+            if cache_key in LOG_THROTTLE_CACHE and (now - LOG_THROTTLE_CACHE[cache_key]) < 3.0:
+                return
+            LOG_THROTTLE_CACHE[cache_key] = now
+
         ts = time.strftime("%H:%M:%S")
         thread_name = threading.current_thread().name
         t_name = "MAIN" if thread_name == "MainThread" else thread_name[:4].upper()
@@ -1507,9 +1522,11 @@ def process_symbol_task(sym, active, mission_state):
         # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
         balance = acc.balance if acc else 0
         current_max_bullets, smart_lot = get_adaptive_risk_params(balance, conf, rsi_val, sym)
-        # v18.9.210: CERROJO ATÓMICO PREVENTIVO (Anti-Metralleta)
-        is_firing_now = (now - STATE.get(f"firing_{sym}", 0)) < 15
-        if is_firing_now: return None # Salida inmediata si ya hay una bala en el aire
+        # v18.9.215: CERROJO ATÓMICO PREVENTIVO (Anti-Metralleta Reforzado)
+        # Si ya se disparó una bala en los últimos 3s, bloqueamos cualquier otro hilo del mismo símbolo
+        last_fire_ts = STATE.get(f"firing_{sym}", 0)
+        if (now - last_fire_ts) < 3.0: 
+            return None # Silencio total si hay una bala en trámite
 
         # TP Dinámico v11.2: SIN TP FIJO - El trailing stop del EA maneja la salida
         # INCIDENTE: TP de 2000 pts ($6) cerraba trades que podían dar $10+
@@ -2169,10 +2186,15 @@ def process_symbol_task(sym, active, mission_state):
                     block_reason = f"ANTI-HEDGE: Evitando giro brusco en {sym} (Cooldown 60s)"
 
                 if not block_action or super_conf or (is_oracle_signal and not is_hard_blocked):
-                    # MARCAR DISPARO ANTES DE ENVIAR (Cerrojo Atómico)
-                    with state_lock: STATE[f"firing_{sym}"] = now 
-                    should_fire = True
-                    trigger_type = "CAMBIO" if not super_conf else "IA-OVERRIDE"
+                    # v18.9.220: DOBLE VERIFICACIÓN ATÓMICA DE BALAS
+                    with state_lock:
+                        last_fire_ts = STATE.get(f"firing_{sym}", 0)
+                        if (now - last_fire_ts) < 5.0:
+                            should_fire = False
+                        else:
+                            STATE[f"firing_{sym}"] = now 
+                            should_fire = True
+                            trigger_type = "CAMBIO" if not super_conf else "IA-OVERRIDE"
                 elif now % 20 < 1:
                     log(f"🧘 BLOQUEO: IA quería {target_sig} pero hay {block_reason}. Esperando...")
             # v18.9.7: LOG DE PERSISTENCIA (Para que el Comandante no piense que el bot murió)
@@ -2318,17 +2340,24 @@ def process_symbol_task(sym, active, mission_state):
                                      log(f"🧘 BLOQUEO VANGUARDIA: {block_reason}")
 
                              if should_fire:
-                                 if is_exploring:
-                                     trigger_type = "EXPLORACIÓN-0.01"
-                                 else:
-                                     trigger_type = "SOLO"
+                                 # v18.9.220: DOBLE VERIFICACIÓN ATÓMICA (Caso B)
+                                 with state_lock:
+                                     last_fire_ts = STATE.get(f"firing_{sym}", 0)
+                                     if (now - last_fire_ts) < 5.0:
+                                         should_fire = False
+                                     else:
+                                         STATE[f"firing_{sym}"] = now
+                                         if is_exploring:
+                                             trigger_type = "EXPLORACIÓN-0.01"
+                                         else:
+                                             trigger_type = "SOLO"
                         elif stacking_trigger:
-                             # Solo stacking si no llegamos al límite
-                             if n_balas < MAX_BULLETS:
+                             # v18.9.215: Respetar límite adaptativo (current_max_bullets) en lugar de constante global
+                             if n_balas < current_max_bullets:
                                  should_fire = True; trigger_type = f"ACUM-B{n_balas+1}"
                              else:
                                  should_fire = False
-                                 log(f"🛑 LIMITE: {n_balas}/{MAX_BULLETS} balas activas.")
+                                 if now % 20 < 1: log(f"🛑 LIMITE: {n_balas}/{current_max_bullets} balas activas.")
                         # --- GESTIÓN ADAPTATIVA DE BALAS v18.9.103 (Lógica de Salvación) ---
                         # Si hay posiciones abiertas > 5 minutos sin profit, desbloquear salvación (4 y 5) sobre $100
                         if balance >= 100.0 and n_balas >= 3:
@@ -2515,8 +2544,12 @@ def process_symbol_task(sym, active, mission_state):
             "bb_pos": bb_pos, "m5_trend": m5_trend_label, "h1_trend": h1_trend
         }
     except Exception as e:
-        log(f"⚠️ Error task {sym}: {e}")
+        log(f"💥 Error task {sym}: {e}")
         return None
+    finally:
+        # v18.9.220: Liberar guarda de tarea al finalizar
+        if sym in ACTIVE_TASKS_VPIN:
+            ACTIVE_TASKS_VPIN.remove(sym)
 
 def metralleta_loop():
     global MIRROR_MODE
@@ -2976,6 +3009,10 @@ def metralleta_loop():
                     if now_loop % 300 < 0.1: # v18.9.141: Solo avisar cada 5 minutos
                         log(f"🛑 MERCADO {sym} CERRADO - Durmiendo octopus...")
                     continue
+                
+                # v18.9.220: GUARDA DE TAREA ACTIVA (Evita que el mismo símbolo corra 2 veces si hay lag)
+                if sym in ACTIVE_TASKS_VPIN: continue
+                ACTIVE_TASKS_VPIN.add(sym)
                 
                 futures.append(executor_octopus.submit(process_symbol_task, sym, active, mission_state))
             
