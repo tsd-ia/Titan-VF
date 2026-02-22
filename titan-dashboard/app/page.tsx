@@ -341,6 +341,17 @@ export default function TitanDashboard() {
                     </div>
                   </div>
                 </button>
+                {/* v18.9.105: REMOTE LAUNCHER BUTTON */}
+                <button onClick={() => sendCommand("remote_launch", true)} className="bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-between p-6 rounded-3xl transition-all shadow-[0_0_50px_rgba(16,185,129,0.3)] group col-span-1 md:col-span-2">
+                  <div className="flex items-center gap-4">
+                    <Power size={24} className="group-hover:rotate-90 transition-transform" />
+                    <div className="text-left">
+                      <p className="font-black text-xs uppercase tracking-widest">TRABAJAR (Remote Start)</p>
+                      <p className="text-[10px] font-bold opacity-80 uppercase">Encender MT5 Link + Oracle + Titan Core</p>
+                    </div>
+                  </div>
+                  <span className="text-[10px] font-black bg-white/20 px-3 py-1 rounded-full">BATCH LAUNCHER</span>
+                </button>
               </div>
 
               {/* v7.9: BRAIN INDEPENDENTS */}
