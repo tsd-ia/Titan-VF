@@ -585,7 +585,7 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     
     if balance < 50.0:
         max_bullets = 3 if is_btc else 1
-        smart_lot = 0.05 if is_btc else 0.01 
+        smart_lot = 0.02 if is_btc else 0.01 
     elif balance < 100.0:
         max_bullets = 3 if is_btc else 2
         smart_lot = 0.08 if is_btc else 0.02
