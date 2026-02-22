@@ -3113,7 +3113,7 @@ def metralleta_loop():
                  elapsed = str(timedelta(seconds=int(end_t - start_t)))
             
             print_dashboard(report, elapsed)
-            time.sleep(1)
+            time.sleep(0.05)
             
         except Exception as e:
             log(f"❌ CRITICAL LOOP CRASH: {e}")

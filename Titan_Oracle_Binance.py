@@ -10,8 +10,8 @@ import threading
 
 SYMBOL_BINANCE = "btcusdt"
 # Umbral para considerarlo una "Ballena" (Whale)
-WHALE_VOLUME_USD = 75000  # $75k USD: Umbral agresivo para entrar al inicio de la vela
-MINI_WHALE_THRESHOLD = 30000 # $30k USD: Para alertas visuales de presión
+WHALE_VOLUME_USD = 300000  # $300k USD: Umbral para ballenas institucionales reales
+MINI_WHALE_THRESHOLD = 100000 # $100k USD: Para alertas visuales de presión
 FILE_SIGNAL = "titan_oracle_signal.json"
 
 
@@ -19,7 +19,8 @@ STATE = {
     "buys_window": [],  # Lista de tuplas (timestamp, volume)
     "sells_window": [],
     "last_heartbeat": time.time(),
-    "last_signal_time": 0.0 # Para evitar spam del mismo lado en periodos cortos
+    "last_signal_time": 0.0, # Para evitar spam del mismo lado en periodos cortos
+    "last_price": 0.0
 }
 
 
@@ -56,8 +57,8 @@ def on_message(ws, message):
         volume_usd = price * qty
         now = time.time()
         
-        # Limpiar operaciones fuera de la ventana de 1.5 segundos
-        window_size = 1.5
+        # Limpiar operaciones fuera de la ventana de 1.2 segundos (Ultra HFT)
+        window_size = 1.2
         STATE["buys_window"] = [(ts, vol) for ts, vol in STATE["buys_window"] if now - ts <= window_size]
         STATE["sells_window"] = [(ts, vol) for ts, vol in STATE["sells_window"] if now - ts <= window_size]
         
@@ -69,23 +70,28 @@ def on_message(ws, message):
         total_sells = sum(vol for ts, vol in STATE["sells_window"])
         total_buys = sum(vol for ts, vol in STATE["buys_window"])
         
-        # Anti-spam: No disparar misma señal en menos de 2 segundos de la anterior
-        can_trigger = (now - STATE["last_signal_time"]) > 2.0
+        # v18.9.140: CONFIRMACIÓN DE PRECIO (Evitar atrapar ventas absorbidas por compras)
+        price_confirm_sell = (price <= STATE["last_price"]) if STATE["last_price"] > 0 else True
+        price_confirm_buy = (price >= STATE["last_price"]) if STATE["last_price"] > 0 else True
+
+        # Anti-spam: No disparar misma señal en menos de 1 segundo de la anterior
+        can_trigger = (now - STATE["last_signal_time"]) > 1.0
         
-        if total_sells > WHALE_VOLUME_USD and can_trigger:
+        if total_sells > WHALE_VOLUME_USD and can_trigger and price_confirm_sell:
             write_signal("SELL", "VENTA ACUMULADA", total_sells)
             STATE["last_signal_time"] = now
-            # Limpiar ventana para evitar re-doblar sobre el mismo volumen
             STATE["sells_window"].clear()
         elif total_sells > MINI_WHALE_THRESHOLD and now % 3 < 0.1:
             print(f"[{time.strftime('%H:%M:%S')}] 📉 PRESIÓN DE VENTA CONTINUA: ${total_sells:,.0f} USD")
             
-        if total_buys > WHALE_VOLUME_USD and can_trigger:
+        if total_buys > WHALE_VOLUME_USD and can_trigger and price_confirm_buy:
             write_signal("BUY", "COMPRA ACUMULADA", total_buys)
             STATE["last_signal_time"] = now
             STATE["buys_window"].clear()
         elif total_buys > MINI_WHALE_THRESHOLD and now % 3 < 0.1:
             print(f"[{time.strftime('%H:%M:%S')}] 📈 PRESIÓN DE COMPRA CONTINUA: ${total_buys:,.0f} USD")
+
+        STATE["last_price"] = price
 
                 
         # v18.9.117: Heartbeat visual cada 10s para confirmar vida
