@@ -113,6 +113,7 @@ CRYPTO_SIGNAL_FILE = "titan_crypto_signals.json" # v18.9.150
 from concurrent.futures import ThreadPoolExecutor
 executor_octopus = ThreadPoolExecutor(max_workers=len(SYMBOLS) + 2)
 ACTIVE_TASKS_VPIN = set() # v18.9.220
+LOG_LOCK = threading.Lock() # v18.9.235
 
 def global_health_check():
     print("🩺 [CONSOLE] EJECUTANDO HEALTH CHECK...")
@@ -539,34 +540,36 @@ if 'MinMaxScaler' in globals(): scaler_lstm = MinMaxScaler(feature_range=(0, 1))
 LOG_THROTTLE_CACHE = {}
 
 def log(msg):
-    """ v18.9.220: Registro con Throttling Inteligente """
+    """ v18.9.235: Registro con Throttling y Lock Atómico """
     global LOG_THROTTLE_CACHE
-    try:
-        now = time.time()
-        # Throttling de mensajes técnicos repetitivos (Evita el spam de 4x Latencia/Escudo)
-        is_repetitive = any(x in msg for x in ["LATENCIA", "BLOQUEO", "VIGILANCIA", "ESCUDO", "CEREBRO", "MERCADO", "BALLENA", "IA-OVERRIDE"])
-        if is_repetitive:
-            cache_key = msg.split(":")[0] # Throttling por tipo de mensaje (ej: VIGILANCIA)
-            if cache_key in LOG_THROTTLE_CACHE and (now - LOG_THROTTLE_CACHE[cache_key]) < 3.0:
-                return
-            LOG_THROTTLE_CACHE[cache_key] = now
-
-        ts = time.strftime("%H:%M:%S")
-        thread_name = threading.current_thread().name
-        t_name = "MAIN" if thread_name == "MainThread" else thread_name[:4].upper()
-        formatted_msg = f"[{ts}][{t_name}] {msg}"
-        LOG_BUFFER.append(formatted_msg)
-        sys.stderr.write(formatted_msg + "\n")
-        sys.stderr.flush()
-        
-        # v18.9.112: Blindaje contra bloqueos de archivo
+    with LOG_LOCK:
         try:
-            with open("titan_vanguardia.log", "a", encoding="utf-8") as f:
-                f.write(formatted_msg + "\n")
-        except:
-            pass # No morir si el archivo está bloqueado
-    except:
-        pass
+            now = time.time()
+            # Throttling de mensajes técnicos repetitivos
+            is_repetitive = any(x in msg for x in ["LATENCIA", "BLOQUEO", "VIGILANCIA", "ESCUDO", "CEREBRO", "MERCADO", "BALLENA", "IA-OVERRIDE", "ORÁCULO"])
+            if is_repetitive:
+                cache_key = msg.split(":")[0] 
+                if cache_key in LOG_THROTTLE_CACHE and (now - LOG_THROTTLE_CACHE[cache_key]) < 10.0:
+                    return
+                LOG_THROTTLE_CACHE[cache_key] = now
+
+            ts = time.strftime("%H:%M:%S")
+            thread_name = threading.current_thread().name
+            t_name = "MAIN" if thread_name == "MainThread" else thread_name[:4].upper()
+            formatted_msg = f"[{ts}][{t_name}] {msg}"
+            LOG_BUFFER.append(formatted_msg)
+            
+            sys.stderr.write(formatted_msg + "\n")
+            sys.stderr.flush()
+            
+            # v18.9.112: Blindaje contra bloqueos de archivo
+            try:
+                with open("titan_vanguardia.log", "a", encoding="utf-8") as f:
+                    f.write(formatted_msg + "\n")
+            except:
+                pass 
+        except Exception:
+            pass
 
 
 import traceback
@@ -2847,22 +2850,16 @@ def metralleta_loop():
                 # Logic moved to main loop for speed
                 pacman_timer = now_loop
 
-            # ACTUALIZAR CONTADOR DE BALAS REAL (POSICIONES ABIERTAS TOTALES)
-            try:
-                all_account_pos = mt5.positions_get()
-                bullet_count = len([p for p in all_account_pos if p.symbol == "XAUUSDm"]) if all_account_pos else 0
-            except:
-                bullet_count = 0
-            
-            # --- CALCULO DE PNL GLOBAL REAL (TRUE EQUITY SYNC) ---
+            # v18.9.235: PnL flotante real visible siempre para el Comandante
+            all_account_pos = mt5.positions_get() or []
+            total_float_pnl = sum(p.profit for p in all_account_pos)
             current_equity = get_equity()
             
-            # v18.9.25: Solo calculamos PnL si la misión está activa para evitar confusión visual
             if mission_state.get("active", False):
                 pnl = current_equity - mission_state.get("start_equity", current_equity)
                 pnl = round(pnl, 2)
             else:
-                pnl = 0.0
+                pnl = round(total_float_pnl, 2)
             
             # v12.0: DETECCIÓN DE VICTORIA INSTANTÁNEA (Sin Lag) (v15.41: +Active Check)
             target_val = mission_state.get("target", 0)
@@ -2881,8 +2878,11 @@ def metralleta_loop():
                 STATE["pnl"] = pnl 
                 STATE["equity"] = current_equity
             
-            # v16.0: Sincronización limpia de conteo de balas
-            # Ya se calculó el bullet_count arriba usando el magic 777 de manera precisa.
+            # ACTUALIZAR CONTADOR DE BALAS REAL (POSICIONES ABIERTAS TOTALES)
+            try:
+                bullet_count = len([p for p in all_account_pos if p.symbol in SYMBOLS])
+            except:
+                bullet_count = 0
             
             # eq = get_equity() # This line is now redundant as current_equity is calculated above
             with state_lock:
