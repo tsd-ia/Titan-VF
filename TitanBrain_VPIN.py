@@ -382,8 +382,10 @@ def get_market_warning():
     return None
 
 def is_market_closed(symbol):
-    """ v18.9.95: Sensor de Cierre Real para evitar reintentos inútiles """
-    if "BTC" in symbol: return False # Cripto 24/7
+    """ v18.9.155: Sensor de Cierre Real - Liberado para Crypto 24/7 """
+    # v18.9.155: Añadido SOL, ETH y patrones crypto comunes
+    crypto_patterns = ["BTC", "SOL", "ETH", "ADA", "DOT", "LINK", "UNI"]
+    if any(c in symbol.upper() for c in crypto_patterns): return False 
     
     now = datetime.now()
     weekday = now.weekday()
@@ -1072,7 +1074,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.150 | VIGILIA EXTREMA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.155 | GOD MODE 280K | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1416,7 +1418,8 @@ def process_symbol_task(sym, active, mission_state):
         target_sig = "HOLD"
         contragolpe_active = False
         bb_pos = 0.5 # Valor neutro inicial
-        is_oracle_signal = False # v18.9.119: Flag Maestro de Bypass
+        is_oracle_signal = False 
+        oracle_volume = 0 # v18.9.155: Para Regla de Oro $280k
 
         
         # v18.8: El conteo ya se realizó al inicio de la tarea técnica.
@@ -1448,7 +1451,8 @@ def process_symbol_task(sym, active, mission_state):
                             sig_pred = oracle_data["signal"]
                             conf_pred = 1.0 
                             is_oracle_signal = True
-                            log(f"⚡ ORÁCULO BTC: {sig_pred} ({oracle_data.get('reason','VOL')})")
+                            oracle_volume = oracle_data.get("volume", 0) # Capturar volumen
+                            log(f"⚡ ORÁCULO BTC: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
 
             # 2. Oráculo Crypto (SOL/ETH/MSTR/OPN) - v18.9.150
             if os.path.exists("titan_crypto_signals.json"):
@@ -1462,7 +1466,8 @@ def process_symbol_task(sym, active, mission_state):
                             sig_pred = c_sig["signal"]
                             conf_pred = 0.95
                             is_oracle_signal = True
-                            log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${c_sig['volume']/1000:.0f}k")
+                            oracle_volume = c_sig.get("volume", 0) # Capturar volumen
+                            log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
         except Exception as e: 
             if random.random() < 0.01: log(f"⚠️ Error lectura oráculos: {e}")
         
@@ -1818,6 +1823,12 @@ def process_symbol_task(sym, active, mission_state):
                     sig = "HOLD"
                     block_action = True
                     block_reason = "CORRIENTE EN CONTRA (M5/EMA/VELA): Venta bloqueada."
+
+            # --- REGLA DE ORO DEL COMANDANTE v18.9.155: GOD MODE $280k ---
+            if is_oracle_signal and oracle_volume >= 280000:
+                block_action = False # BYPASS TOTAL DE GRILLETES
+                log(f"🔱 GOD MODE ACTIVADO: Señal de ${oracle_volume/1000:.0f}k detectada. Ignorando grilletes técnicos.")
+
             
             # 2. BLOQUEO Bollinger (v18.7: MODO CONTRAGOLPE)
             b_range = upper_band - lower_band
