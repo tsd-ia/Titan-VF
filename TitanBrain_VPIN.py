@@ -1371,15 +1371,19 @@ def process_symbol_task(sym, active, mission_state):
         try:
             # Apagamos Ollama por defecto si usamos oráculo para no gastar cuota 
             # (IA seguirá prediciendo con LSTM local rápido)
-            if os.path.exists("titan_oracle_signal.json"):
-                with open("titan_oracle_signal.json", "r") as f:
-                    oracle_data = json.load(f)
-                    # Solo consideramos válido si la ballena nadó hace menos de 2 segundos
-                    if time.time() - oracle_data["timestamp"] < 2.0:
-                        if oracle_data["symbol"] == sym or sym == "BTCUSDm":
-                            sig_pred = oracle_data["signal"]
-                            conf_pred = 1.0 # Override 100%
-                            if now % 2 < 1: log(f"⚡ ORÁCULO APLICADO: {sig_pred} ({oracle_data['reason']})")
+                # v18.9.106: Lectura segura para evitar WinError 32
+                try:
+                    if os.path.exists("titan_oracle_signal.json"):
+                        with open("titan_oracle_signal.json", "r") as f:
+                            oracle_data = json.load(f)
+                            # Solo consideramos válido si la ballena nadó hace menos de 2 segundos
+                            if time.time() - oracle_data["timestamp"] < 2.0:
+                                if oracle_data["symbol"] == sym or sym == "BTCUSDm":
+                                    sig_pred = oracle_data["signal"]
+                                    conf_pred = 1.0 # Override 100%
+                                    if now % 2 < 1: log(f"⚡ ORÁCULO APLICADO: {sig_pred} ({oracle_data['reason']})")
+                except (IOError, json.JSONDecodeError):
+                    pass # El archivo está siendo escrito o bloqueado, ignorar este tick
         except: pass
         
         # v18.9.3: RECONEXIÓN CRÍTICA - Asignar señal de IA al ciclo
