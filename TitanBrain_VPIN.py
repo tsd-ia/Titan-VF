@@ -1623,16 +1623,22 @@ def process_symbol_task(sym, active, mission_state):
             else:
                 razones.append("IA_OVERRIDE:⚡")
             
-            if tot > 0 and not is_oracle_signal: # v18.9.119: Oracle Bypasses Council
-                s_buy = votos_buy / tot
+            tot = votos_buy + votos_sell
+            if not is_oracle_signal:
+                if tot > 0: 
+                    s_buy = votos_buy / tot
+                    s_sell = votos_sell / tot
+                    if s_buy > 0.58: # Umbral más alto para mayor rigor
+                        sig = "BUY"; conf = min(0.5 + s_buy*0.5, 0.98)
+                    elif s_sell > 0.58:
+                        sig = "SELL"; conf = min(0.5 + s_sell*0.5, 0.98)
+                    else: sig = "HOLD"; conf = 0.0
+                else: 
+                    sig = "HOLD"; conf = 0.0
+            else:
+                # v18.9.122: Si es señal de Oráculo, NO tocar 'sig' ni 'conf'
+                pass
 
-                s_sell = votos_sell / tot
-                if s_buy > 0.58: # Umbral más alto para mayor rigor
-                    sig = "BUY"; conf = min(0.5 + s_buy*0.5, 0.98)
-                elif s_sell > 0.58:
-                    sig = "SELL"; conf = min(0.5 + s_sell*0.5, 0.98)
-                else: sig = "HOLD"; conf = 0.0
-            else: sig = "HOLD"; conf = 0.0
             
             # v15.6: Capturar señal pura de indicadores antes de influencia IA
             council_sig = sig
