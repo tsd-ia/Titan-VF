@@ -1065,7 +1065,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.144 | VIGILIA EXTREMA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.145 | VIGILIA EXTREMA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2719,10 +2719,12 @@ def metralleta_loop():
                 #         if p.profit >= 1.20: close_ticket(p, "COSECHA_TACTICA")
                 #     continue
 
-                # v18.9.28: BOTÓN DE PÁNICO GLOBAL (REACTIVADO)
+                # v18.9.28: BOTON DE PANICO GLOBAL (REACTIVADO)
                 if current_open_pnl <= MAX_SESSION_LOSS:
-                    # v18.9.141: Throttling de log para no saturar consola
-                    if now_loop % 60 < 0.1:
+                    # v18.9.145: Throttling real compatible con loop de 0.05s
+                    if not hasattr(metralleta_loop, "last_vigilancia"): metralleta_loop.last_vigilancia = 0
+                    if (now_loop - metralleta_loop.last_vigilancia) > 60:
+                        metralleta_loop.last_vigilancia = now_loop
                         log(f"🧘 VIGILANCIA VANGUARDIA: PnL {current_open_pnl:.2f}. Manteniendo posiciones.")
                     continue
 
