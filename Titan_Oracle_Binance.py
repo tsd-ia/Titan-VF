@@ -10,14 +10,17 @@ import threading
 
 SYMBOL_BINANCE = "btcusdt"
 # Umbral para considerarlo una "Ballena" (Whale)
-WHALE_VOLUME_USD = 150000  # $150k USD: Umbral agresivo para volumen de 500+ trades/día
+WHALE_VOLUME_USD = 100000  # $100k USD: Umbral adaptado para fin de semana (Acumulado/seg)
+MINI_WHALE_THRESHOLD = 50000 # $50k USD: Para alertas visuales de presión
 FILE_SIGNAL = "titan_oracle_signal.json"
+
 
 STATE = {
     "recent_buys": 0.0,
     "recent_sells": 0.0,
     "last_reset": time.time(),
-    "last_heartbeat": time.time() # v18.9.117
+    "last_heartbeat": time.time(), # v18.9.117
+    "triggered_this_sec": False # v18.9.118: Anti-spam por segundo
 }
 
 
@@ -59,15 +62,25 @@ def on_message(ws, message):
             STATE["recent_buys"] = 0.0
             STATE["recent_sells"] = 0.0
             STATE["last_reset"] = now
+            STATE["triggered_this_sec"] = False
             
-        if is_buyer_maker: # SELL
+        if is_buyer_maker: # SELL PRESSURE
             STATE["recent_sells"] += volume_usd
-            if volume_usd > WHALE_VOLUME_USD:
-                write_signal("SELL", "VENTA", volume_usd)
-        else: # BUY
+            if STATE["recent_sells"] > WHALE_VOLUME_USD and not STATE["triggered_this_sec"]:
+                write_signal("SELL", "VENTA ACUMULADA", STATE["recent_sells"])
+                STATE["triggered_this_sec"] = True
+            elif STATE["recent_sells"] > MINI_WHALE_THRESHOLD and not STATE["triggered_this_sec"]:
+                if now % 2 < 0.1: # Evitar spam en consola
+                    print(f"[{time.strftime('%H:%M:%S')}] 📉 PRESIÓN DE VENTA: ${STATE['recent_sells']:,.0f} USD")
+        else: # BUY PRESSURE
             STATE["recent_buys"] += volume_usd
-            if volume_usd > WHALE_VOLUME_USD:
-                write_signal("BUY", "COMPRA", volume_usd)
+            if STATE["recent_buys"] > WHALE_VOLUME_USD and not STATE["triggered_this_sec"]:
+                write_signal("BUY", "COMPRA ACUMULADA", STATE["recent_buys"])
+                STATE["triggered_this_sec"] = True
+            elif STATE["recent_buys"] > MINI_WHALE_THRESHOLD and not STATE["triggered_this_sec"]:
+                if now % 2 < 0.1:
+                    print(f"[{time.strftime('%H:%M:%S')}] 📈 PRESIÓN DE COMPRA: ${STATE['recent_buys']:,.0f} USD")
+
                 
         # v18.9.117: Heartbeat visual cada 10s para confirmar vida
         if now - STATE["last_heartbeat"] > 10.0:
