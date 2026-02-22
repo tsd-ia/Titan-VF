@@ -1801,15 +1801,17 @@ def process_symbol_task(sym, active, mission_state):
             b_floor = lower_band + (b_range * 0.18)
             
             # EXCEPCIÓN CONTRAGOLPE: Si no hay posiciones y estamos en el techo/piso
-            # permitimos la entrada contraria 'Hormiga' para sopesar.
+            # v18.9.125: DESACTIVADO. El usuario quiere control total y dependencia del Oráculo.
+            # Nada de compras automáticas por Bollinger.
             contragolpe_active = False
-            if active and n_balas_reales == 0:
-                if curr_price >= b_ceiling and ultima_vela_roja:
-                    sig = "SELL"; conf = 0.90; block_action = False; contragolpe_active = True
-                    log(f"⚔️ MODO CONTRAGOLPE: Techo detectado. Abriendo SELL táctico (0.01)")
-                elif curr_price <= b_floor and ultima_vela_verde:
-                    sig = "BUY"; conf = 0.90; block_action = False; contragolpe_active = True
-                    log(f"⚔️ MODO CONTRAGOLPE: Piso detectado. Abriendo BUY táctico (0.01)")
+            # if active and n_balas_reales == 0:
+            #     if curr_price >= b_ceiling and ultima_vela_roja:
+            #         sig = "SELL"; conf = 0.90; block_action = False; contragolpe_active = True
+            #         log(f"⚔️ MODO CONTRAGOLPE: Techo detectado. Abriendo SELL táctico (0.01)")
+            #     elif curr_price <= b_floor and ultima_vela_verde:
+            #         sig = "BUY"; conf = 0.90; block_action = False; contragolpe_active = True
+            #         log(f"⚔️ MODO CONTRAGOLPE: Piso detectado. Abriendo BUY táctico (0.01)")
+
 
             if not contragolpe_active and not block_action:
                 if sig == "BUY" and curr_price >= b_ceiling:
