@@ -16,11 +16,10 @@ FILE_SIGNAL = "titan_oracle_signal.json"
 
 
 STATE = {
-    "recent_buys": 0.0,
-    "recent_sells": 0.0,
-    "last_reset": time.time(),
-    "last_heartbeat": time.time(), # v18.9.117
-    "triggered_this_sec": False # v18.9.118: Anti-spam por segundo
+    "buys_window": [],  # Lista de tuplas (timestamp, volume)
+    "sells_window": [],
+    "last_heartbeat": time.time(),
+    "last_signal_time": 0.0 # Para evitar spam del mismo lado en periodos cortos
 }
 
 
@@ -57,29 +56,36 @@ def on_message(ws, message):
         volume_usd = price * qty
         now = time.time()
         
-        # Reset accumulator every 1.5 seconds para atrapar ballenas que inyectan más lento
-        if now - STATE["last_reset"] > 1.5:
-            STATE["recent_buys"] = 0.0
-            STATE["recent_sells"] = 0.0
-            STATE["last_reset"] = now
-            STATE["triggered_this_sec"] = False
-            
+        # Limpiar operaciones fuera de la ventana de 1.5 segundos
+        window_size = 1.5
+        STATE["buys_window"] = [(ts, vol) for ts, vol in STATE["buys_window"] if now - ts <= window_size]
+        STATE["sells_window"] = [(ts, vol) for ts, vol in STATE["sells_window"] if now - ts <= window_size]
+        
         if is_buyer_maker: # SELL PRESSURE
-            STATE["recent_sells"] += volume_usd
-            if STATE["recent_sells"] > WHALE_VOLUME_USD and not STATE["triggered_this_sec"]:
-                write_signal("SELL", "VENTA ACUMULADA", STATE["recent_sells"])
-                STATE["triggered_this_sec"] = True
-            elif STATE["recent_sells"] > MINI_WHALE_THRESHOLD and not STATE["triggered_this_sec"]:
-                if now % 2 < 0.1: # Evitar spam en consola
-                    print(f"[{time.strftime('%H:%M:%S')}] 📉 PRESIÓN DE VENTA: ${STATE['recent_sells']:,.0f} USD")
+            STATE["sells_window"].append((now, volume_usd))
         else: # BUY PRESSURE
-            STATE["recent_buys"] += volume_usd
-            if STATE["recent_buys"] > WHALE_VOLUME_USD and not STATE["triggered_this_sec"]:
-                write_signal("BUY", "COMPRA ACUMULADA", STATE["recent_buys"])
-                STATE["triggered_this_sec"] = True
-            elif STATE["recent_buys"] > MINI_WHALE_THRESHOLD and not STATE["triggered_this_sec"]:
-                if now % 2 < 0.1:
-                    print(f"[{time.strftime('%H:%M:%S')}] 📈 PRESIÓN DE COMPRA: ${STATE['recent_buys']:,.0f} USD")
+            STATE["buys_window"].append((now, volume_usd))
+            
+        total_sells = sum(vol for ts, vol in STATE["sells_window"])
+        total_buys = sum(vol for ts, vol in STATE["buys_window"])
+        
+        # Anti-spam: No disparar misma señal en menos de 2 segundos de la anterior
+        can_trigger = (now - STATE["last_signal_time"]) > 2.0
+        
+        if total_sells > WHALE_VOLUME_USD and can_trigger:
+            write_signal("SELL", "VENTA ACUMULADA", total_sells)
+            STATE["last_signal_time"] = now
+            # Limpiar ventana para evitar re-doblar sobre el mismo volumen
+            STATE["sells_window"].clear()
+        elif total_sells > MINI_WHALE_THRESHOLD and now % 3 < 0.1:
+            print(f"[{time.strftime('%H:%M:%S')}] 📉 PRESIÓN DE VENTA CONTINUA: ${total_sells:,.0f} USD")
+            
+        if total_buys > WHALE_VOLUME_USD and can_trigger:
+            write_signal("BUY", "COMPRA ACUMULADA", total_buys)
+            STATE["last_signal_time"] = now
+            STATE["buys_window"].clear()
+        elif total_buys > MINI_WHALE_THRESHOLD and now % 3 < 0.1:
+            print(f"[{time.strftime('%H:%M:%S')}] 📈 PRESIÓN DE COMPRA CONTINUA: ${total_buys:,.0f} USD")
 
                 
         # v18.9.117: Heartbeat visual cada 10s para confirmar vida
