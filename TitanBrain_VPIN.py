@@ -584,7 +584,7 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_btc = (sym == "BTCUSDm")
     
     if balance < 50.0:
-        max_bullets = 1 if is_btc else 1
+        max_bullets = 3 if is_btc else 1
         smart_lot = 0.10 if is_btc else 0.01 
     elif balance < 100.0:
         max_bullets = 3 if is_btc else 2
@@ -2197,9 +2197,9 @@ def process_symbol_task(sym, active, mission_state):
                             # BALA 2: Solo si la bala 1 está positiva
                             # BALA 3: Solo si la bala 2 está positiva
                             prev_is_positive = lp.profit > 0
-                            if (prev_is_positive and (now - LAST_ENTRY.get(sym, 0)) > 20.0) or (is_oracle_signal and (now - LAST_ENTRY.get(sym, 0)) > 5.0):
+                            if prev_is_positive and ((now - LAST_ENTRY.get(sym, 0)) > 20.0 or (is_oracle_signal and (now - LAST_ENTRY.get(sym, 0)) > 5.0)):
                                 stacking_trigger = True
-                                r_text = 'ORÁCULO FORZA (5s Delay)' if is_oracle_signal else f'Anterior positiva (${lp.profit:.2f})'
+                                r_text = 'ORÁCULO FORZA (Secuencial)' if is_oracle_signal else f'Anterior positiva (${lp.profit:.2f})'
                                 log(f"🟢 BALA {n_balas+1}: {r_text}. ACUMULANDO.")
                             elif not prev_is_positive:
                                 stacking_trigger = False
