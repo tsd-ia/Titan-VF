@@ -1099,7 +1099,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.210 | ATOMIC LOCKS | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.225 | BLOQUEO ATOMICO 8s | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2327,88 +2327,89 @@ def process_symbol_task(sym, active, mission_state):
                             LAST_CLOSE_REASON[sym] = "RE-ENTERED"
 
                         if n_balas == 0 and not is_urgent_continuation:
-                             # v16.7: Solo entrar si NO hay bloqueos de Bollinger/Spread
-                             # v18.9.120: ORACLE BYPASS total de bloqueos tácticos
-                             if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= 0.60:  
-                                 should_fire = True
-                             else:
-                                 should_fire = False
-
-                                 if now % 20 < 1 and not block_action: 
-                                     log(f"⏳ BAJA CONFIANZA: {conf*100:.1f}% < 70%")
-                                 elif now % 20 < 1:
-                                     log(f"🧘 BLOQUEO VANGUARDIA: {block_reason}")
-
-                             if should_fire:
-                                 # v18.9.220: DOBLE VERIFICACIÓN ATÓMICA (Caso B)
-                                 with state_lock:
-                                     last_fire_ts = STATE.get(f"firing_{sym}", 0)
-                                     if (now - last_fire_ts) < 5.0:
-                                         should_fire = False
-                                     else:
-                                         STATE[f"firing_{sym}"] = now
-                                         if is_exploring:
-                                             trigger_type = "EXPLORACIÓN-0.01"
-                                         else:
-                                             trigger_type = "SOLO"
-                        elif stacking_trigger:
-                             # v18.9.215: Respetar límite adaptativo (current_max_bullets) en lugar de constante global
-                             if n_balas < current_max_bullets:
-                                 should_fire = True; trigger_type = f"ACUM-B{n_balas+1}"
-                             else:
-                                 should_fire = False
-                                 if now % 20 < 1: log(f"🛑 LIMITE: {n_balas}/{current_max_bullets} balas activas.")
-                        # --- GESTIÓN ADAPTATIVA DE BALAS v18.9.103 (Lógica de Salvación) ---
-                        # Si hay posiciones abiertas > 5 minutos sin profit, desbloquear salvación (4 y 5) sobre $100
-                        if balance >= 100.0 and n_balas >= 3:
-                            oldest_pos_time = min(p.time for p in pos_list) if pos_list else now
-                            if (now - oldest_pos_time) > 300: # 5 minutos
-                                current_max_bullets = 5
-                                log(f"🆘 ACTIVANDO BALAS DE SALVACIÓN (n={n_balas+1}): Posiciones estancadas > 5m.")
-
-                        if n_balas >= current_max_bullets:
-                            should_fire = False
-                            if now % 20 < 1: log(f"🛑 LIMITE ADAPTATIVO: {n_balas}/{current_max_bullets} balas (Saldo ${balance:.2f}).")
+                            # v16.7: Solo entrar si NO hay bloqueos de Bollinger/Spread
+                            # v18.9.120: ORACLE BYPASS total de bloqueos tácticos
+                            if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= 0.60:  
+                                should_fire = True
                             else:
-                                 # v18.9.40: Distancia Maratón (Misión $500)
-                                 # v18.9.81: Distancia reducida si la confianza es BRUTAL
-                                 smart_min_dist = 0.80  # v18.9.94: Min 80 pts entre balas en Oro
-                                 
-                                 # 3. Confirmación de color de vela (Flexibilizado para Máxima Potencia)
-                                 confirmacion_vela = False
-                                 if target_sig == "SELL" and ultima_vela_roja: confirmacion_vela = True
-                                 if target_sig == "BUY" and ultima_vela_verde: confirmacion_vela = True
-                                 
-                                 # Si la IA es BRUTAL (85%+), ignoramos el color de la vela y el delay
-                                 if conf >= 0.85: 
-                                     confirmacion_vela = True
-                                     # req_delay ya se cumplió por el elif
+                                should_fire = False
+                                if now % 20 < 1 and not block_action: 
+                                    log(f"⏳ BAJA CONFIANZA: {conf*100:.1f}% < 70%")
+                                elif now % 20 < 1:
+                                    log(f"🧘 BLOQUEO VANGUARDIA: {block_reason}")
 
-                                 # Condición de Rescate Real
-                                 if dist_val >= smart_min_dist and confirmacion_vela:
-                                     # Solo promediamos si hay una señal clara
-                                     if raw_prob > 0.75 or conf > 0.90:
-                                         if is_exploring:
-                                             if n_balas == 0:
-                                                 should_fire = True
-                                                 trigger_type = "EXPLORACIÓN-0.01"
-                                             else:
-                                                 should_fire = False
-                                         else:
-                                             should_fire = True
-                                             trigger_type = f"BALA-{n_balas+1}"
+                            if should_fire:
+                                trigger_type = "EXPLORACIÓN-0.01" if is_exploring else "SOLO"
+                        
+                        elif stacking_trigger:
+                            # v18.9.225: Aplicar límite adaptativo y preparar para verificación atómica
+                            if n_balas < current_max_bullets:
+                                should_fire = True
+                                trigger_type = f"ACUM-B{n_balas+1}"
+                            else:
+                                should_fire = False
+                                if now % 20 < 1: log(f"🛑 LIMITE: {n_balas}/{current_max_bullets} balas activas.")
+
+                        # --- GESTIÓN ADAPTATIVA DE BALAS v18.9.225 (Blindaje Total) ---
+                        # v18.9.225: Limite Rígido de Seguridad (No más de 6 bajo ninguna circunstancia)
+                        hard_limit = min(6, current_max_bullets)
+                        
+                        if n_balas >= hard_limit:
+                            should_fire = False
+                            if now % 20 < 1: log(f"🛑 LIMITE RIGIDO: {n_balas}/{hard_limit} balas en {sym}. Bloqueando.")
+                        
+                        # --- VERIFICACIÓN ATÓMICA FINAL DE DISPARO ---
+                        if should_fire:
+                            with state_lock:
+                                last_fire_ts = STATE.get(f"firing_{sym}", 0)
+                                if (now - last_fire_ts) < 8.0: # 8s de silencio total entre órdenes del mismo activo
+                                    should_fire = False
+                                else:
+                                    STATE[f"firing_{sym}"] = now
+                                    # Conservar trigger_type asignado arriba
+                                    pass
+                        
+                        # --- CÁLCULO DE PARÁMETROS DE PROMEDIACIÓN (v18.9.40) ---
+                        smart_min_dist = 0.80 # Default
+                        if n_balas > 0:
+                            # v18.9.81: Distancia reducida si la confianza es BRUTAL
+                            smart_min_dist = 0.80  # v18.9.94: Min 80 pts entre balas en Oro
+                            
+                            # 3. Confirmación de color de vela (Flexibilizado para Máxima Potencia)
+                            confirmacion_vela = False
+                            if target_sig == "SELL" and ultima_vela_roja: confirmacion_vela = True
+                            if target_sig == "BUY" and ultima_vela_verde: confirmacion_vela = True
+                                 
+                            # Si la IA es BRUTAL (85%+), ignoramos el color de la vela y el delay
+                            if conf >= 0.85: 
+                                confirmacion_vela = True
+                                # req_delay ya se cumplió por el elif
+
+                            # Condición de Rescate Real
+                            if dist_val >= smart_min_dist and confirmacion_vela:
+                                # Solo promediamos si hay una señal clara
+                                if raw_prob > 0.75 or conf > 0.90:
+                                    if is_exploring:
+                                        if n_balas == 0:
+                                            should_fire = True
+                                            trigger_type = "EXPLORACIÓN-0.01"
+                                        else:
+                                            should_fire = False
+                                    else:
+                                        should_fire = True
+                                        trigger_type = f"BALA-{n_balas+1}"
                                      
-                                     if should_fire:
-                                         if sym_pnl < 0:
-                                              log(f"🚑 RESCATE VANGUARDIA: B{n_balas+1} (D:{dist_val:.2f} P:{raw_prob:.2f})")
-                                         else:
-                                              log(f"🪜 TRABAJANDO: Añadiendo B{n_balas+1} (IA:{raw_prob:.2f}) a favor")
-                                 else:
-                                     should_fire = False
-                                     # Log de espera detallado
-                                     if now % 20 < 1:
-                                         razon_espera = "Distancia" if dist_val < smart_min_dist else "Color de Vela"
-                                         log(f"🧘 AFILANDO PUNTERÍA: Esperando {razon_espera} para B{n_balas+1} (D:{dist_val:.2f}/0.25)")
+                                    if should_fire:
+                                        if sym_pnl < 0:
+                                            log(f"🚑 RESCATE VANGUARDIA: B{n_balas+1} (D:{dist_val:.2f} P:{raw_prob:.2f})")
+                                        else:
+                                            log(f"🪜 TRABAJANDO: Añadiendo B{n_balas+1} (IA:{raw_prob:.2f}) a favor")
+                                else:
+                                    should_fire = False
+                                    # Log de espera detallado
+                                    if now % 20 < 1:
+                                        razon_espera = "Distancia" if dist_val < smart_min_dist else "Color de Vela"
+                                        log(f"🧘 AFILANDO PUNTERÍA: Esperando {razon_espera} para B{n_balas+1} (D:{dist_val:.2f}/0.25)")
                         
                         # --- FILTRO DE VIDA MÍNIMA v11.6 (ANTI-WHIPSAW) ---
                         # v12.1: Ignorar delay si es un HEDGE (Rescate urgente)
