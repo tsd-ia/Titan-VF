@@ -248,7 +248,7 @@ def push_firebase(data):
 def firebase_command_poller():
     """ v18.9.97: Puente de Mandos desde la WEB vía Firebase """
     global STATE
-    url = f"{FIREBASE_URL}/commands.json"
+    url = f"{FIREBASE_URL}/live/commands.json"
     log("📡 PUENTE DE MANDOS WEB ACTIVADO")
     while True:
         try:

@@ -86,7 +86,7 @@ export default function TitanDashboard() {
   }, []);
 
   const sendCommand = async (cmd: string, val: any) => {
-    await update(ref(db, "commands"), { [cmd]: val });
+    await update(ref(db, "live/commands"), { [cmd]: val });
     alert(`ACCIÓN ENVIADA: ${cmd.toUpperCase()}`);
   };
 
