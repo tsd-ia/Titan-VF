@@ -56,28 +56,24 @@ def kill_port_process(port):
         pass 
 
 def kill_previous_instances():
-    """ Mata cualquier proceso de Python que esté ejecutando este script específico """
+    """ Mata instancias previas de forma segura (v18.9.107) """
     try:
         import psutil
-        current_pid = os.getpid()
-        parent_pid = os.getppid()
+        my_pid = os.getpid()
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
             try:
-                pname = proc.info.get('name', '')
-                if 'python' not in pname.lower():
-                    continue
+                pid = proc.info['pid']
+                if pid == my_pid: continue
+                # Evitar matar al Runner (nuestro padre)
+                if pid == os.getppid(): continue
+                
                 cmd = proc.info.get('cmdline', [])
-                if not cmd:
-                    continue
-                if any('TitanBrain_VPIN' in s for s in cmd):
-                    pid = proc.info['pid']
-                    if pid != current_pid and pid != parent_pid:
-                        print(f"🧹 PURGA: Matando instancia anterior (PID: {pid})")
-                        proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-    except Exception:
-        pass
+                if cmd and any('TitanBrain_VPIN' in s for s in cmd):
+                    print(f"🧹 PURGA: Eliminando instancia fantasma (PID: {pid})")
+                    proc.kill()
+            except: continue
+    except: pass
+
 
 # EJECUTAR LIMPIEZA INMEDIATA
 print("🧹 [CONSOLE] LIMPIANDO PROCESOS FANTASMA...")
@@ -520,11 +516,15 @@ def log(msg):
         ts = time.strftime("%H:%M:%S")
         formatted_msg = f"[{ts}] {msg}"
         LOG_BUFFER.append(formatted_msg)
-        # Escribir en stderr para no interferir con el Dashboard que usa stdout \033[H
+        # Escribir en stderr para no interferir con el Dashboard que usa stdout
         sys.stderr.write(formatted_msg + "\n")
         sys.stderr.flush()
+        # v18.9.107: Log de Persistencia Física (Diagnóstico remoto)
+        with open("titan_vanguardia.log", "a", encoding="utf-8") as f:
+            f.write(formatted_msg + "\n")
     except:
         pass
+
 
 def atomic_write(path, content):
     try: os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -3320,12 +3320,23 @@ if __name__ == "__main__":
         t2.start()
         
         log(f"🚀 TITAN BRAIN ONLINE @ PORT {PORT} (FASTAPI MODE)")
-        uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="error")
+        # v18.9.107: Modo Super-Persistencia
+        try:
+            uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="error")
+        except Exception as uv_e:
+            log(f"⚠️ UVICORN HA FINALIZADO: {uv_e}")
+        
+        # SI LLEGAMOS AQUÍ, EL SCRIPT QUISO CERRARSE. LO BLOQUEAMOS.
+        log("🧥 MODO PERSISTENCIA ACTIVADO: Bloqueando cierre de terminal...")
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
         log("🛑 APAGADO MANUAL DETECTADO")
     except Exception as e:
         import traceback
         error_msg = f"💥 FATAL ERROR EN HILO PRINCIPAL: {e}\n{traceback.format_exc()}"
         print(error_msg)
+        log(error_msg)
         input("\n⚠️ EL PROCESO HA CAÍDO. Presione ENTER para cerrar la ventana y revise el error arriba...")
         sys.exit(1)
+
