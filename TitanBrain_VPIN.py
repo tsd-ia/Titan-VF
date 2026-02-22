@@ -415,7 +415,7 @@ MISSION_HISTORY = deque(maxlen=1000) # v15.47: Fix Critical
 MISSION_LATENCIES = [] # v15.43: Rastro de ms para auditoría real
 LAST_LATENCY = 0.0      # v15.45: Memoria para bloqueo preventivo
 LAST_LATENCY_UPDATE = 0 # v15.48: Control de frescura del ping
-state_lock = threading.Lock()
+state_lock = threading.RLock()
 
 def load_history():
     try:
