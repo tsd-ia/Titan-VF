@@ -282,9 +282,9 @@ def firebase_command_poller():
                             stop_mission()
                             # Resetear pánico en firebase para no loopear
                             requests.patch(url, json={"panic": False})
-            time.sleep(5)
+            time.sleep(1)
         except:
-            time.sleep(10)
+            time.sleep(2)
 
 # --- ESTADO DE MISIÓN (Persistente) ---
 mission_state = {

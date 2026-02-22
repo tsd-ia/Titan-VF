@@ -73,21 +73,31 @@ export default function TitanDashboard() {
   const [data, setData] = useState<SentinelData | null>(null);
   const [activeTab, setActiveTab] = useState<"radar" | "audit" | "history" | "system">("radar");
   const [connecting, setConnecting] = useState(true);
+  const [overrides, setOverrides] = useState<Record<string, any>>({});
 
   useEffect(() => {
     const liveRef = ref(db, "live");
     const unsub = onValue(liveRef, (snap) => {
       if (snap.exists()) {
-        setData(snap.val());
+        const newData = snap.val();
+        setData(newData);
         setConnecting(false);
+        // Limpiar overrides si el dato real ya coincide
+        setOverrides(prev => {
+          const next = { ...prev };
+          Object.keys(next).forEach(key => {
+            if (newData[key] === next[key]) delete next[key];
+          });
+          return next;
+        });
       }
     });
     return () => unsub();
   }, []);
 
   const sendCommand = async (cmd: string, val: any) => {
+    setOverrides(prev => ({ ...prev, [cmd]: val }));
     await update(ref(db, "live/commands"), { [cmd]: val });
-    alert(`ACCIÓN ENVIADA: ${cmd.toUpperCase()}`);
   };
 
   if (connecting || !data) {
@@ -322,7 +332,7 @@ export default function TitanDashboard() {
             <div className="bg-gray-900 border border-gray-800 rounded-[2.5rem] p-10">
               <h3 className="text-xs font-black tracking-[0.3em] uppercase mb-8 text-white text-center italic">Titan Mission Orchestrator</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <button onClick={() => sendCommand("auto_mode", !data.auto_mode)} className={`flex items-center justify-between p-6 rounded-3xl border transition-all ${data.auto_mode ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-gray-800/10 border-gray-800 text-gray-500'}`}>
+                <button onClick={() => sendCommand("auto_mode", !(overrides.auto_mode ?? data.auto_mode))} className={`flex items-center justify-between p-6 rounded-3xl border transition-all ${(overrides.auto_mode ?? data.auto_mode) ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-500' : 'bg-gray-800/10 border-gray-800 text-gray-500'}`}>
                   <div className="flex items-center gap-4">
                     <Power size={24} />
                     <div className="text-left">
@@ -330,7 +340,7 @@ export default function TitanDashboard() {
                       <p className="text-[10px] opacity-60 uppercase font-bold">Total control engagement</p>
                     </div>
                   </div>
-                  <span className="text-xs font-black">{data.auto_mode ? 'ON' : 'OFF'}</span>
+                  <span className="text-xs font-black">{(overrides.auto_mode ?? data.auto_mode) ? 'ON' : 'OFF'}</span>
                 </button>
                 <button onClick={() => sendCommand("start_mission", true)} className="bg-cyan-500 hover:bg-cyan-400 text-black flex items-center justify-between p-6 rounded-3xl transition-all shadow-[0_0_50px_rgba(6,182,212,0.3)] group">
                   <div className="flex items-center gap-4">
@@ -356,7 +366,7 @@ export default function TitanDashboard() {
 
               {/* v7.9: BRAIN INDEPENDENTS */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
-                <button onClick={() => sendCommand("oro_brain_on", !data.oro_brain_on)} className={`flex items-center justify-between p-6 rounded-3xl border transition-all ${data.oro_brain_on ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-gray-800/10 border-gray-800 text-gray-400'}`}>
+                <button onClick={() => sendCommand("oro_brain_on", !(overrides.oro_brain_on ?? data.oro_brain_on))} className={`flex items-center justify-between p-6 rounded-3xl border transition-all ${(overrides.oro_brain_on ?? data.oro_brain_on) ? 'bg-yellow-500/10 border-yellow-500/30 text-yellow-500' : 'bg-gray-800/10 border-gray-800 text-gray-400'}`}>
                   <div className="flex items-center gap-4">
                     <BrainCircuit size={24} />
                     <div className="text-left">
@@ -364,9 +374,9 @@ export default function TitanDashboard() {
                       <p className="text-[10px] opacity-60 uppercase font-bold text-yellow-500/80">XAUUSD + FX Analysis</p>
                     </div>
                   </div>
-                  <span className="text-xs font-black">{data.oro_brain_on ? 'ONLINE' : 'OFFLINE'}</span>
+                  <span className="text-xs font-black">{(overrides.oro_brain_on ?? data.oro_brain_on) ? 'ONLINE' : 'OFFLINE'}</span>
                 </button>
-                <button onClick={() => sendCommand("btc_brain_on", !data.btc_brain_on)} className={`flex items-center justify-between p-6 rounded-3xl border transition-all ${data.btc_brain_on ? 'bg-orange-500/10 border-orange-500/30 text-orange-500' : 'bg-gray-800/10 border-gray-800 text-gray-400'}`}>
+                <button onClick={() => sendCommand("btc_brain_on", !(overrides.btc_brain_on ?? data.btc_brain_on))} className={`flex items-center justify-between p-6 rounded-3xl border transition-all ${(overrides.btc_brain_on ?? data.btc_brain_on) ? 'bg-orange-500/10 border-orange-500/30 text-orange-500' : 'bg-gray-800/10 border-gray-800 text-gray-400'}`}>
                   <div className="flex items-center gap-4">
                     <BrainCircuit size={24} />
                     <div className="text-left">
@@ -374,7 +384,7 @@ export default function TitanDashboard() {
                       <p className="text-[10px] opacity-60 uppercase font-bold text-orange-500/80">Bitcoin 24/7 Neural Core</p>
                     </div>
                   </div>
-                  <span className="text-xs font-black">{data.btc_brain_on ? 'ONLINE' : 'OFFLINE'}</span>
+                  <span className="text-xs font-black">{(overrides.btc_brain_on ?? data.btc_brain_on) ? 'ONLINE' : 'OFFLINE'}</span>
                 </button>
               </div>
             </div>
