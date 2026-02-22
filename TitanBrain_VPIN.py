@@ -136,9 +136,9 @@ def global_health_check():
         print(f"⚠️ Error en Health Check: {e}")
 
 # --- CONFIGURACIÓN DE GESTIÓN ---
-MAX_BULLETS = 3  # v18.9.94: 3 balas - bala 2 y 3 solo si anterior positiva
+MAX_BULLETS = 10 # v18.9.250: Ampliado para mover la cuenta agresivamente
 MAX_DAILY_LOSS = 0.85 # -85% equidad = Stop loss global (Sobrevivencia = Mínimo $15.0)9
-MAX_SESSION_LOSS = -8.0  # v18.9.93: Máximo -$8 por sesión
+MAX_SESSION_LOSS = -25.0  # v18.9.250: Ampliado para aguantar BTC/ETH domingo
 MIN_EQUITY_TO_TRADE = 10.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $10, bot se congela
 LAST_ENTRY_PRICE = {} # Memoria de precio para evitar apilar en el mismo punto
 LAST_HEARTBEAT = {} 
@@ -319,9 +319,9 @@ mission_state = {
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
     "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
-    "BTCUSDm": {"lot": 0.01, "sl": 250000, "tp": 15000}, 
-    "ETHUSDm": {"lot": 0.10, "sl": 25000, "tp": 1000},
-    "SOLUSDm": {"lot": 0.10, "sl": 250, "tp": 10},
+    "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 10},
+    "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 10},
+    "ETHUSDm": {"lot": 0.8, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 10},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000},
@@ -623,9 +623,9 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     if balance < 50.0:
         smart_lot = 0.03 if is_btc else (0.1 if is_crypto else 0.01)
     elif balance < 100.0:
-        smart_lot = 0.05 if is_btc else (0.2 if is_crypto else 0.02)
+        smart_lot = 0.05 if is_btc else (0.8 if "ETH" in sym else 0.2 if is_crypto else 0.02)
     else:
-        smart_lot = 0.06 if is_btc else (0.3 if is_crypto else 0.03)
+        smart_lot = 0.06 if is_btc else (0.8 if "ETH" in sym else 0.3 if is_crypto else 0.03)
         
     return max_bullets, smart_lot
 
@@ -877,7 +877,7 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
     elif "XAU" in symbol:
         skew_limit = 1000  # Oro domingo: permitir spreads de 10.00 pips
     else:
-        skew_limit = 500   # SOL/ETH: permitir 500pts
+        skew_limit = 8000   # SOL/ETH: permitir 8000pts (Sunday Resilience v18.9.250)
     
     if spread > skew_limit:
         final_lot = 0.01
@@ -1102,7 +1102,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.245 | PRECISION FIRE | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.250 | GIGA-FIRE | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1870,8 +1870,8 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = True
                     block_reason = "CORRIENTE EN CONTRA (M5/EMA/VELA): Venta bloqueada."
 
-            # --- REGLA DE ORO DEL COMANDANTE v18.9.155: GOD MODE $280k ---
-            if is_oracle_signal and oracle_volume >= 280000:
+            # --- REGLA DE ORO DEL COMANDANTE v18.9.250: GOD MODE $80k UNIFICADO ---
+            if is_oracle_signal and oracle_volume >= 80000:
                 block_action = False # BYPASS TOTAL DE GRILLETES
                 log(f"🔱 GOD MODE ACTIVADO: Señal de ${oracle_volume/1000:.0f}k detectada. Ignorando grilletes técnicos.")
 
@@ -2122,7 +2122,8 @@ def process_symbol_task(sym, active, mission_state):
         # Throttling inteligente: Si use_cache es True, no llamamos aunque pasen 3m.
         # v18.9.103: Reducimos a 180s (3m) el refresco forzado para scalping minuto a minuto.
         # v18.9.123: Salto de IA si es señal de Oráculo (Confianza ciega en ballenas)
-        if conf >= 0.70 and not active and (not use_cache or (time.time() - last_call_ts > 180)):
+        # v18.9.250: Permitir IA incluso en misión para confirmar oráculos
+        if conf >= 0.70 and (not use_cache or (time.time() - last_call_ts > 180)):
 
             LAST_OLLAMA_CALL[sym] = time.time()
             bb_txt = "TOPE" if bb_pos > 0.8 else "SUELO" if bb_pos < 0.2 else "CENTRO"
