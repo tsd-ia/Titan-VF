@@ -1084,7 +1084,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.195 | SELECTIVE ACTIVATION | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.202 | FIX RSI_VAL_PRED | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1449,8 +1449,8 @@ def process_symbol_task(sym, active, mission_state):
         # Assuming `predecir` is the function that provides these values.
         # The user's snippet implies `get_advice` but the original code uses `predecir`.
         # I will keep `predecir` as it's in the original code, but ensure `sig`, `conf`, `raw_prob` are updated.
-        # v18.9.200: FIX RSI 0 - Asegurar que tenemos suficientes velas para el cálculo
-        # La función predecir ya calcula RSI, pero lo re-validamos aquí para el display
+        # v18.9.202: FIX RSI CRÍTICO (Restaurando llamada a IA)
+        sig_pred, conf_pred, rsi_val_pred, raw_prob_pred, adx_val = predecir(sym)
         rsi_val = rsi_val_pred if rsi_val_pred > 0 else 50.0
         LAST_PROBS[sym] = raw_prob_pred
         raw_prob = raw_prob_pred  

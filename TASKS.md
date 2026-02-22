@@ -34,6 +34,7 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Modo Hibernación Selectiva de Oráculos (`v18.9.195`).
 - [x] Calibración Fin de Semana y God Mode $150k (`v18.9.200`).
 - [x] Soporte Fuego Autónomo (Auto-Fire) para Oráculos.
+- [x] Fix crítico `rsi_val_pred` no definido (`v18.9.202`).
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*
