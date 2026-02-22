@@ -1084,7 +1084,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.202 | FIX RSI_VAL_PRED | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.210 | ATOMIC LOCKS | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1477,12 +1477,12 @@ def process_symbol_task(sym, active, mission_state):
                     bin_sym = sym.replace("USDm", "usdt").lower()
                     if bin_sym in crypto_signals:
                         c_sig = crypto_signals[bin_sym]
-                        if time.time() - c_sig["timestamp"] < 8.0:
+                        if time.time() - c_sig["timestamp"] < 15.0: # Aumento cooldown contra spam
                             sig_pred = c_sig["signal"]
                             conf_pred = 0.95
                             is_oracle_signal = True
                             oracle_volume = c_sig.get("volume", 0) # Capturar volumen
-                            log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
+                            if now % 10 < 1: log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
 
             # 3. Oráculo Oro (XAUUSDm) - v18.9.160
             if os.path.exists("titan_gold_signals.json") and ("XAU" in sym or "Gold" in sym):
@@ -1507,10 +1507,10 @@ def process_symbol_task(sym, active, mission_state):
         # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
         balance = acc.balance if acc else 0
         current_max_bullets, smart_lot = get_adaptive_risk_params(balance, conf, rsi_val, sym)
-        with state_lock:
-            # Actualizamos el lote global para este símbolo para que todos los bloques lo usen
-            ASSET_CONFIG[sym]["lot"] = smart_lot
-        
+        # v18.9.210: CERROJO ATÓMICO PREVENTIVO (Anti-Metralleta)
+        is_firing_now = (now - STATE.get(f"firing_{sym}", 0)) < 15
+        if is_firing_now: return None # Salida inmediata si ya hay una bala en el aire
+
         # TP Dinámico v11.2: SIN TP FIJO - El trailing stop del EA maneja la salida
         # INCIDENTE: TP de 2000 pts ($6) cerraba trades que podían dar $10+
         # Ahora surf_tp = None → usa cfg['tp'] = 999999 (decoy que nunca se alcanza)
@@ -2163,7 +2163,14 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = True
                     block_reason = f"ANTI-WHIPSAW: Bloqueo re-entrada {target_sig} tras pérdida (180s)"
                 
+                # v18.9.210: ANTI-HEDGE DE PÁNICO (Mínimo 60s entre cambios)
+                if last_dir != "" and (now - last_time) < 60 and target_sig != last_type:
+                    block_action = True
+                    block_reason = f"ANTI-HEDGE: Evitando giro brusco en {sym} (Cooldown 60s)"
+
                 if not block_action or super_conf or (is_oracle_signal and not is_hard_blocked):
+                    # MARCAR DISPARO ANTES DE ENVIAR (Cerrojo Atómico)
+                    with state_lock: STATE[f"firing_{sym}"] = now 
                     should_fire = True
                     trigger_type = "CAMBIO" if not super_conf else "IA-OVERRIDE"
                 elif now % 20 < 1:
