@@ -9,11 +9,13 @@ Este documento sirve como la "Constitución" para cualquier IA o desarrollador q
     *   **IA Híbrida**: Combina modelos LSTM locales (`.h5`) con sentimientos de Ollama.
 3.  **CAPA VISUAL (Vercel)**: Next.js 15 conectado por Firebase. Solo sirve para monitoreo y mandos remotos (toggles de cerebros).
 
-## 2. Reglas de Gestión de Riesgo (Protocolo v18.9.103)
-El bot debe adaptar su agresividad según el saldo real de la cuenta:
-- **Balance < $50**: 1 Bala máxima. Solo Scalping de precisión. Lote: `0.01` (máximo `0.03` si la IA tiene >90% conf).
-- **Balance $50 - $100**: Máximo 2 posiciones simultáneas. Lote: `0.02 - 0.04`.
-- **Balance > $100**: Hasta 3 posiciones base + 2 de salvación. Libertad de lote hasta `0.06`.
+## 2. Reglas de Gestión de Riesgo (Protocolo v18.9.170)
+El bot utiliza un sistema de **Independencia de Balas** (Buckets) por cada instrumento:
+- **ORO (XAUUSDm)**: 3 Balas máximo (Excluyente de otros).
+- **BTC (BTCUSDm)**: 3 Balas máximo (Excluyente de otros).
+- **CRYPTO (SOL, ETH, etc.)**: 5 Balas máximo por símbolo (Excluyente de otros).
+- **Regla God Mode ($280k)**: Si el volumen del Oráculo supera $280k, se ignoran grilletes técnicos y se dispara la bala obligatoriamente.
+- **Lotaje**: Adaptativo según balance y activo (Crypto usa lotaje base 0.10 para mayor impacto).
 - **Salvación**: Solo se activa si las posiciones base llevan > 5 minutos estancadas.
 
 ## 3. Lógica de Inteligencia Artificial

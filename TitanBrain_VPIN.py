@@ -317,7 +317,9 @@ mission_state = {
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
     "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
-    "BTCUSDm": {"lot": 0.01, "sl": 250000, "tp": 15000}, # Usuario: 0.01 LOT | MODO BUNKER
+    "BTCUSDm": {"lot": 0.01, "sl": 250000, "tp": 15000}, 
+    "ETHUSDm": {"lot": 0.10, "sl": 25000, "tp": 1000},
+    "SOLUSDm": {"lot": 0.10, "sl": 250, "tp": 10},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000},
@@ -588,18 +590,23 @@ def get_equity():
     return acc.equity if acc else 0.0
 
 def get_adaptive_risk_params(balance, conf, rsi_val, sym):
-    """ Protocolo v18.9.150: Gestión de Riesgo para ORO, BTC y CRYPTO """
+    """ Protocolo v18.9.165: Independencia de Balas (3 Oro, 3 BTC, 5 Crypto) """
     is_btc = (sym == "BTCUSDm")
-    is_crypto = (sym in ["SOLUSDm", "ETHUSDm", "ADAUSDm", "DOTUSDm"])
+    is_gold = ("XAU" in sym or "Gold" in sym)
+    is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
+    # 1. Definir Balas por Categoría (Petición Comandante)
+    if is_gold: max_bullets = 3
+    elif is_btc: max_bullets = 3
+    elif is_crypto: max_bullets = 5
+    else: max_bullets = 2 # General/Forex
+    
+    # 2. Definir Lotaje según Balance
     if balance < 50.0:
-        max_bullets = 2 if (is_btc or is_crypto) else 1
         smart_lot = 0.05 if is_btc else (0.1 if is_crypto else 0.01)
     elif balance < 100.0:
-        max_bullets = 3 if (is_btc or is_crypto) else 2
         smart_lot = 0.08 if is_btc else (0.2 if is_crypto else 0.02)
     else:
-        max_bullets = 4 if (is_btc or is_crypto) else 3
         smart_lot = 0.10 if is_btc else (0.3 if is_crypto else 0.03)
         
     return max_bullets, smart_lot
@@ -1074,7 +1081,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.160 | TRIPLE ORACLE (XAU/BTC/CRYPTO) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.170 | INDEPENDENT BUCKETS (3-3-5) | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2448,8 +2455,9 @@ def process_symbol_task(sym, active, mission_state):
                         return
                     
                     # v18.9.115: REGLA BUNKER $25 USD (Recuperación/Stacking)
+                    # v18.9.170: Lote Dinámico (Smart Lot) según balance
                     side_mt5 = mt5.ORDER_TYPE_BUY if target_sig == "BUY" else mt5.ORDER_TYPE_SELL
-                    final_lot = ASSET_CONFIG[sym]["lot"]
+                    final_lot = smart_lot if smart_lot > 0 else (ASSET_CONFIG.get(sym, DEFAULT_CONFIG).get("lot", 0.01))
                     sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
 
                     request = {
