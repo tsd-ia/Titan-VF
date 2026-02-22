@@ -10,8 +10,8 @@ import threading
 
 SYMBOL_BINANCE = "btcusdt"
 # Umbral para considerarlo una "Ballena" (Whale)
-WHALE_VOLUME_USD = 100000  # $100k USD: Umbral adaptado para fin de semana (Acumulado/seg)
-MINI_WHALE_THRESHOLD = 50000 # $50k USD: Para alertas visuales de presión
+WHALE_VOLUME_USD = 75000  # $75k USD: Umbral agresivo para entrar al inicio de la vela
+MINI_WHALE_THRESHOLD = 30000 # $30k USD: Para alertas visuales de presión
 FILE_SIGNAL = "titan_oracle_signal.json"
 
 
@@ -57,8 +57,8 @@ def on_message(ws, message):
         volume_usd = price * qty
         now = time.time()
         
-        # Reset accumulator every 1 second
-        if now - STATE["last_reset"] > 1.0:
+        # Reset accumulator every 1.5 seconds para atrapar ballenas que inyectan más lento
+        if now - STATE["last_reset"] > 1.5:
             STATE["recent_buys"] = 0.0
             STATE["recent_sells"] = 0.0
             STATE["last_reset"] = now

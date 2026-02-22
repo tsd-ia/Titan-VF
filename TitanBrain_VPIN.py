@@ -2011,7 +2011,7 @@ def process_symbol_task(sym, active, mission_state):
         if sig == "BUY" and df.iloc[-1]['close'] < df.iloc[-2]['close']:
             block_action = True; block_reason = "PRECIO CAYENDO (Veto M1)"
 
-        is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason or "SPREAD BALLENA" in block_reason or "SPREAD PROHIBITIVO" in block_reason or "ANTI-WHIPSAW" in block_reason
+        is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason or "SPREAD BALLENA" in block_reason or "SPREAD PROHIBITIVO" in block_reason or "ANTI-WHIPSAW" in block_reason or "Veto M1" in block_reason
         
         if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
