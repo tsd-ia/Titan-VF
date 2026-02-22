@@ -536,7 +536,10 @@ def atomic_write(path, content):
     return False
 
 def init_mt5():
-    if not mt5.initialize(): return False
+    if not mt5.initialize(): 
+        # v18.9.106: Reportar error real de MT5 para Diagnóstico
+        print(f"❌ FALLO CRÍTICO MT5: {mt5.last_error()}")
+        return False
     for s in SYMBOLS: mt5.symbol_select(s, True)
     return True
 
@@ -3297,8 +3300,6 @@ if __name__ == "__main__":
     except Exception as e:
         import traceback
         error_msg = f"💥 FATAL ERROR EN HILO PRINCIPAL: {e}\n{traceback.format_exc()}"
-        print(error_msg) # IMPRIMIR A CONSOLA
-        log(error_msg)
-        with open("crash_report.log", "w") as f:
-            f.write(error_msg)
+        print(error_msg)
+        input("\n⚠️ EL PROCESO HA CAÍDO. Presione ENTER para cerrar la ventana y revise el error arriba...")
         sys.exit(1)
