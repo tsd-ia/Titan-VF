@@ -10,8 +10,8 @@ import threading
 
 SYMBOL_BINANCE = "btcusdt"
 # Umbral para considerarlo una "Ballena" (Whale)
-WHALE_VOLUME_USD = 300000  # $300k USD: Umbral para ballenas institucionales reales
-MINI_WHALE_THRESHOLD = 100000 # $100k USD: Para alertas visuales de presión
+WHALE_VOLUME_USD = 220000  # $220k USD: Umbral solicitado por Comandante (Evitar ruido)
+MINI_WHALE_THRESHOLD = 80000  # $80k USD: Alertas de presión real
 FILE_SIGNAL = "titan_oracle_signal.json"
 
 

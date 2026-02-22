@@ -19,6 +19,7 @@ El bot debe adaptar su agresividad según el saldo real de la cuenta:
 ## 3. Lógica de Inteligencia Artificial
 - **Ollama Throttling**: No pedir confirmación a la IA si los indicadores técnicos (RSI/BB) no han cambiado más de un 3% (Caché Cognitivo).
 - **Veto IA**: Si la IA local dice "BUY" pero Ollama dice "NO", se descarta el trade o se reduce la confianza al 50%.
+- **CONSULTA DE UMBRALES (REGLA DE ORO)**: PROHIBIDO bajar o cambiar umbrales de ballena (Oracle) sin preguntar antes al Comandante. El ruido de mercado bajo mata la cuenta en comisiones.
 
 ## 4. Mantenimiento del Repositorio
 - **Prohibido**: Subir carpetas `node_modules`, `.gradle`, `.idea` o logs de más de 1MB.
