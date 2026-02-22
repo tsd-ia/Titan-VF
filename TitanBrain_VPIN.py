@@ -518,13 +518,31 @@ if 'MinMaxScaler' in globals(): scaler_lstm = MinMaxScaler(feature_range=(0, 1))
 def log(msg):
     try:
         ts = time.strftime("%H:%M:%S")
-        formatted_msg = f"[{ts}] {msg}"
+        thread_name = threading.current_thread().name
+        t_name = "MAIN" if thread_name == "MainThread" else thread_name[:4].upper()
+        formatted_msg = f"[{ts}][{t_name}] {msg}"
         LOG_BUFFER.append(formatted_msg)
-        # Escribir en stderr para no interferir con el Dashboard que usa stdout \033[H
         sys.stderr.write(formatted_msg + "\n")
         sys.stderr.flush()
+        
+        # v18.9.112: Blindaje contra bloqueos de archivo
+        try:
+            with open("titan_vanguardia.log", "a", encoding="utf-8") as f:
+                f.write(formatted_msg + "\n")
+        except:
+            pass # No morir si el archivo está bloqueado
     except:
         pass
+
+
+import traceback
+def global_exception_handler(exctype, value, tb):
+    error_msg = f"💥 UNCAUGHT EXCEPTION: {exctype.__name__}: {value}\n{''.join(traceback.format_exception(exctype, value, tb))}"
+    log(error_msg)
+    sys.__excepthook__(exctype, value, tb)
+
+sys.excepthook = global_exception_handler
+
 
 def atomic_write(path, content):
     try: os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1024,7 +1042,10 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     current_spread = tick.ask - tick.bid if tick else 0.0
     s_info_disp = mt5.symbol_info(tick.symbol) if tick else None
-    spread_pts = current_spread / s_info_disp.point if (tick and s_info_disp) else 0
+    spread_pts = 0
+    if tick and s_info_disp and hasattr(s_info_disp, 'point') and s_info_disp.point > 0:
+        spread_pts = current_spread / s_info_disp.point
+
 
     
     # Contar racha en MISSION_HISTORY
@@ -1234,11 +1255,10 @@ def start_mission(symbol="ORO/VANGUARDIA", target_profit=50.0):
     # --- RESET ATÓMICO v15.37 ---
     global mission_state, MISSION_LATENCIES
     MISSION_LATENCIES = [] # v15.43: Limpiar rastro de ms al iniciar
-    log("🔄 PREPARANDO MESA: Limpiando residuos y archivos de misión...")
-    
-    # Limpiar terminal para frescura visual
-    try: os.system('cls' if os.name == 'nt' else 'clear')
-    except: pass
+    log("🔄 PREPARANDO MESA: Reiniciando misión...")
+    # Limpieza visual suave (ANSI) en lugar de os.system que bloquea
+    print("\033[H\033[J", end="")
+
 
     # Borrar archivo físico para evitar resurrecciones de PnL
     if os.path.exists(MISSION_FILE_PATH):
@@ -3329,12 +3349,23 @@ if __name__ == "__main__":
         t2.start()
         
         log(f"🚀 TITAN BRAIN ONLINE @ PORT {PORT} (FASTAPI MODE)")
-        uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="error")
+        # v18.9.111: Blindaje de Uvicorn y bucle de persistencia
+        try:
+            uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="error")
+        except Exception as uv_e:
+            log(f"⚠️ Uvicorn detenido inesperadamente: {uv_e}")
+
+        log("🧥 MODO PERSISTENCIA ACTIVADO: Evitando cierre de ventana...")
+        while True:
+            time.sleep(1)
     except KeyboardInterrupt:
-        log("🛑 APAGADO MANUAL DETECTADO")
+        log("🛑 APAGADO MANUAL")
     except Exception as e:
-        import traceback
-        error_msg = f"💥 FATAL ERROR EN HILO PRINCIPAL: {e}\n{traceback.format_exc()}"
+        error_msg = f"\n💥 ERROR FATAL (v18.9.112): {e}\n{traceback.format_exc()}"
+        log(error_msg)
         print(error_msg)
-        input("\n⚠️ EL PROCESO HA CAÍDO. Presione ENTER para cerrar la ventana y revise el error arriba...")
-        sys.exit(1)
+        print("\n🧥 [ESCUDO] BLOQUEANDO CIERRE DE VENTANA POST-ERROR...")
+        while True:
+            time.sleep(1)
+
+
