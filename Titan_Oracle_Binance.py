@@ -11,7 +11,7 @@ SYMBOL_BINANCE = "btcusdt"
 SOCKET = f"wss://stream.binance.com:9443/ws/{SYMBOL_BINANCE}@aggTrade"
 
 # Umbrales para considerarlo una "Ballena" (Whale)
-WHALE_VOLUME_USD = 500000  # $500k USD en una sola orden (configurable)
+WHALE_VOLUME_USD = 150000  # $150k USD: Umbral agresivo para volumen de 500+ trades/día
 FILE_SIGNAL = "titan_oracle_signal.json"
 
 STATE = {
