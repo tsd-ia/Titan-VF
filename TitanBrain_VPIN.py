@@ -56,24 +56,28 @@ def kill_port_process(port):
         pass 
 
 def kill_previous_instances():
-    """ Mata instancias previas de forma segura (v18.9.107) """
+    """ Mata cualquier proceso de Python que esté ejecutando este script específico """
     try:
         import psutil
-        my_pid = os.getpid()
+        current_pid = os.getpid()
+        parent_pid = os.getppid()
         for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
             try:
-                pid = proc.info['pid']
-                if pid == my_pid: continue
-                # Evitar matar al Runner (nuestro padre)
-                if pid == os.getppid(): continue
-                
+                pname = proc.info.get('name', '')
+                if 'python' not in pname.lower():
+                    continue
                 cmd = proc.info.get('cmdline', [])
-                if cmd and any('TitanBrain_VPIN' in s for s in cmd):
-                    print(f"🧹 PURGA: Eliminando instancia fantasma (PID: {pid})")
-                    proc.kill()
-            except: continue
-    except: pass
-
+                if not cmd:
+                    continue
+                if any('TitanBrain_VPIN' in s for s in cmd):
+                    pid = proc.info['pid']
+                    if pid != current_pid and pid != parent_pid:
+                        print(f"🧹 PURGA: Matando instancia anterior (PID: {pid})")
+                        proc.kill()
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                continue
+    except Exception:
+        pass
 
 # EJECUTAR LIMPIEZA INMEDIATA
 print("🧹 [CONSOLE] LIMPIANDO PROCESOS FANTASMA...")
@@ -514,19 +518,13 @@ if 'MinMaxScaler' in globals(): scaler_lstm = MinMaxScaler(feature_range=(0, 1))
 def log(msg):
     try:
         ts = time.strftime("%H:%M:%S")
-        thread_name = threading.current_thread().name
-        # Acortar nombre de hilo para el log
-        t_name = "MAIN" if thread_name == "MainThread" else thread_name[:4].upper()
-        formatted_msg = f"[{ts}][{t_name}] {msg}"
+        formatted_msg = f"[{ts}] {msg}"
         LOG_BUFFER.append(formatted_msg)
+        # Escribir en stderr para no interferir con el Dashboard que usa stdout \033[H
         sys.stderr.write(formatted_msg + "\n")
         sys.stderr.flush()
-        with open("titan_vanguardia.log", "a", encoding="utf-8") as f:
-            f.write(formatted_msg + "\n")
     except:
         pass
-
-
 
 def atomic_write(path, content):
     try: os.makedirs(os.path.dirname(path), exist_ok=True)
@@ -1019,10 +1017,15 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.27 | VIGILIA EXTREMA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
+    # v18.9.110: SPREAD DINÁMICO (Priorizar Oro, fallback a BTC)
     tick = mt5.symbol_info_tick("XAUUSDm")
+    if not tick or (time.time() - tick.time > 60):
+        tick = mt5.symbol_info_tick("BTCUSDm")
+    
     current_spread = tick.ask - tick.bid if tick else 0.0
-    # Convertir a puntos (spread típico de oro 35-50 -> 3.5-5.0)
-    spread_pts = current_spread / mt5.symbol_info("XAUUSDm").point if tick else 0
+    s_info_disp = mt5.symbol_info(tick.symbol) if tick else None
+    spread_pts = current_spread / s_info_disp.point if (tick and s_info_disp) else 0
+
     
     # Contar racha en MISSION_HISTORY
     wins_today = sum(1 for m in list(MISSION_HISTORY)[-20:] if m.get('type') == 'WIN')
@@ -1231,10 +1234,11 @@ def start_mission(symbol="ORO/VANGUARDIA", target_profit=50.0):
     # --- RESET ATÓMICO v15.37 ---
     global mission_state, MISSION_LATENCIES
     MISSION_LATENCIES = [] # v15.43: Limpiar rastro de ms al iniciar
-    # log("🔄 PREPARANDO MESA: Limpiando residuos...")
-    # Limpiar terminal de forma suave sin os.system que bloquee hilos
-    print("\033[H\033[J", end="") 
-
+    log("🔄 PREPARANDO MESA: Limpiando residuos y archivos de misión...")
+    
+    # Limpiar terminal para frescura visual
+    try: os.system('cls' if os.name == 'nt' else 'clear')
+    except: pass
 
     # Borrar archivo físico para evitar resurrecciones de PnL
     if os.path.exists(MISSION_FILE_PATH):
@@ -1936,19 +1940,12 @@ def process_symbol_task(sym, active, mission_state):
                 
                 res = mt5.order_send(request)
                 if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                    log(f"✅ INICIO EXITOSO: {sig} (# {res.order}) - Gatillo Directo")
+                    log(f"✅ INICIO EXITOSO: {sig} (# {res.order}) - Gatillo Directo") # Changed rec_sig to sig
                     with state_lock: STATE[f"firing_{sym}"] = now
                     LAST_ENTRY[sym] = now
                     time.sleep(10) # Cooldown inicial
                 else:
-                    err_msg = res.comment if res else "Unknown Error"
-                    if "AutoTrading" in err_msg:
-                        if not hasattr(process_symbol_task, "last_at_warn") or (now - process_symbol_task.last_at_warn > 60):
-                            log(f"❌ ALGO-TRADING DESACTIVADO EN MT5: Por favor, pulse el botón 'Algo Trading' en el terminal.")
-                            process_symbol_task.last_at_warn = now
-                    else:
-                        log(f"⚠️ FALLO API INICIO: {err_msg}. Reintentando...")
-
+                    log(f"⚠️ FALLO API INICIO: {res.comment if res else 'Error'}. Reintentando...")
                 STATE[f"last_perm_{sym}"] = now # Moved this line from the original block
                 # The original block had STATE[f"firing_{sym}"] = now and LAST_ENTRY[sym] = now here,
                 # but the new code already has them inside the 'if res' block.
@@ -2720,11 +2717,14 @@ def metralleta_loop():
                 STATE["bullets"] = bullet_count
                 active = mission_state["active"]
 
-            # --- ACTUALIZAR PRECIO XAUUSD (PARA GRAFICO APP) ---
-            # v15.48: PING HEARTBEAT (Monitor de Latencia cuando no hay trades)
+            # --- v18.9.110: PULSO ADAPTATIVO (Oro -> BTC) ---
             ping_start = time.perf_counter()
             tick_gold = mt5.symbol_info_tick("XAUUSDm")
+            # Si el oro no tiene ticks frescos, es fin de semana: usamos BTC para el pulso
+            if not tick_gold or (time.time() - tick_gold.time > 60):
+                tick_gold = mt5.symbol_info_tick("BTCUSDm")
             ping_end = time.perf_counter()
+
             
             # Solo actualizar si el dato de latencia es muy viejo (> 5s)
             if time.time() - LAST_LATENCY_UPDATE > 5.0:
@@ -2748,8 +2748,9 @@ def metralleta_loop():
                     if not os.path.exists(t_path):
                         with open(t_path, "w") as f: f.write("Timestamp,Equity,PnL,Floating,Spread,Latency,Bullets\n")
                     
-                    s_info = mt5.symbol_info("XAUUSDm")
+                    s_info = mt5.symbol_info(tick_gold.symbol) if tick_gold else None
                     spread_val = (tick_gold.ask - tick_gold.bid) / s_info.point if tick_gold and s_info else 0
+
                     
                     row = f"{datetime.now().strftime('%Y-%m-%d %H:%M:%S')},{current_equity:.2f},{pnl:.2f},{current_open_pnl:.2f},{spread_val:.1f},{LAST_LATENCY:.0f},{bullet_count}\n"
                     with open(t_path, "a") as f: f.write(row)
@@ -3328,23 +3329,12 @@ if __name__ == "__main__":
         t2.start()
         
         log(f"🚀 TITAN BRAIN ONLINE @ PORT {PORT} (FASTAPI MODE)")
-        # v18.9.107: Modo Super-Persistencia
-        try:
-            uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="error")
-        except Exception as uv_e:
-            log(f"⚠️ UVICORN HA FINALIZADO: {uv_e}")
-        
-        # SI LLEGAMOS AQUÍ, EL SCRIPT QUISO CERRARSE. LO BLOQUEAMOS.
-        log("🧥 MODO PERSISTENCIA ACTIVADO: Bloqueando cierre de terminal...")
-        while True:
-            time.sleep(1)
+        uvicorn.run(app, host="0.0.0.0", port=PORT, log_level="error")
     except KeyboardInterrupt:
         log("🛑 APAGADO MANUAL DETECTADO")
     except Exception as e:
         import traceback
         error_msg = f"💥 FATAL ERROR EN HILO PRINCIPAL: {e}\n{traceback.format_exc()}"
         print(error_msg)
-        log(error_msg)
         input("\n⚠️ EL PROCESO HA CAÍDO. Presione ENTER para cerrar la ventana y revise el error arriba...")
         sys.exit(1)
-
