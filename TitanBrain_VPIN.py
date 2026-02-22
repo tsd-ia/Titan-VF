@@ -95,8 +95,8 @@ print("✅ LIMPIEZA COMPLETA.")
 # ================= CONFIG =================
 PORT = 8000
 # LISTA DE ACTIVOS MONITORIZADOS (RADAR MÚLTIPLE v7.8)
-# CEREBRO DUAL: Configurado para ORO y BTC independientes
-SYMBOLS = ["XAUUSDm", "BTCUSDm"]
+# CEREBRO TRIPLE: ORO, BTC y CRYPTO (SOL/ETH/MSTR/OPN)
+SYMBOLS = ["XAUUSDm", "BTCUSDm", "SOLUSDm", "ETHUSDm"] # Añadidos SOL y ETH. MSTR/OPN sujetos a broker.
 
 # REPARACIÓN DE RUTA (Basada en LOGS del Robot)
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
@@ -107,6 +107,7 @@ HISTORY_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_history.json')
 SETTINGS_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_settings.json')
 AUTOPILOT_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_autopilot.txt')
 MISSION_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_mission.json')
+CRYPTO_SIGNAL_FILE = "titan_crypto_signals.json" # v18.9.150
 
 # --- CONFIGURACIÓN DE PARALELIZACIÓN (OCTOPUS 2.0) ---
 from concurrent.futures import ThreadPoolExecutor
@@ -280,6 +281,11 @@ def firebase_command_poller():
                             if val != STATE.get("btc_brain_on"):
                                 STATE["btc_brain_on"] = val
                                 log(f"🧠 MANDO WEB: Cerebro BTC {'ACTIVADO' if val else 'DESACTIVADO'}")
+                        if "crypto_brain_on" in cmds:
+                            val = bool(cmds["crypto_brain_on"])
+                            if val != STATE.get("crypto_brain_on"):
+                                STATE["crypto_brain_on"] = val
+                                log(f"🧠 MANDO WEB: Cerebro CRYPTO {'ACTIVADO' if val else 'DESACTIVADO'}")
                         if "auto_mode" in cmds:
                             val = bool(cmds["auto_mode"])
                             if val != STATE.get("auto_mode", False):
@@ -404,9 +410,10 @@ STATE = {
     "market_warning": "OPEN 🟢",
     "last_ollama_res": "Ollama Sentinel Active",
     "price_history": [],
-    "oro_brain_on": True,   # v18.9.95: Control Manual vía Web
-    "btc_brain_on": True,    # v18.9.95: Control Manual vía Web
-    "auto_mode": False,      # v18.9.99: Control de Autofuego por Defecto OFF
+    "oro_brain_on": True,   
+    "btc_brain_on": True,    
+    "crypto_brain_on": True, # v18.9.150: 3er Cerebro Crypto
+    "auto_mode": False,      
     "start_mission": False
 }
 
@@ -579,19 +586,19 @@ def get_equity():
     return acc.equity if acc else 0.0
 
 def get_adaptive_risk_params(balance, conf, rsi_val, sym):
-    """ Protocolo v18.9.126: Gestión de Riesgo Adaptativa Acelerada para BTC """
-    # Si es BTC, usamos un setting de agresividad especial a solicitud del Jefe
+    """ Protocolo v18.9.150: Gestión de Riesgo para ORO, BTC y CRYPTO """
     is_btc = (sym == "BTCUSDm")
+    is_crypto = (sym in ["SOLUSDm", "ETHUSDm", "ADAUSDm", "DOTUSDm"])
     
     if balance < 50.0:
-        max_bullets = 2 if is_btc else 1
-        smart_lot = 0.05 if is_btc else 0.01 
+        max_bullets = 2 if (is_btc or is_crypto) else 1
+        smart_lot = 0.05 if is_btc else (0.1 if is_crypto else 0.01)
     elif balance < 100.0:
-        max_bullets = 3 if is_btc else 2
-        smart_lot = 0.08 if is_btc else 0.02
+        max_bullets = 3 if (is_btc or is_crypto) else 2
+        smart_lot = 0.08 if is_btc else (0.2 if is_crypto else 0.02)
     else:
-        max_bullets = 4 if is_btc else 3
-        smart_lot = 0.10 if is_btc else 0.03
+        max_bullets = 4 if (is_btc or is_crypto) else 3
+        smart_lot = 0.10 if is_btc else (0.3 if is_crypto else 0.03)
         
     return max_bullets, smart_lot
 
@@ -1065,7 +1072,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.145 | VIGILIA EXTREMA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.150 | VIGILIA EXTREMA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1430,19 +1437,34 @@ def process_symbol_task(sym, active, mission_state):
         LAST_PROBS[sym] = raw_prob_pred
         raw_prob = raw_prob_pred  
         
-        # --- ORACULO DE BINANCE (OVERRIDE MAESTRO LEAD-LAG) ---
+        # --- ORACULOS DE BINANCE (OVERRIDE MAESTRO LEAD-LAG) ---
         try:
+            # 1. Oráculo BTC Principal
             if os.path.exists("titan_oracle_signal.json"):
                 with open("titan_oracle_signal.json", "r") as f:
                     oracle_data = json.load(f)
-                    # v18.9.119: TTL aumentado a 10s para fin de semana
                     if time.time() - oracle_data["timestamp"] < 10.0:
-                        if oracle_data["symbol"] == sym or sym == "BTCUSDm":
+                        if oracle_data["symbol"] == sym or (sym == "BTCUSDm" and oracle_data["symbol"] == "btcusdt"):
                             sig_pred = oracle_data["signal"]
                             conf_pred = 1.0 
                             is_oracle_signal = True
-                            log(f"⚡ ORÁCULO ACTIVO: {sig_pred} ({oracle_data['reason']})")
-        except: pass
+                            log(f"⚡ ORÁCULO BTC: {sig_pred} ({oracle_data.get('reason','VOL')})")
+
+            # 2. Oráculo Crypto (SOL/ETH/MSTR/OPN) - v18.9.150
+            if os.path.exists("titan_crypto_signals.json"):
+                with open("titan_crypto_signals.json", "r") as f:
+                    crypto_signals = json.load(f)
+                    # Convertir nombre MT5 a nombre Binance (ej: SOLUSDm -> solusdt)
+                    bin_sym = sym.replace("USDm", "usdt").lower()
+                    if bin_sym in crypto_signals:
+                        c_sig = crypto_signals[bin_sym]
+                        if time.time() - c_sig["timestamp"] < 8.0:
+                            sig_pred = c_sig["signal"]
+                            conf_pred = 0.95
+                            is_oracle_signal = True
+                            log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${c_sig['volume']/1000:.0f}k")
+        except Exception as e: 
+            if random.random() < 0.01: log(f"⚠️ Error lectura oráculos: {e}")
         
         # v18.9.3: RECONEXIÓN CRÍTICA - Asignar señal de IA al ciclo
         sig = sig_pred
@@ -2889,6 +2911,7 @@ def metralleta_loop():
                 with state_lock:
                     if "XAU" in sym or "Gold" in sym: brain_on = STATE.get("oro_brain_on", True)
                     elif "BTC" in sym: brain_on = STATE.get("btc_brain_on", True)
+                    elif any(c in sym for c in ["SOL", "ETH", "ADA", "DOT"]): brain_on = STATE.get("crypto_brain_on", True)
                 
                 if not brain_on:
                     if time.time() % 60 < 1: log(f"💤 CEREBRO {sym} APAGADO (Manual)")
@@ -2983,6 +3006,7 @@ def metralleta_loop():
                         "market": get_market_warning() or "OPEN 🟢",
                         "oro_brain_on": STATE.get("oro_brain_on", True),
                         "btc_brain_on": STATE.get("btc_brain_on", True),
+                        "crypto_brain_on": STATE.get("crypto_brain_on", True),
                         "auto_mode": STATE.get("auto_mode", False)
                     }
                     push_firebase(fb_payload)

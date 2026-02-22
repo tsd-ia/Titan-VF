@@ -67,6 +67,7 @@ interface SentinelData {
   };
   oro_brain_on?: boolean;
   btc_brain_on?: boolean;
+  crypto_brain_on?: boolean;
 }
 
 export default function TitanDashboard() {
@@ -385,6 +386,16 @@ export default function TitanDashboard() {
                     </div>
                   </div>
                   <span className="text-xs font-black">{(overrides.btc_brain_on ?? data.btc_brain_on) ? 'ONLINE' : 'OFFLINE'}</span>
+                </button>
+                <button onClick={() => sendCommand("crypto_brain_on", !(overrides.crypto_brain_on ?? data.crypto_brain_on))} className={`flex items-center justify-between p-6 rounded-3xl border transition-all ${(overrides.crypto_brain_on ?? data.crypto_brain_on) ? 'bg-indigo-500/10 border-indigo-500/30 text-indigo-500' : 'bg-gray-800/10 border-gray-800 text-gray-400'}`}>
+                  <div className="flex items-center gap-4">
+                    <BrainCircuit size={24} />
+                    <div className="text-left">
+                      <p className="font-black text-xs uppercase tracking-widest text-white">CEREBRO CRYPTO</p>
+                      <p className="text-[10px] opacity-60 uppercase font-bold text-indigo-500/80">SOL / ETH / MSTR Dynamic</p>
+                    </div>
+                  </div>
+                  <span className="text-xs font-black">{(overrides.crypto_brain_on ?? data.crypto_brain_on) ? 'ONLINE' : 'OFFLINE'}</span>
                 </button>
               </div>
             </div>
