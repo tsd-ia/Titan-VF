@@ -2197,9 +2197,9 @@ def process_symbol_task(sym, active, mission_state):
                             # BALA 2: Solo si la bala 1 está positiva
                             # BALA 3: Solo si la bala 2 está positiva
                             prev_is_positive = lp.profit > 0
-                            if (prev_is_positive and (now - LAST_ENTRY.get(sym, 0)) > 20.0) or is_oracle_signal:
+                            if (prev_is_positive and (now - LAST_ENTRY.get(sym, 0)) > 20.0) or (is_oracle_signal and (now - LAST_ENTRY.get(sym, 0)) > 5.0):
                                 stacking_trigger = True
-                                r_text = 'ORÁCULO FORZA' if is_oracle_signal else f'Anterior positiva (${lp.profit:.2f})'
+                                r_text = 'ORÁCULO FORZA (5s Delay)' if is_oracle_signal else f'Anterior positiva (${lp.profit:.2f})'
                                 log(f"🟢 BALA {n_balas+1}: {r_text}. ACUMULANDO.")
                             elif not prev_is_positive:
                                 stacking_trigger = False
@@ -2303,9 +2303,11 @@ def process_symbol_task(sym, active, mission_state):
                             should_fire = False
                             if now % 5 < 1: log(f"⏳ PROTECCIÓN: Esperando estabilidad (15s) para {sym}")
                         else:
-                             if now % 20 < 1: # Reducido spam v14.1
-                                 reason = f"Distancia {dist_val:.2f}/{min_dist}" if dist_val < min_dist else f"Tiempo {int(time_val)}/{req_delay}s"
-                                 log(f"💤 EN GUARDIA: Esperando B{n_balas+1} en {sym} para {target_sig} ({reason}) | IA:{raw_prob:.2f}")
+                             if dist_val < min_dist or time_val < req_delay:
+                                 should_fire = False
+                                 if now % 20 < 1: # Reducido spam v14.1
+                                     reason = f"Distancia {dist_val:.2f}/{min_dist}" if dist_val < min_dist else f"Tiempo {int(time_val)}/{req_delay}s"
+                                     log(f"💤 EN GUARDIA: Esperando B{n_balas+1} en {sym} para {target_sig} ({reason}) | IA:{raw_prob:.2f}")
                     elif block_action and (now - LAST_INSTINTO_LOG.get(f"block_{sym}", 0)) > 15:
                         log(f"🧘 BLOQUEO VANGUARDIA: {block_reason}")
                         LAST_INSTINTO_LOG[f"block_{sym}"] = now
