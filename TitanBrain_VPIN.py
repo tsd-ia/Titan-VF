@@ -1407,6 +1407,8 @@ def process_symbol_task(sym, active, mission_state):
         target_sig = "HOLD"
         contragolpe_active = False
         bb_pos = 0.5 # Valor neutro inicial
+        is_oracle_signal = False # v18.9.119: Flag Maestro de Bypass
+
         
         # v18.8: El conteo ya se realizó al inicio de la tarea técnica.
 
@@ -1428,21 +1430,16 @@ def process_symbol_task(sym, active, mission_state):
         
         # --- ORACULO DE BINANCE (OVERRIDE MAESTRO LEAD-LAG) ---
         try:
-            # Apagamos Ollama por defecto si usamos oráculo para no gastar cuota 
-            # (IA seguirá prediciendo con LSTM local rápido)
-                # v18.9.106: Lectura segura para evitar WinError 32
-                try:
-                    if os.path.exists("titan_oracle_signal.json"):
-                        with open("titan_oracle_signal.json", "r") as f:
-                            oracle_data = json.load(f)
-                            # Solo consideramos válido si la ballena nadó hace menos de 2 segundos
-                            if time.time() - oracle_data["timestamp"] < 2.0:
-                                if oracle_data["symbol"] == sym or sym == "BTCUSDm":
-                                    sig_pred = oracle_data["signal"]
-                                    conf_pred = 1.0 # Override 100%
-                                    if now % 2 < 1: log(f"⚡ ORÁCULO APLICADO: {sig_pred} ({oracle_data['reason']})")
-                except (IOError, json.JSONDecodeError):
-                    pass # El archivo está siendo escrito o bloqueado, ignorar este tick
+            if os.path.exists("titan_oracle_signal.json"):
+                with open("titan_oracle_signal.json", "r") as f:
+                    oracle_data = json.load(f)
+                    # v18.9.119: TTL aumentado a 10s para fin de semana
+                    if time.time() - oracle_data["timestamp"] < 10.0:
+                        if oracle_data["symbol"] == sym or sym == "BTCUSDm":
+                            sig_pred = oracle_data["signal"]
+                            conf_pred = 1.0 
+                            is_oracle_signal = True
+                            log(f"⚡ ORÁCULO ACTIVO: {sig_pred} ({oracle_data['reason']})")
         except: pass
         
         # v18.9.3: RECONEXIÓN CRÍTICA - Asignar señal de IA al ciclo
@@ -1450,6 +1447,7 @@ def process_symbol_task(sym, active, mission_state):
         conf = conf_pred
         rsi_val = rsi_val_pred 
         curr_price = tick.bid
+
 
         # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
         balance = acc.balance if acc else 0
@@ -1625,9 +1623,9 @@ def process_symbol_task(sym, active, mission_state):
             else:
                 razones.append("IA_OVERRIDE:⚡")
             
-            tot = votos_buy + votos_sell
-            if tot > 0:
+            if tot > 0 and not is_oracle_signal: # v18.9.119: Oracle Bypasses Council
                 s_buy = votos_buy / tot
+
                 s_sell = votos_sell / tot
                 if s_buy > 0.58: # Umbral más alto para mayor rigor
                     sig = "BUY"; conf = min(0.5 + s_buy*0.5, 0.98)
@@ -1664,8 +1662,8 @@ def process_symbol_task(sym, active, mission_state):
                 if (sig == "BUY" and h1_trend == "SELL") or (sig == "SELL" and h1_trend == "BUY"):
                     log_veto = " [Contra-H1]"
             
-            # v17.1: M5 VETO ES LEY ABSOLUTA (Bypass IA >97% + ADX Filter v18.9.88)
-            skip_m5_veto = (conf >= 0.97) and (adx_val < 40) 
+            # v17.1: M5 VETO ES LEY ABSOLUTA (Bypass Oracle v18.9.119)
+            skip_m5_veto = (conf >= 0.97) and (adx_val < 40) or is_oracle_signal
             
             if not skip_m5_veto:
                 if not MIRROR_MODE and (m5_trend_label == "🔴🔴") and sig == "BUY":
@@ -1994,12 +1992,13 @@ def process_symbol_task(sym, active, mission_state):
 
         is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason
         
-        if block_action:
+        if block_action and not is_oracle_signal:
             target_sig = "HOLD"
         else:
-            if block_action and super_conf:
-                log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por Confianza {conf*100:.1f}%.")
+            if block_action and (super_conf or is_oracle_signal):
+                log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
             target_sig = sig if sig != "HOLD" else "HOLD"
+
 
         # Compartir decisión con PACMAN (v7.99)
         GLOBAL_ADVICE[sym] = {"sig": target_sig, "conf": conf}
@@ -2206,10 +2205,12 @@ def process_symbol_task(sym, active, mission_state):
 
                         if n_balas == 0 and not is_urgent_continuation:
                              # v16.7: Solo entrar si NO hay bloqueos de Bollinger/Spread
-                             if not block_action and conf >= 0.60:  # v18.9.91: Bajado a 60% para modo autonomo nocturno
+                             # v18.9.120: ORACLE BYPASS total de bloqueos tácticos
+                             if (not block_action or is_oracle_signal) and conf >= 0.60:  
                                  should_fire = True
                              else:
                                  should_fire = False
+
                                  if now % 20 < 1 and not block_action: 
                                      log(f"⏳ BAJA CONFIANZA: {conf*100:.1f}% < 70%")
                                  elif now % 20 < 1:
@@ -2350,8 +2351,9 @@ def process_symbol_task(sym, active, mission_state):
             
             # v18.1: Blindaje de Envío de Señal
             # Solo enviar si NO hay bloqueos o si es un refresco de una señal ya existente
-            # v18.9.24: Liberación de Gatillo - IA 97%+ ignora bloqueos tácticos (M5/Trend)
-            if target_sig in ["BUY", "SELL"] and (not block_action or super_conf):
+            # v18.9.24: Liberación de Gatillo - IA 97%+ / Oracle ignora bloqueos tácticos (M5/Trend)
+            if target_sig in ["BUY", "SELL"] and (not block_action or super_conf or is_oracle_signal):
+
                 should_send = False
                 if should_fire: should_send = True # Disparo forzado (nuevo o stacking)
                 elif is_heartbeat and target_sig == LAST_SIGNALS.get(sym): should_send = True # Heartbeat normal
