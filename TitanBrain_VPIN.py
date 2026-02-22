@@ -1099,7 +1099,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.225 | BLOQUEO ATOMICO 8s | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.230 | ANTI-SPAM II | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2151,7 +2151,8 @@ def process_symbol_task(sym, active, mission_state):
             ai_reply = cache['res']
             model_used = cache['model']
             if "SI" not in ai_reply.upper(): conf *= 0.8
-            if time.time() % 300 < 1: log(f"🧠 IA CACHE ({sym}): Reutilizando decisión previa ({ai_reply[:20]}...)")
+            if now % 120 < 1: # Reducir frecuencia de log de caché a cada 2 minutos
+                log(f"🧠 IA CACHE ({sym}): Reutilizando decisión previa ({ai_reply[:30]}...)")
 
         if active and target_sig != "HOLD":
             # v18.9.32: MIRROR_MODE ELIMINADO POR SEGURIDAD
