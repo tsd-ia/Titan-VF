@@ -14,6 +14,8 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Verificar sincronización de Firebase desde la nueva carpeta.
 - [x] Testear lotajes adaptativos en mercado real (Oro/BTC).
 - [x] Implementar control independiente de cerebros (Oro/BTC) en Dashboard y VPIN.
+- [x] Implementar "Escudo Bunker" (Stop Loss Fijo $25).
+- [x] Blindaje de Comunicación Brain-Oracle y purga de procesos.
 
 ## 🚀 FASE 3: OPTIMIZACIÓN IA (PENDIENTE)
 - [ ] Refinar modelo LSTM de Bitcoin con más datos históricos.
