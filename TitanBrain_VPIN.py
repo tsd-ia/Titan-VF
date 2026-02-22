@@ -136,9 +136,9 @@ def global_health_check():
         print(f"⚠️ Error en Health Check: {e}")
 
 # --- CONFIGURACIÓN DE GESTIÓN ---
-MAX_BULLETS = 10 # v18.9.250: Ampliado para mover la cuenta agresivamente
+MAX_BULLETS = 20 # v18.9.260: Límite extendido para GIGA-FIRE Domingo
 MAX_DAILY_LOSS = 0.85 # -85% equidad = Stop loss global (Sobrevivencia = Mínimo $15.0)9
-MAX_SESSION_LOSS = -25.0  # v18.9.250: Ampliado para aguantar BTC/ETH domingo
+MAX_SESSION_LOSS = -50.0  # v18.9.260: Margen de maniobra ampliado para 0.8 lots
 MIN_EQUITY_TO_TRADE = 10.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $10, bot se congela
 LAST_ENTRY_PRICE = {} # Memoria de precio para evitar apilar en el mismo punto
 LAST_HEARTBEAT = {} 
@@ -319,9 +319,9 @@ mission_state = {
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
     "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
-    "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 10},
-    "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 10},
-    "ETHUSDm": {"lot": 0.8, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 10},
+    "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 20},
+    "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 20},
+    "ETHUSDm": {"lot": 0.8, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 20},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000},
@@ -1102,7 +1102,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.250 | GIGA-FIRE | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.260 | GIGA-FIRE FIX | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2504,9 +2504,9 @@ def process_symbol_task(sym, active, mission_state):
                                 too_close = True
                                 break
                     
-                    if too_close:
-                        if now % 10 < 1: log(f"⏳ ZONA PROHIBIDA: Precio demasiado cerca de bala existente. Esperando espacio...")
-                        return
+                        if too_close:
+                            if now % 10 < 1: log(f"⏳ ZONA PROHIBIDA: Precio demasiado cerca de bala existente. Esperando espacio...")
+                            return
                     
                     # v18.9.115: REGLA BUNKER $25 USD (Recuperación/Stacking)
                     # v18.9.170: Lote Dinámico (Smart Lot) según balance
@@ -2562,8 +2562,22 @@ def metralleta_loop():
     while not init_mt5():
         log("❌ MT5 Connection Failed. Retrying in 5s...")
         time.sleep(5)
+    
+    # v18.9.255: ASEGURAR QUE LOS SÍMBOLOS ESTÉN ACTIVOS EN MARKET WATCH
+    for sym in SYMBOLS:
+        if mt5.symbol_select(sym, True):
+            log(f"✅ SÍMBOLO ACTIVO: {sym}")
+        else:
+            log(f"🚨 ERROR: No se pudo activar {sym}. Verifica el nombre en tu broker!")
+
     cargar_modelo_lstm()
     load_settings() 
+    
+    # v18.9.255: Forzar encendido de cerebros si están en None
+    with state_lock:
+        if STATE.get("btc_brain_on") is None: STATE["btc_brain_on"] = True
+        if STATE.get("crypto_brain_on") is None: STATE["crypto_brain_on"] = True
+        if STATE.get("oro_brain_on") is None: STATE["oro_brain_on"] = True
     if not mission_state["active"]:
         positions = mt5.positions_get()
         if positions and any(p.symbol in SYMBOLS for p in positions):
@@ -2998,7 +3012,8 @@ def metralleta_loop():
                     elif any(c in sym for c in ["SOL", "ETH", "ADA", "DOT"]): brain_on = STATE.get("crypto_brain_on", True)
                 
                 if not brain_on:
-                    if time.time() % 60 < 1: log(f"💤 CEREBRO {sym} APAGADO (Manual)")
+                    if time.time() % 30 < 1: 
+                        log(f"💤 CEREBRO {sym} APAGADO. (Revisa Dashboard o Firebase)")
                     continue
                     
                 # 2. Verificar si el mercado está abierto
