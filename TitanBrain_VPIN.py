@@ -60,24 +60,28 @@ def kill_previous_instances():
     try:
         import psutil
         current_pid = os.getpid()
-        parent_pid = os.getppid()
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+        # v18.9.114: Búsqueda agresiva por línea de comandos
+        purged = 0
+        for proc in psutil.process_iter(['pid', 'cmdline']):
             try:
-                pname = proc.info.get('name', '')
-                if 'python' not in pname.lower():
-                    continue
                 cmd = proc.info.get('cmdline', [])
-                if not cmd:
-                    continue
-                if any('TitanBrain_VPIN' in s for s in cmd):
+                if cmd and any('TitanBrain_VPIN' in s for s in cmd):
                     pid = proc.info['pid']
-                    if pid != current_pid and pid != parent_pid:
-                        print(f"🧹 PURGA: Matando instancia anterior (PID: {pid})")
+                    if pid != current_pid:
+                        # No matar al padre (Runner)
+                        try:
+                            parent = psutil.Process(current_pid).parent()
+                            if parent and pid == parent.pid: continue
+                        except: pass
+                        
                         proc.kill()
-            except (psutil.NoSuchProcess, psutil.AccessDenied):
-                continue
-    except Exception:
-        pass
+                        purged += 1
+            except: continue
+        if purged > 0:
+            print(f"🧹 PURGA COMPLETA: {purged} instancias eliminadas.")
+    except Exception as e:
+        print(f"⚠️ Error en Purga: {e}")
+
 
 # EJECUTAR LIMPIEZA INMEDIATA
 print("🧹 [CONSOLE] LIMPIANDO PROCESOS FANTASMA...")
