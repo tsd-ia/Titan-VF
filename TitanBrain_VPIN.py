@@ -1883,9 +1883,16 @@ def process_symbol_task(sym, active, mission_state):
             if spread > MAX_EXPLORATION_SPREAD and not is_oracle_signal:
                 block_action = True
                 block_reason = f"SPREAD PROHIBITIVO ({spread:.1f} pts)"
-            elif is_oracle_signal and spread > 5000: # Límite extremo para ballenas
+            elif is_oracle_signal and spread > 1500: # Protocolo v18.9.134: Límite prudente $15 USD
                 block_action = True
-                block_reason = f"SPREAD BALLENA EXTREMO ({spread:.1f})"
+                block_reason = f"SPREAD BALLENA INVIABLE (${spread/100:.2f} USD)"
+                if now % 60 < 1: # Para no spamear Telegram cada segundo de la misma señal
+                    try:
+                        tg_token = os.getenv('TELEGRAM_TOKEN', '8217691336:AAFWduUGkO_f-QRF6MN338HY-MA46CjzHMg')
+                        tg_chat = os.getenv('TELEGRAM_CHAT_ID', '8339882349')
+                        msg = f"⛔ TITAN BLOQUEO DE ORÁCULO\nActivo: {sym}\nEl broker(Exness) está cobrando ${spread/100:.2f} USD de Spread (Comisión Oculta). Disparo Abortado por precaución al capital."
+                        requests.get(f"https://api.telegram.org/bot{tg_token}/sendMessage?chat_id={tg_chat}&text={msg}", timeout=2)
+                    except: pass
 
             elif spread > MAX_SKEW_SPREAD:
                 if n_balas_actuales < MAX_BULLETS: # v18.9.13: Permitir las 5 balas incluso con spread alto
