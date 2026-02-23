@@ -2762,6 +2762,8 @@ def metralleta_loop():
             m_speed = 20.0 # Default
             if len(ph_v) > 10:
                 m_speed = (max(ph_v) - min(ph_v)) * 6.0 # $/min aprox con 0.01
+            
+            is_fast = m_speed > 35.0 # Definición v18.9.20
             with state_lock: STATE["market_speed_val"] = m_speed
 
             # --- GESTOR DE RIESGO HIPER-VELOCIDD (PACMAN) ---
