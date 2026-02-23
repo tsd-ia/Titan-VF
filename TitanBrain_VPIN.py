@@ -646,10 +646,11 @@ def perform_ai_health_audit():
         # 2. Criterios de entrada al tribunal de la IA
         trade_life = now - p.time
         
-        # v18.9.610: PURGA POR ESTANCAMIENTO AGRESIVA (Scalping Real)
-        # Si en 5 minutos no hemos llegado a la zona de $1.0, la posición es basura.
-        if trade_life > 300 and p.profit < 1.00:
-             log(f"🧊 LENTITUD DETECTADA: {p.symbol} estancado en ${p.profit:.2f}. Cortando para liberar capital.")
+        # v18.9.650: PURGA SELECTIVA (Oro es Inmune)
+        # Solo purgamos ETH/BTC si se quedan estancados. El Oro tiene aire total.
+        is_stagnation_candidate = any(x in p.symbol for x in ["ETH", "BTC", "SOL"])
+        if is_stagnation_candidate and trade_life > 300 and p.profit < 1.00:
+             log(f"🧊 LENTITUD DETECTADA: {p.symbol} estancado en ${p.profit:.2f}. Cortando para recuperar margen.")
              close_ticket(p, "SCALPING_PURGE"); continue
 
         if trade_life < 240 and p.profit > -2.0: continue 
@@ -1139,7 +1140,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.610 | REAL SCALPING | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.660 | SINCRO MILLONARIA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1926,16 +1927,8 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = True
                     block_reason = "CORRIENTE EN CONTRA (M5/EMA/VELA): Venta bloqueada."
 
-            # --- REGLA DE ORO DEL COMANDANTE v18.9.320: GOD MODE $220k ANTI-SPAM ---
-            if is_oracle_signal and oracle_volume >= 220000:
-                block_action = False # BYPASS TOTAL DE GRILLETES
-                last_god_log = STATE.get(f"last_god_log_{sym}", 0)
-                if now - last_god_log > 30.0:
-                    log(f"🔱 GOD MODE ACTIVADO [{sym}]: Señal de ${oracle_volume/1000:.0f}k detectada. Ignorando grilletes técnicos.")
-                    STATE[f"last_god_log_{sym}"] = now
-                STATE[f"oracle_active_{sym}"] = True
-            else:
-                STATE[f"oracle_active_{sym}"] = False
+            # --- v18.9.660: BYPASS SUPREMO (MOVIDO AL FINAL PARA PODER TOTAL) ---
+            # Se calculará al final de los filtros para sobreescribir cualquier bloqueo.
 
             
             # 2. BLOQUEO Bollinger (v18.7: MODO CONTRAGOLPE)
@@ -2078,6 +2071,24 @@ def process_symbol_task(sym, active, mission_state):
         elif margin_level > 0 and margin_level < MIN_MARGIN_LEVEL:
             block_action = True
             block_reason = f"MARGEN CRÍTICO ({margin_level:.1f}%)"
+
+        # === v18.9.660: GATILLO DE DIOS (GOD MODE) - EL COMANDANTE MANDA ===
+        # Esta regla sobreescribe cualquier bloqueo anterior (Bollinger, RSI, Trend, Gravedad)
+        # Solo se detiene por Margen Crítico o Max Balas.
+        min_whale_vol = 150000 if "XAU" in sym else 500000 
+        is_god_entry = is_oracle_signal and oracle_volume >= min_whale_vol
+        
+        if is_god_entry:
+            if block_action and "MARGEN" not in block_reason and "BALAS" not in block_reason:
+                last_god_log = STATE.get(f"last_god_log_{sym}", 0)
+                if now - last_god_log > 30.0:
+                    log(f"🔱 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por ORÁCULO (${oracle_volume/1000:.0f}k).")
+                    STATE[f"last_god_log_{sym}"] = now
+                block_action = False # LIBERTAD ABSOLUTA
+                is_hard_blocked = False
+                STATE[f"oracle_active_{sym}"] = True
+        else:
+            STATE[f"oracle_active_{sym}"] = False
 
         # 3. FILTRO DE VOLATILIDAD (ATR DYNAMICS)
         # Si el mercado está loco (ATR alto), aumentamos la distancia de las balas
@@ -2657,14 +2668,16 @@ def process_symbol_task(sym, active, mission_state):
                             move = process_symbol_task.price_hist[-1] - process_symbol_task.price_hist[0]
                             is_aligned = (target_sig == "BUY" and move > 0) or (target_sig == "SELL" and move < 0)
                             
-                            # v18.9.600: EXPLOSIÓN LOCAL PARA ETH (Doble exigencia)
-                            if sym == "ETHUSDm" and abs(move) < 0.15:
-                                if now % 10 < 1: log(f"⏳ ETH SIN EXPLOSIÓN: Movimiento {abs(move):.2f} insuficiente para $1 rápido.")
-                                return
-
-                            if not is_aligned:
+                            # v18.9.650: BYPASS DE IMPULSO (Caza de Rebote)
+                            # Si hay señal de ORÁCULO o Super Confianza, ignoramos si el precio va en contra (para comprar el dip)
+                            is_rebound_hunt = is_oracle_signal or conf > 0.98
+                            
+                            if not is_aligned and not is_rebound_hunt:
                                 if now % 5 < 1: log(f"⏳ ESPERANDO IMPULSO: {sym} señal {target_sig} pero precio en contra ({move:.4f}).")
                                 return
+                            
+                            if is_rebound_hunt and not is_aligned:
+                                if now % 5 < 1: log(f"🏹 CAZA EN REBOTE: {sym} detectado Dip/Peak. Entrando contra momentum por Oráculo.")
 
                         # v18.9.45: VALIDACIÓN DE EXCLUSIÓN DE PRECIO (Anti-Metralleta)
                         tick = mt5.symbol_info_tick(sym)
