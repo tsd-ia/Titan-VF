@@ -1110,7 +1110,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.330 | ANTI-SPAM TOTAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.340 | ZONA DINAMICA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2541,11 +2541,12 @@ def process_symbol_task(sym, active, mission_state):
                         if not tick: return
                         price = tick.ask if target_sig == "BUY" else tick.bid
                         
-                        # Escanear precios de posiciones actuales
+                        # v18.9.340: ZONA PROHIBIDA DINÁMICA (Distancia entre balas)
+                        dist_min = 0.85 if "XAU" in sym else (25.0 if "BTC" in sym else 0.45) # BTC requiere más espacio, Oro menos
                         too_close = False
                         for p in pos_list:
                             dist_to_pos = abs(price - p.price_open)
-                            if dist_to_pos < 0.35: # 350 puntos de zona prohibida
+                            if dist_to_pos < dist_min: 
                                 too_close = True
                                 break
                     
