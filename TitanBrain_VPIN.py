@@ -850,8 +850,7 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
 
     if not hasattr(send_signal, "last_ts"): send_signal.last_ts = {}
 
-    # Bridge Central Unificado (Compatible con EA)
-    fname = CMD_FILE_PATH 
+    # Bridge Central Unificado (v18.9.405: Doble salida)
     norm_sym = symbol.lower()
     cfg = ASSET_CONFIG.get(symbol, DEFAULT_CONFIG)
     
@@ -880,6 +879,10 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
             elif free < 35.0:
                 lot_to_use = 0.01
     except: pass
+    
+    # v18.9.405: PROTECCIÓN LOTE MÍNIMO SOLANA (Exness requiere 0.1)
+    if "SOL" in symbol and lot_to_use < 0.1:
+        lot_to_use = 0.1
 
     # --- ESCUDO ELÁSTICO v15.27 ---
     try:
@@ -910,16 +913,21 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
         final_lot = 0.01
         log(f"🛡️ SPREAD ALTO: Lote 0.01 por seguridad.")
     
-    # FORMATO BRIDGE MAESTRO: symbol|type|lot|sl|tp|ts
+    # FORMATOS BRIDGE (Doble compatibilidad)
     mode_num = 0 if mode == "BUY" else 1
-    payload = f"{norm_sym}|{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
+    # 1. Formato Legacy: type|lot|sl|tp|ts
+    payload_legacy = f"{mode}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
+    # 2. Formato Multi: symbol|type|lot|sl|tp|ts
+    payload_multi = f"{norm_sym}|{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
 
-    if not atomic_write(fname, payload):
-        try:
-             with open(fname, "w") as f: f.write(payload)
-        except: pass
+    # Escribir en archivos de misión y comando
+    f_mission = os.path.join(MQL5_FILES_PATH, 'titan_mission.txt')
+    f_command = os.path.join(MQL5_FILES_PATH, 'titan_command.txt')
+    
+    atomic_write(f_mission, payload_legacy)
+    atomic_write(f_command, payload_multi)
         
-    log(f"📡 GATEWAY -> {norm_sym} {mode} @ {final_lot} [Safe Logic Restored]")
+    log(f"📡 GATEWAY -> {norm_sym} {mode} @ {final_lot} [SOL_MIN_LOT_FIX]")
 
 def cargar_modelo_lstm():
     global modelo_lstm, modelo_lstm_btc
