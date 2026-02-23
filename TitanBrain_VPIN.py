@@ -2302,6 +2302,12 @@ def process_symbol_task(sym, active, mission_state):
                         osig_data = json.load(f)
                         oracle_power = osig_data.get("volume", 0)
                 except: pass
+            elif sym == "BTCUSDm" and os.path.exists("titan_oracle_signal.json"):
+                try:
+                    with open("titan_oracle_signal.json", "r") as f:
+                        osig_data = json.load(f)
+                        oracle_power = 220000 # El oráculo de BTC solo escribe si superó WHALE_VOLUME_USD
+                except: pass
             
             # v18.11.910: Si es ballena pequeña (<$80k), NO bypass parcial. Requiere IA Confirmación.
             if sym == "XAUUSDm" and oracle_power < 80000:
@@ -2707,7 +2713,8 @@ def process_symbol_task(sym, active, mission_state):
                                 return
                         
                         # 2. Gatillo de Volatilidad Mínima (BTC/ETH)
-                        if sym in ["BTCUSDm", "ETHUSDm"]:
+                        # v19.1: EL ORÁCULO BYPASSEA LA VOLATILIDAD (Si hay ballenas, hay acción)
+                        if sym in ["BTCUSDm", "ETHUSDm"] and not is_oracle_signal:
                             # Verificar si el activo tiene "sangre" (movimiento real)
                             history = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 5)
                             if history is not None and len(history) > 0:
