@@ -54,5 +54,11 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Exigencia ETH 95%: Confianza extrema + explosión local.
 - [x] Optimización Latencia: Reducción de 265ms a ~100ms.
 
+- [x] Oro Inmune v18.9.650: Exento de purga de estancamiento.
+- [x] Sincro Millonaria v18.9.660: Bypass absoluto de Bollinger/RSI para ballenas.
+- [x] Oro Rocket Mode v18.9.700: Fix de contaminación de memoria (price_hist independiente).
+- [x] Oráculo Inteligente v18.9.750: Filtro Anti-Suicidio Oro (no SELL en contratendencia).
+- [x] Sincro Log v18.9.750: Fecha y hora en consola.
+
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*

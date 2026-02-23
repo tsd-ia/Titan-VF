@@ -568,7 +568,7 @@ def log(msg):
             if os.path.exists("titan_vanguardia.log") and os.path.getsize("titan_vanguardia.log") > 50*1024*1024:
                 with open("titan_vanguardia.log", "w") as f: f.write("--- LOG ROTATED (TITAN AUTO-CLEAN) ---\n")
 
-            ts = time.strftime("%H:%M:%S")
+            ts = time.strftime("%d/%m %H:%M:%S")
             thread_name = threading.current_thread().name
             t_name = "MAIN" if thread_name == "MainThread" else thread_name[:4].upper()
             formatted_msg = f"[{ts}][{t_name}] {msg}"
@@ -1140,7 +1140,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.660 | SINCRO MILLONARIA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.750 | ORÁCULO INTELIGENTE | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2072,11 +2072,15 @@ def process_symbol_task(sym, active, mission_state):
             block_action = True
             block_reason = f"MARGEN CRÍTICO ({margin_level:.1f}%)"
 
-        # === v18.9.660: GATILLO DE DIOS (GOD MODE) - EL COMANDANTE MANDA ===
-        # Esta regla sobreescribe cualquier bloqueo anterior (Bollinger, RSI, Trend, Gravedad)
-        # Solo se detiene por Margen Crítico o Max Balas.
-        min_whale_vol = 150000 if "XAU" in sym else 500000 
+        # === v18.9.750: GATILLO DE DIOS (GOD MODE) - FILTRO ANTI-SUICIDIO ORO ===
+        min_whale_vol = 40000 if "XAU" in sym else 300000 
         is_god_entry = is_oracle_signal and oracle_volume >= min_whale_vol
+        
+        # v18.9.750: MODERACIÓN DE VENTAS EN ORO (No ir contra tendencia fuerte)
+        if is_god_entry and "XAU" in sym and target_sig == "SELL":
+            if m5_trend_dir == "BUY" and oracle_volume < 100000:
+                if now % 30 < 1: log(f"🧘 FILTRO ANTI-SUICIDIO ORO: Ignorando Whale SELL de ${oracle_volume/1000:.0f}k por Tendencia M5 ALCISTA.")
+                is_god_entry = False
         
         if is_god_entry:
             if block_action and "MARGEN" not in block_reason and "BALAS" not in block_reason:
@@ -2660,12 +2664,14 @@ def process_symbol_task(sym, active, mission_state):
                                     if now % 20 < 1: log(f"🧘 FILTRO VOLATILIDAD: {sym} mercado plano ({m1_range:.2f} < {min_vol}). Saltando.")
                                     return
 
-                        # Guardar historial de precios para momentum (v18.9.505)
-                        if not hasattr(process_symbol_task, "price_hist"): process_symbol_task.price_hist = deque(maxlen=5)
-                        process_symbol_task.price_hist.append(tick.bid if target_sig == "BUY" else tick.ask)
+                        # v18.9.700: MEMORIAS BLINDADAS (Evitar contaminación entre símbolos)
+                        if not hasattr(process_symbol_task, "price_hist"): process_symbol_task.price_hist = {}
+                        if sym not in process_symbol_task.price_hist: process_symbol_task.price_hist[sym] = deque(maxlen=5)
                         
-                        if len(process_symbol_task.price_hist) >= 3:
-                            move = process_symbol_task.price_hist[-1] - process_symbol_task.price_hist[0]
+                        process_symbol_task.price_hist[sym].append(tick.bid if target_sig == "BUY" else tick.ask)
+                        
+                        if len(process_symbol_task.price_hist[sym]) >= 3:
+                            move = process_symbol_task.price_hist[sym][-1] - process_symbol_task.price_hist[sym][0]
                             is_aligned = (target_sig == "BUY" and move > 0) or (target_sig == "SELL" and move < 0)
                             
                             # v18.9.650: BYPASS DE IMPULSO (Caza de Rebote)
