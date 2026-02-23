@@ -15,6 +15,7 @@ SYMBOL_BINANCE = "paxgusdt"
 WHALE_THRESHOLD = 25000    
 GOD_MODE_THRESHOLD = 90000 
 FILE_SIGNAL = "titan_gold_signals.json"
+FILE_PULSE = "titan_gold_pulse.json"
 FIREBASE_FLAG_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/oro_brain_on.json"
 
 STATE = {
@@ -28,27 +29,26 @@ def is_brain_on():
         res = requests.get(FIREBASE_FLAG_URL, timeout=2)
         if res.status_code == 200:
             val = res.json()
-            if val is None: return True # Default ON if null
+            if val is None: return True 
             return bool(val)
     except:
-        return True # Default ON si falla internet
+        return True 
     return True
 
 async def gold_oracle():
-    print(f"🔱 ORÁCULO ORO v18.9.350 [HYPER-SENSE]")
+    print(f"🔱 ORÁCULO ORO v18.9.950 [HI-SYNC]")
     
     while True:
         if not is_brain_on():
-            print(f"💤 [{datetime.now().strftime('%H:%M:%S')}] CEREBRO ORO EN DESCANSO... (Esperando Dashboard)")
+            print(f"💤 [{datetime.now().strftime('%H:%M:%S')}] CEREBRO ORO EN DESCANSO...")
             await asyncio.sleep(15)
             continue
 
         try:
             url = f"wss://stream.binance.com:9443/ws/{SYMBOL_BINANCE}@aggTrade"
             async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
-                print(f"⚡ CONECTADO A BINANCE (ORO) - Scaneando...")
+                print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] CONECTADO A BINANCE (ORO)")
                 while True:
-                    # Check de bandera cada 30 segundos sin bloquear el websocket
                     if int(time.time()) % 30 == 0:
                         if not is_brain_on(): break
 
@@ -86,33 +86,27 @@ async def gold_oracle():
                                 "price": price, "timestamp": now, "god_mode": vol >= GOD_MODE_THRESHOLD
                             }
                             with open(FILE_SIGNAL, "w") as f: json.dump(data_sig, f)
-                            print(f"🔱 BALLENA ORO: {sig} | Vol: ${vol/1000:.1f}k {'[GOD MODE]' if vol >= GOD_MODE_THRESHOLD else ''}")
+                            ts_str = datetime.now().strftime('%H:%M:%S')
+                            print(f"🔱 [{ts_str}] BALLENA ORO: {sig} | Vol: ${vol/1000:.1f}k {'[GOD MODE]' if vol >= GOD_MODE_THRESHOLD else ''}")
                         
-                        # v18.9.400: PULSO DE VIDA (Heartbeat) para dar confianza al Comandante
-                        if now - STATE["last_pulse_time"] > 10.0:
+                        # PULSO DE VIDA (Aislado)
+                        if now - STATE["last_pulse_time"] > 5.0:
                             STATE["last_pulse_time"] = now
                             v_total = (vol_buy + vol_sell)
-                            print(f"📡 [PULSO] Oráculo Oro escaneando... | Rumor actual: ${v_total/1000:.1f}k")
-                            # Actualizar el archivo también para que el Brain sepa que está vivo
-                            pulse_data = {
-                                "symbol": "XAUUSDm", "signal": "HEARTBEAT", "volume": v_total,
-                                "price": price, "timestamp": now
-                            }
-                            with open(FILE_SIGNAL, "w") as f: json.dump(pulse_data, f)
+                            ts_str = datetime.now().strftime('%H:%M:%S')
+                            print(f"📡 [{ts_str}] [RADAR] Oro escaneando... | Rumor: ${v_total/1000:.1f}k")
+                            pulse_data = {"symbol": "XAUUSDm", "signal": "HEARTBEAT", "timestamp": now}
+                            with open(FILE_PULSE, "w") as f: json.dump(pulse_data, f)
+
                     except asyncio.TimeoutError:
-                        # v18.9.850: PULSO DE VIDA INCLUSO EN TIMEOUT
-                        if time.time() - STATE["last_pulse_time"] > 5.0:
+                        if time.time() - STATE["last_pulse_time"] > 10.0:
+                            ts_str = datetime.now().strftime('%H:%M:%S')
+                            print(f"📡 [{ts_str}] [RADAR] Oro escaneando... | Mercado Lento")
                             STATE["last_pulse_time"] = time.time()
-                            print(f"📡 [RADAR] Oro escaneando... | Mercado en Calma... | OK")
                         continue 
         except Exception as e:
             print(f"⚠️ Error Oro: {e}")
             await asyncio.sleep(5)
 
 if __name__ == "__main__":
-    # v18.9.195: ACTIVACIÓN SELECTIVA
-    if not is_brain_on():
-        print("💤 CEREBRO ORO APAGADO EN DASHBOARD. Abortando lanzamiento...")
-        time.sleep(2)
-        exit(0)
     asyncio.run(gold_oracle())
