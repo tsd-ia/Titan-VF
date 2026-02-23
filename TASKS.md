@@ -60,5 +60,7 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Oráculo Inteligente v18.9.750: Filtro Anti-Suicidio Oro (no SELL en contratendencia).
 - [x] Sincro Log v18.9.750: Fecha y hora en consola.
 
+- [x] Oro Rocket Air v18.9.800: Trailing stop con 40% de aire durante explosiones.
+
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*

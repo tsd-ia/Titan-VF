@@ -1140,7 +1140,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.750 | ORÁCULO INTELIGENTE | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.800 | ORO ROCKET AIR | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2920,8 +2920,15 @@ def metralleta_loop():
                         if symbol_info:
                             dist_sl = 1 / (lot * symbol_info.trade_contract_size)
                             
-                            # === ESCALERA TITÁN v18.9.520 (SOLICITUD COMANDANTE) ===
-                            if profit >= 9.0: locked_p = 8.50
+                            # === ESCALERA TITÁN v18.9.800 (CON ROCKET AIR PARA ORO) ===
+                            # v18.9.800: Si es Oro y hay velocidad, damos "Doble Aire" (Buffer más grande)
+                            is_gold = "XAU" in sym or "Gold" in sym
+                            is_rocket = is_gold and is_fast
+                            
+                            if is_rocket and profit >= 5.0:
+                                # Modo Rocket: Dejamos un buffer del 40% del profit (Más aire)
+                                locked_p = profit * 0.60
+                            elif profit >= 9.0: locked_p = 8.50
                             elif profit >= 8.0: locked_p = 7.50
                             elif profit >= 7.0: locked_p = 6.50
                             elif profit >= 6.0: locked_p = 5.50
@@ -2989,10 +2996,11 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v18.9.330: PARACAÍDAS DE GANANCIAS (ANTI-DRENAJE) ===
-                    # Ajustado a 75% (Cierre si perdemos un 25% del pico máximo)
-                    if max_p > 1.05 and profit < (max_p * 0.75):
-                        log(f"🪂 PARACAÍDAS ACTIVADO: {sym} protegiendo ${profit:.2f} tras caída desde ${max_p:.2f}.")
+                    # === v18.9.800: PARACAÍDAS DE GANANCIAS (ANTI-DRENAJE) ===
+                    # Ajustado a 75% | ORO ROCKET: 60% (Cierre si perdemos un 40% del pico máximo)
+                    parachute_ratio = 0.60 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
+                    if max_p > 1.05 and profit < (max_p * parachute_ratio):
+                        log(f"🪂 PARACAÍDAS {'ROCKET' if parachute_ratio==0.6 else ''} ACTIVADO: {sym} protegiendo ${profit:.2f} tras caída desde ${max_p:.2f}.")
                         close_ticket(p, "PROFIT_PARACHUTE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
