@@ -102,7 +102,7 @@ SYMBOLS = ["XAUUSDm", "BTCUSDm", "SOLUSDm", "ETHUSDm"] # Añadidos SOL y ETH. MS
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
 MODEL_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'modelo_lstm_titan.h5') 
 MODEL_BTC_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'modelo_lstm_btc.h5') # v18.9.98: Cerebro BTC
-CMD_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_command.txt')
+CMD_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_mission.txt')
 HISTORY_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_history.json')
 SETTINGS_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_settings.json')
 AUTOPILOT_FILE_PATH = os.path.join(MQL5_FILES_PATH, 'titan_autopilot.txt')
@@ -1129,7 +1129,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.366 | UNIFIED TRAIL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.405 | UNIFIED TRAIL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
