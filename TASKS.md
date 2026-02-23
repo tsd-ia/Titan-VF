@@ -62,6 +62,10 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 
 - [x] Oro Rocket Air v18.9.800: Trailing stop con 40% de aire durante explosiones.
 
+- [x] **Sincronización de Balas (v18.11.900):** Fix ceguera del Dashboard, ahora lee posiciones reales de MT5.
+- [x] **Filtro de Giga-Fire (Oráculo):** Umbral subido a $80k para evitar falsos positivos en tendencias.
+- [x] **Botón TRABAJAR (Dashboard):** Reparado cableado lógico y sincronización de rutas con el Remote Runner.
+- [ ] **Auditoría de Deslizamiento (Slippage):** Verificar por qué BTC cierra con menos profit de lo esperado.
 - [x] Gold Floor $0.50 v18.9.900: Prohibido cerrar Oro con menos de medio dólar de profit.
 - [x] Blindaje de Aire Oro: Paracaídas del 40% para maximizar explosiones.
 - [x] Gold Hi-Sync v18.9.950: Pulse & Signal aislados + Timestamps de precisión.
