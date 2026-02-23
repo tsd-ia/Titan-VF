@@ -1545,75 +1545,42 @@ def process_symbol_task(sym, active, mission_state):
         oracle_volume = 0 # v18.9.155: Para Regla de Oro $280k
 
         
-        # v18.8: El conteo ya se realizó al inicio de la tarea técnica.
+        # v18.11.985: PROTOCOLO LATENCIA CERO (FAST-PATH)
+        is_oracle_signal = False
+        oracle_volume = 0
+        sig_pred = "HOLD"
+        conf_pred = 0.0
+        
+        try:
+            # 1. Oráculo BTC
+            if sym == "BTCUSDm" and os.path.exists("titan_oracle_signal.json"):
+                with open("titan_oracle_signal.json", "r") as f:
+                    o_data = json.load(f)
+                    if time.time() - o_data["timestamp"] < 10.0:
+                        sig_pred = o_data["signal"]; conf_pred = 1.0; is_oracle_signal = True; oracle_volume = o_data.get("volume", 0)
+            # 2. Oráculo ORO (Umbral $10k)
+            elif "XAU" in sym and os.path.exists("titan_gold_signals.json"):
+                with open("titan_gold_signals.json", "r") as f:
+                    o_data = json.load(f)
+                    if time.time() - o_data["timestamp"] < 10.0:
+                        is_oracle_signal = True; sig_pred = o_data["signal"]; conf_pred = 1.0; oracle_volume = o_data.get("volume", 0)
+        except: pass
 
-        # 1. Obtener datos
-        df = obtener_datos(sym, 100) # Changed from get_data to obtener_datos to match original
-        if df.empty: return None 
-
+        if is_oracle_signal:
+            log(f"🔱 FAST-PATH [{sym}]: Gatillo Instantáneo (${oracle_volume/1000:.1f}k)")
+            rsi_val = 50.0; raw_prob = 1.0
+        else:
+            # Solo si no hay oráculo, seguimos con la parsimonia técnica
+            sig_pred, conf_pred, rsi_val, raw_prob, adx_val = predecir(sym)
+            
         tick = mt5.symbol_info_tick(sym)
         if not tick: return None
         
         # Predecir (original location, now re-assigning after initial values)
-        # This line needs to be adjusted to use the new `get_advice` or `predecir`
-        # Assuming `predecir` is the function that provides these values.
-        # The user's snippet implies `get_advice` but the original code uses `predecir`.
-        # I will keep `predecir` as it's in the original code, but ensure `sig`, `conf`, `raw_prob` are updated.
-        # v18.9.202: FIX RSI CRÍTICO (Restaurando llamada a IA)
-        sig_pred, conf_pred, rsi_val_pred, raw_prob_pred, adx_val = predecir(sym)
-        rsi_val = rsi_val_pred if rsi_val_pred > 0 else 50.0
-        LAST_PROBS[sym] = raw_prob_pred
-        raw_prob = raw_prob_pred  
-        
-        # --- ORACULOS DE BINANCE (OVERRIDE MAESTRO LEAD-LAG) ---
-        try:
-            # 1. Oráculo BTC Principal
-            if os.path.exists("titan_oracle_signal.json"):
-                with open("titan_oracle_signal.json", "r") as f:
-                    oracle_data = json.load(f)
-                    if time.time() - oracle_data["timestamp"] < 20.0:
-                        if oracle_data["symbol"] == sym or (sym == "BTCUSDm" and oracle_data["symbol"] == "btcusdt"):
-                            sig_pred = oracle_data["signal"]
-                            conf_pred = 1.0 
-                            is_oracle_signal = True
-                            oracle_volume = oracle_data.get("volume", 0) # Capturar volumen
-                            log(f"⚡ ORÁCULO BTC: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
-
-            # 2. Oráculo Crypto (SOL/ETH/MSTR/OPN) - v18.9.150
-            if os.path.exists("titan_crypto_signals.json"):
-                with open("titan_crypto_signals.json", "r") as f:
-                    crypto_signals = json.load(f)
-                    # Convertir nombre MT5 a nombre Binance (ej: SOLUSDm -> solusdt)
-                    bin_sym = sym.replace("USDm", "usdt").lower()
-                    if bin_sym in crypto_signals:
-                        c_sig = crypto_signals[bin_sym]
-                        if time.time() - c_sig["timestamp"] < 30.0: # v18.9.270: Tolerancia de 30s para crypto
-                            sig_pred = c_sig["signal"]
-                            conf_pred = 0.98 # Subir a 98% para consistencia con Gold/BTC
-                            is_oracle_signal = True
-                            oracle_volume = c_sig.get("volume", 0) # Capturar volumen
-                            if now % 10 < 1: log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
-                        elif now % 30 < 1:
-                            log(f"⏳ ORÁCULO CRYPTO [{sym}] OBSOLETO ({int(time.time() - c_sig['timestamp'])}s).")
-
-            # 3. Oráculo Oro (XAUUSDm) - v18.9.160
-            if os.path.exists("titan_gold_signals.json") and ("XAU" in sym or "Gold" in sym):
-                with open("titan_gold_signals.json", "r") as f:
-                    gold_sig = json.load(f)
-                    if time.time() - gold_sig["timestamp"] < 10.0:
-                        sig_pred = gold_sig["signal"]
-                        conf_pred = 0.98
-                        is_oracle_signal = True
-                        oracle_volume = gold_sig.get("volume", 0)
-                        log(f"🔱 ORÁCULO ORO: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
-        except Exception as e: 
-            if random.random() < 0.01: log(f"⚠️ Error lectura oráculos: {e}")
-        
-        # v18.9.3: RECONEXIÓN CRÍTICA - Asignar señal de IA al ciclo
+        # v18.9.3: ASIGNACIÓN FINAL DE SEÑAL
         sig = sig_pred
         conf = conf_pred
-        rsi_val = rsi_val_pred 
-        curr_price = tick.bid
+        curr_price = tick.bid if tick else 0.0
 
 
         # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
