@@ -845,7 +845,7 @@ def update_sl(ticket, new_sl, comment=""):
         return False
 
 def send_signal(symbol, mode, force=False, custom_tp=None):
-    # v18.9.405: RESTAURACIÓN TOTAL + FIX BRIDGE
+    # v18.9.490: ORO DE SANGRE (Ratio 1.5 + Bridge Pro)
     adv = GLOBAL_ADVICE.get(symbol, {"conf": 0.0})
     is_high_conf = adv.get("conf", 0.0) >= 0.95 or "SOL" in symbol or "XAU" in symbol
     
@@ -854,7 +854,7 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
 
     if not hasattr(send_signal, "last_ts"): send_signal.last_ts = {}
 
-    # Bridge Central Unificado (v18.9.405: Doble salida)
+    # Bridge Imperial (v18.9.490: Doble Sincro 0/1)
     norm_sym = symbol.lower()
     cfg = ASSET_CONFIG.get(symbol, DEFAULT_CONFIG)
     
@@ -1141,7 +1141,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.405 | UNIFIED TRAIL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.490 | IMPERIAL GOLD | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
