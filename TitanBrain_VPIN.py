@@ -1175,7 +1175,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.995 | ESTABILIDAD TOTAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.999 | ORO QUIRÚRGICO | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2149,8 +2149,22 @@ def process_symbol_task(sym, active, mission_state):
                 if conf < 0.80: # v18.9.14: Sincronizado con la regla de Élite (antes 0.96)
                     block_action = True; block_reason = f"TENDENCIA M5 CONTRARIA ({m5_trend_dir})"
                 else:
-                    if now % 300 < 1: log(f"🧠 IA-OVERRIDE: M5 en contra pero IA 80%+ confident. ¡ENTRANDO!")
-                    block_action = False 
+                    # v18.9.999: FILTRO QUIRÚRGICO DE CALIDAD (No comprar caro, no vender barato)
+                    if "XAU" in sym or "Gold" in sym:
+                        if target_sig == "BUY" and rsi_val > 75:
+                            block_action = True; block_reason = f"RSI SOBRECOMPRADO ({rsi_val:.1f})"
+                        elif target_sig == "SELL" and rsi_val < 25:
+                            block_action = True; block_reason = f"RSI SOBREVENDIDO ({rsi_val:.1f})"
+                        
+                        # Filtro de Bollinger
+                        if target_sig == "BUY" and bb_pos > 0.90:
+                            block_action = True; block_reason = "PRECIO EN TECHO BOLLINGER"
+                        elif target_sig == "SELL" and bb_pos < 0.10:
+                            block_action = True; block_reason = "PRECIO EN SUELO BOLLINGER"
+
+                    if not block_action:
+                        if now % 300 < 1: log(f"🧠 IA-OVERRIDE: M5 en contra pero IA 80%+ confident. ¡ENTRANDO!")
+                        block_action = False 
 
         # 6. FILTRO DE MOMENTUM (MOMENTUM RIDER v18.9.19)
         # Si el precio se mueve demasiado rápido, dejamos de ser "tercos" y seguimos la ola.
