@@ -96,7 +96,7 @@ print("✅ LIMPIEZA COMPLETA.")
 PORT = 8000
 # LISTA DE ACTIVOS MONITORIZADOS (RADAR MÚLTIPLE v7.8)
 # CEREBRO TRIPLE: ORO, BTC y CRYPTO (SOL/ETH/MSTR/OPN)
-SYMBOLS = ["XAUUSDm", "MSTRm", "OPNm", "BTCUSDm", "ETHUSDm"] 
+SYMBOLS = ["XAUUSDm", "SOLUSDm", "XRPUSDm", "BTCUSDm", "ETHUSDm"] 
 
 # REPARACIÓN DE RUTA (Basada en LOGS del Robot)
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
@@ -153,6 +153,7 @@ LAST_STABLE_SIG = {}     # {symbol: (signal, first_seen_ts)}
 CONRARY_COUNT = {}      # NEW v7.61 - estabilidad anti-ruido
 LAST_OLLAMA_CALL = {}   # v18.9.95: Throttling Ollama (10m cooldown)
 LAST_OLLAMA_CACHE = {}  # v18.9.101: Cognitive Cache (RSI, BB, Sig -> Res)
+OLLAMA_COOLDOWN = 600   # 10 MINUTOS DE SILENCIO (v18.9.980)
 TICK_FREQUENZ = {}      # v18.9.103: Monitor de frecuencia de ticks
 LAST_CLOSE_TS = {}  # Memoria anti-reentrada (v6.4)
 LAST_STABLE_SIG = {} # Memoria de estabilidad (v7.72)
@@ -1143,7 +1144,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.900 | GOLD FLOOR $0.50 | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.980 | ORO HI-SYNC SYNC | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2117,7 +2118,7 @@ def process_symbol_task(sym, active, mission_state):
                 if conf < 0.80: # v18.9.14: Sincronizado con la regla de Élite (antes 0.96)
                     block_action = True; block_reason = f"TENDENCIA M5 CONTRARIA ({m5_trend_dir})"
                 else:
-                    if now % 60 < 1: log(f"🧠 IA-OVERRIDE: M5 en contra pero IA 80%+ confident. ¡ENTRANDO!")
+                    if now % 300 < 1: log(f"🧠 IA-OVERRIDE: M5 en contra pero IA 80%+ confident. ¡ENTRANDO!")
                     block_action = False 
 
         # 6. FILTRO DE MOMENTUM (MOMENTUM RIDER v18.9.19)
