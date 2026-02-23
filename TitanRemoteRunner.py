@@ -24,10 +24,14 @@ print("==================================================")
 
 while True:
     try:
-        # 1. Escuchar comando maestro (remote_launch)
-        res = requests.get(f"{FIREBASE_URL}/commands/remote_launch.json", timeout=10)
-        if res.status_code == 200 and res.json() == True:
-            print("🎯 SEÑAL RECIBIDA: Iniciando Motores Selectivos...")
+        # 1. Escuchar comando maestro (remote_launch) desde la ruta exacta de la web
+        res = requests.get(f"{FIREBASE_URL}/commands.json", timeout=10)
+        if res.status_code == 200:
+            cmds = res.json()
+            # v18.11.970: Manejo ultra-robusto de booleanos (acepta True, 1 o "true")
+            launch_val = cmds.get("remote_launch", False)
+            if launch_val in [True, 1, "true", "True"]:
+                print("🎯 SEÑAL RECIBIDA: Iniciando Motores Selectivos...")
             
             # 2. Verificar cada activo antes de lanzar
             if get_flag("btc_brain_on"):

@@ -97,8 +97,14 @@ export default function TitanDashboard() {
   }, []);
 
   const sendCommand = async (cmd: string, val: any) => {
+    console.log(`📡 [SENTINEL] Enviando Mando: ${cmd} = ${val}`);
     setOverrides(prev => ({ ...prev, [cmd]: val }));
-    await update(ref(db, "live/commands"), { [cmd]: val });
+    try {
+      await update(ref(db, "live/commands"), { [cmd]: val });
+      console.log(`✅ [SENTINEL] Mando ${cmd} sincronizado con Firebase.`);
+    } catch (err) {
+      console.error(`❌ [SENTINEL] error al enviar mando:`, err);
+    }
   };
 
   if (connecting || !data) {
@@ -353,15 +359,21 @@ export default function TitanDashboard() {
                   </div>
                 </button>
                 {/* v18.9.105: REMOTE LAUNCHER BUTTON */}
-                <button onClick={() => sendCommand("remote_launch", true)} className="bg-emerald-600 hover:bg-emerald-500 text-white flex items-center justify-between p-6 rounded-3xl transition-all shadow-[0_0_50px_rgba(16,185,129,0.3)] group col-span-1 md:col-span-2">
+                <button
+                  onClick={() => {
+                    sendCommand("remote_launch", true);
+                    alert("🚀 Se ha enviado la señal de ARRANQUE a las terminales locales.");
+                  }}
+                  className="bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white flex items-center justify-between p-6 rounded-3xl transition-all shadow-[0_0_50px_rgba(16,185,129,0.3)] group col-span-1 md:col-span-2"
+                >
                   <div className="flex items-center gap-4">
                     <Power size={24} className="group-hover:rotate-90 transition-transform" />
                     <div className="text-left">
-                      <p className="font-black text-xs uppercase tracking-widest">TRABAJAR (Remote Start)</p>
-                      <p className="text-[10px] font-bold opacity-80 uppercase">Encender MT5 Link + Oracle + Titan Core</p>
+                      <p className="font-black text-xs uppercase tracking-widest italic">TRABAJAR (Remote Start)</p>
+                      <p className="text-[10px] font-bold opacity-80 uppercase">Lanzar MT5 Link + Oráculos + Cerebros</p>
                     </div>
                   </div>
-                  <span className="text-[10px] font-black bg-white/20 px-3 py-1 rounded-full">BATCH LAUNCHER</span>
+                  <span className="text-[10px] font-black bg-white/20 px-3 py-1 rounded-full animate-pulse tracking-widest">FIRE_READY</span>
                 </button>
               </div>
 
