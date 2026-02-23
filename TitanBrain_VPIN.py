@@ -146,7 +146,8 @@ STATE = {
     "bullets": 0, "pnl": 0.0, "last_fire": 0, "active_pairs": [],
     "market_warning": "OPEN 🟢", "last_ollama_res": "Ollama Sentinel Active",
     "price_history": [], "oro_brain_on": True, "btc_brain_on": True,
-    "crypto_brain_on": True, "auto_mode": False, "start_mission": False
+    "crypto_brain_on": True, "auto_mode": True, "start_mission": True,
+    "auto_pilot": True
 }
 
 def init_memories(s):
@@ -516,9 +517,8 @@ def load_settings():
             with open(SETTINGS_FILE_PATH, 'r') as f:
                 data = json.load(f)
                 with state_lock:
-                    STATE["auto_pilot"] = data.get("auto_pilot", False)
-                    # Sincronización de Modo Espejo desde el archivo
-                    MIRROR_MODE = data.get("mirror_mode", MIRROR_MODE)
+                    STATE["auto_pilot"] = data.get("auto_pilot", True)
+                    STATE["auto_mode"] = STATE["auto_pilot"]
                 log(f"⚙️ Configuración recuperada: Auto-Pilot {'ON' if STATE['auto_pilot'] else 'OFF'} | Espejo {'ON' if MIRROR_MODE else 'OFF'}")
         
         # PERSISTENCIA DE MISIÓN
