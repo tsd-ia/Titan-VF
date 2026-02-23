@@ -619,11 +619,8 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_gold = ("XAU" in sym or "Gold" in sym)
     is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
-    # 1. Definir Balas por Categoría (Petición Comandante)
-    if is_gold: max_bullets = 3
-    elif is_btc: max_bullets = 3
-    elif is_crypto: max_bullets = 5
-    else: max_bullets = 2 # General/Forex
+    # 1. Definir Balas por Categoría (v18.9.310: Límite de 20 por instrumento solicitado)
+    max_bullets = 20
     
     # 2. Definir Lotaje según Balance
     if balance < 50.0:
@@ -1108,7 +1105,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.300 | GIGA-FIRE WHALE-SENSE | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.310 | INDEPENDENCIA TOTAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2544,6 +2541,9 @@ def process_symbol_task(sym, active, mission_state):
                         
                         LAST_ENTRY_PRICE[sym] = float(price)
                         log(f"⚡ {sym} -> {target_sig} ({conf*100:.1f}%) [{trigger_type}]")
+                    elif is_heartbeat and not is_vigilancia_blocked:
+                        # Si es solo un heartbeat, no necesitamos actualizar LAST_ENTRY_PRICE
+                        pass
 
         return {
             "symbol": sym, "signal": target_sig if target_sig != "HOLD" else LAST_SIGNALS.get(sym, "WAIT"),
