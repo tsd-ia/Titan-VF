@@ -2083,12 +2083,12 @@ def process_symbol_task(sym, active, mission_state):
         if adx_val > 25: # Alta tendencia/volatilidad
             atr_factor = 1.5 if adx_val < 40 else 2.5
         
-        # v18.9.390: INDULTO ETERNO PARA SOLANA (Comandante Order)
+        # v18.9.410: INDULTO SOLANA (Reducido log para evitar spam)
         if "SOL" in sym:
             block_action = False
             block_reason = ""
             is_hard_blocked = False
-            log(f"🔓 INDULTO SOLANA: Saltando todas las restricciones de seguridad.")
+            if now % 30 < 1: log(f"🔓 MODO GATILLO: SOLANA liberada de bloqueos.")
         
         # 4. FILTRO DE TENDENCIA MAYOR (M5 ALIGNMENT v15.35 BLINDADO)
         # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
@@ -2605,7 +2605,8 @@ def process_symbol_task(sym, active, mission_state):
                 should_send = False
             elif target_sig in ["BUY", "SELL"]: 
                 # v18.9.245: Si es Oráculo, ignorar bloqueos suaves (Veto M1, etc)
-                can_pass_block = not block_action or super_conf or (is_oracle_signal and not is_hard_blocked)
+                # v18.9.410: GATILLO REAL - Solana y Oráculos tienen vía libre absoluta
+                can_pass_block = not block_action or super_conf or is_oracle_signal or ("SOL" in sym)
                 
                 if can_pass_block:
                     should_send = False
