@@ -2279,13 +2279,12 @@ def process_symbol_task(sym, active, mission_state):
                                 conf = 1.0 # Confianza ciega en el Oráculo
             except: pass
 
-        # 2. ORÁCULO CRYPTO (BTC/ETH/SOL)
-        elif any(c in sym for c in ["BTC", "ETH", "SOL"]):
+        # 2. ORÁCULO CRYPTO (ETH/SOL via Crypto Oracle)
+        elif any(c in sym for c in ["ETH", "SOL"]):
             try:
                 if os.path.exists("titan_crypto_signals.json"):
                     with open("titan_crypto_signals.json", "r") as f:
                         csigs = json.load(f)
-                        # Símbolo normalizado (solusdt -> SOLUSDm)
                         s_key = sym.lower().replace("usdm", "usdt")
                         if s_key in csigs:
                             csig = csigs[s_key]
@@ -2296,6 +2295,21 @@ def process_symbol_task(sym, active, mission_state):
                                     log(f"🔱 GOD MODE ACTIVADO [{sym}]: Señal de Oráculo Detectada.")
                                     sig = oracle_sig
                                     conf = 1.0
+            except: pass
+        
+        # 3. ORÁCULO BINANCE (BTC via Binance Oracle)
+        elif sym == "BTCUSDm":
+            try:
+                if os.path.exists("titan_oracle_signal.json"):
+                    with open("titan_oracle_signal.json", "r") as f:
+                        osig = json.load(f)
+                        if (time.time() - osig.get("timestamp", 0)) < 15:
+                            is_oracle_signal = True
+                            oracle_sig = osig.get("signal", "HOLD")
+                            if oracle_sig != "HOLD":
+                                log(f"🔱 GOD MODE ACTIVADO [BTC]: Ballena Binance Detectada.")
+                                sig = oracle_sig
+                                conf = 1.0
             except: pass
 
         if is_oracle_signal and oracle_sig != "HOLD":
