@@ -30,6 +30,7 @@ def write_signal(signal, side, volume):
         "source": "BINANCE_ORACLE",
         "symbol": "BTCUSDm",  # Equivalente en MT5
         "signal": signal,
+        "volume": volume,
         "confidence": 1.0,
         "reason": f"🐋 BALLENA DETECTADA: {side} ${volume:,.0f} USD"
     }
