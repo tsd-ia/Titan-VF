@@ -324,6 +324,9 @@ def firebase_command_poller():
                                 val = bool(cmds[flag])
                                 if val != STATE.get(flag):
                                     STATE[flag] = val
+                                    if flag == "auto_mode": 
+                                        STATE["auto_pilot"] = val
+                                        save_settings()
                                     log(f"🧠 MANDO WEB (JSON): {flag} -> {'ACTIVADO' if val else 'DESACTIVADO'}")
             
             # v18.9.280: Poll directo de flags raíz para evitar desincronización con el Dashboard
@@ -342,6 +345,8 @@ def firebase_command_poller():
                 val = bool(cmds["auto_mode"])
                 if val != STATE.get("auto_mode", False):
                     STATE["auto_mode"] = val
+                    STATE["auto_pilot"] = val
+                    save_settings()
                     log(f"🔫 MANDO WEB: Autonomous Fire {'ON' if val else 'OFF'}")
             if "start_mission" in cmds and cmds["start_mission"]:
                 log("🎯 MANDO WEB: FORCING START MISSION!")

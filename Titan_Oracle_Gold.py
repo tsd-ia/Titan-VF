@@ -12,8 +12,8 @@ except ImportError:
 
 # CONFIGURACIÓN DEL ORÁCULO ORO (PAXG/USDT)
 SYMBOL_BINANCE = "paxgusdt"
-WHALE_THRESHOLD = 25000    
-GOD_MODE_THRESHOLD = 90000 
+WHALE_THRESHOLD = 18000    
+GOD_MODE_THRESHOLD = 80000 
 FILE_SIGNAL = "titan_gold_signals.json"
 FILE_PULSE = "titan_gold_pulse.json"
 FIREBASE_FLAG_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/oro_brain_on.json"
