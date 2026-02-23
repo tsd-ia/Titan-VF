@@ -2251,19 +2251,18 @@ def process_symbol_task(sym, active, mission_state):
                                     conf = 1.0
             except: pass
 
-        # v18.9.375: INTEGRACIÓN GIGA-FIRE 2.0 (Bypass IA)
         if is_oracle_signal and oracle_sig != "HOLD":
-            ai_reply = "GOD_MODE: ORACLE_FIRE"
-            model_used = "ORACLE"
+            ai_reply = "YES" # Bypass absoluto
+            model_used = "ORACLE_MODE"
             conf = 1.0
             last_god_log = STATE.get(f"last_god_log_{sym}", 0)
             if now - last_god_log > 15.0:
-                log(f"🔱 GIGA-FIRE [{sym}]: Oráculo manda. Saltando IA lenta.")
+                log(f"🔱 GIGA-FIRE [{sym}]: Oráculo manda. Bypass IA.")
                 STATE[f"last_god_log_{sym}"] = now
         elif conf >= 0.70 and (not use_cache or (time.time() - last_call_ts > 180)):
-            # Throttling IA: Solo si no hay Oráculo y la confianza base es media-alta
+            # PROMPT MATEMÁTICO (Anti-Veto de Ollama)
             LAST_OLLAMA_CALL[sym] = time.time()
-            prompt = f"Trader 2026: {sym} {sig} | RSI:{rsi_val:.1f} BB:{bb_pos:.2f}. Proceed? (YES/NO)"
+            prompt = f"Analyze Vector: {sym} | V1:{rsi_val:.1f} | V2:{bb_pos:.2f} | D:{sig}. Output 'YES' if V1 and V2 align with D, else 'NO'. Strict 1 word."
             ai_reply, model_used = call_ollama(prompt)
             LAST_OLLAMA_CACHE[sym] = {'rsi': rsi_val, 'bb': bb_pos, 'sig': target_sig, 'res': ai_reply, 'model': model_used}
             with state_lock: STATE["last_ollama_res"] = f"[{model_used}] {ai_reply}"
@@ -2782,16 +2781,20 @@ def metralleta_loop():
         try:
             now_loop = time.time()
             
-            # v18.9.28: BLOQUEO DINÁMICO POR MARGEN (Fix: 0% sin posiciones = cuenta libre)
+            # v18.9.385: FIX MARGEN FANTASMA (0.0% suele ser error de API)
             acc_check = mt5.account_info()
-            has_open_pos = len(mt5.positions_get() or []) > 0
-            if acc_check and has_open_pos and acc_check.margin_level < MIN_MARGIN_LEVEL:
+            positions_now = mt5.positions_get() or []
+            has_open_pos = len(positions_now) > 0
+            m_level = acc_check.margin_level if acc_check else 0.0
+            
+            # Solo bloqueamos si el margen es real (entre 0.1 y MIN_MARGIN)
+            if acc_check and has_open_pos and 0.1 < m_level < MIN_MARGIN_LEVEL:
                 if not VANGUARDIA_LOCK:
                     VANGUARDIA_LOCK = True
-                    log(f"🛡️ BLOQUEO DE SEGURIDAD: Margen insuficiente ({acc_check.margin_level:.1f}%)")
-            elif VANGUARDIA_LOCK and (not has_open_pos or (acc_check and acc_check.margin_level > (MIN_MARGIN_LEVEL + 20))):
+                    log(f"🛡️ BLOQUEO DE SEGURIDAD: Margen insuficiente ({m_level:.1f}%)")
+            elif VANGUARDIA_LOCK and (not has_open_pos or (acc_check and m_level > (MIN_MARGIN_LEVEL + 20) or m_level == 0)):
                 VANGUARDIA_LOCK = False
-                log(f"🔓 SISTEMA LIBERADO: Margen OK o sin posiciones.")
+                log(f"🔓 SISTEMA LIBERADO: Margen OK o reset de API.")
             # v18.9.78: GESTIÓN DE RIESGO ADAPTATIVA
             current_equity = get_equity()
             # El usuario solicita lotaje dinámico para mover la cuenta
