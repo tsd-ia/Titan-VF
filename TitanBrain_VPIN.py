@@ -183,6 +183,7 @@ LAST_CLOSE_TYPE = {} # {symbol: "BUY"/"SELL"}
 COOLDOWN_AFTER_CLOSE = 15  # v15.30: Reducido para scalping rápido (antes 90s)
 LAST_CLOSE_TIME = {}       # Memoria para el cooldown
 LAST_AI_PURGE_CHECK = 0    # v18.9.368: Auditoría de Salud IA cada 5 min
+PNL_MEMORIA = {}          # v18.9.370: Memoria de evolución para evitar purgar lo que mejora
 
 
 # --- CONFIGURACIÓN DE FIREBASE (SENTINEL v7.0) ---
@@ -630,9 +631,19 @@ def perform_ai_health_audit():
     log("🩺 [AUDITOR] Iniciando chequeo de salud de cuenta...")
     
     for p in positions:
-        # Solo auditar posiciones con más de 10 minutos de vida o que estén perdiendo > $5
+        # v18.9.370: Detectar si la posición está MEJORANDO
+        last_pnl = PNL_MEMORIA.get(p.ticket, p.profit)
+        is_improving = p.profit > last_pnl + 0.05 # Ha mejorado al menos 5 centavos desde el último check
+        PNL_MEMORIA[p.ticket] = p.profit
+        
+        # 1. SI ESTÁ MEJORANDO, INDULTO AUTOMÁTICO (No molestar al gráfico)
+        if is_improving and p.profit > -15.0:
+            if now % 60 < 2: log(f"🌱 [AUDITOR] {p.symbol} mejorando (${p.profit:.2f} > ${last_pnl:.2f}). Indulto concedido.")
+            continue
+
+        # 2. Criterios de entrada al tribunal de la IA (Más de 15 min o pérdida seria)
         trade_life = now - p.time
-        if trade_life < 600 and p.profit > -5.0: continue
+        if trade_life < 900 and p.profit > -8.0: continue
         
         # Preparar diagnóstico para la IA
         duration_min = int(trade_life / 60)
@@ -641,21 +652,28 @@ def perform_ai_health_audit():
         
         prompt = f"""
         AUDITORÍA DE RIESGO TITAN 2026:
-        Posición: {p.symbol} ({'BUY' if p.type == 0 else 'SELL'})
-        Profit Actual: ${p.profit:.2f}
-        Tiempo Abierta: {duration_min} minutos
-        Contexto Mercado: {trend_context}
-        Instrucción: Si la posición está estancada, va contra la tendencia o no muestra signos de recuperación rápida para llegar a profit, ordena 'PURGA: SI'. 
-        Si crees que puede recuperarse en menos de 5 min, ordena 'PURGA: NO'. 
-        Explica brevemente por qué.
+        Ticket: #{p.ticket} en {p.symbol} ({'BUY' if p.type == 0 else 'SELL'})
+        Profit Actual: ${p.profit:.2f} (Estado previo: ${last_pnl:.2f})
+        Tiempo Abierta: {duration_min} minutos.
+        Contexto Mercado: {trend_context}.
+        
+        INSTRUCCIÓN CRÍTICA: 
+        - Si la posición está MEJORANDO (se acerca a cero) o el mercado está girando a su favor, responde 'PURGA: NO'.
+        - Solo responde 'PURGA: SI' si la posición es un "clavo" sin movimiento, está estancada en pérdida profunda o el mercado la está destruyendo sin piedad.
+        - Sé breve.
         """
         
         res, model = call_ollama(prompt)
         if "PURGA: SI" in res.upper():
-            log(f"💀 SENTENCIA IA ({model}): Purga confirmada para #{p.ticket} ({p.symbol}). Razón: {res[:120]}...")
+            log(f"💀 SENTENCIA IA ({model}): Purga confirmada para #{p.ticket}. Razón: {res[:120]}...")
             close_ticket(p, "AI_HEALTH_PURGE")
         else:
-            if now % 60 < 2: log(f"🩺 AUDITOR: Posición #{p.ticket} validada para continuar. ({model})")
+            log(f"🩺 AUDITOR: #{p.ticket} mantenida por potencial de recuperación detectado.")
+           
+    # Limpiar memoria de tickets que ya no existen
+    current_tickets = [pos.ticket for pos in positions]
+    for tid in list(PNL_MEMORIA.keys()):
+        if tid not in current_tickets: del PNL_MEMORIA[tid]
 
 def get_equity():
     acc = mt5.account_info()
