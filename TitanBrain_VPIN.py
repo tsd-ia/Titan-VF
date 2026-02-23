@@ -732,11 +732,11 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     # El Comandante pide 6 balas por instrumento.
     max_bullets = 6 if conf > 0.80 else 4
     
-    # 2. Definir Lotaje según Balance
-    # ETH a 0.30, SOL a 0.10. Oro/BTC a 0.01 por seguridad.
+    # 2. Definir Lotaje según Balance (v18.11.970: Comandante Mode $100+)
+    # ETH a 0.30, BTC/SOL a 0.10. Oro a 0.01 por seguridad de margen.
     if "ETH" in sym:
         smart_lot = 0.3
-    elif "SOL" in sym:
+    elif "BTC" in sym or "SOL" in sym:
         smart_lot = 0.1
     else:
         smart_lot = 0.01
