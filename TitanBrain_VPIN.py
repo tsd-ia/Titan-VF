@@ -622,7 +622,7 @@ def perform_ai_health_audit():
     """ Analiza posiciones estancadas y decide purgas preventivas """
     global LAST_AI_PURGE_CHECK
     now = time.time()
-    if (now - LAST_AI_PURGE_CHECK) < 300: return # Cada 5 min
+    if (now - LAST_AI_PURGE_CHECK) < 120: return # Cada 2 min para mayor fluidez
     
     LAST_AI_PURGE_CHECK = now
     positions = mt5.positions_get()
@@ -643,7 +643,7 @@ def perform_ai_health_audit():
 
         # 2. Criterios de entrada al tribunal de la IA (Más de 15 min o pérdida seria)
         trade_life = now - p.time
-        if trade_life < 900 and p.profit > -8.0: continue
+        if trade_life < 420 and p.profit > -3.0: continue # v18.9.455: Más agresivo (7 min / -$3)
         
         # Preparar diagnóstico para la IA
         duration_min = int(trade_life / 60)
@@ -789,7 +789,6 @@ def close_ticket(pos, reason="UNK"):
             if CONSECUTIVE_LOSSES[pos.symbol] >= 2:
                 COOL_DOWN_UNTIL[pos.symbol] = time.time() + 180 
         
-        log(f"✅ CIERRE EXITOSO #{pos.ticket} [{reason}]: Profit {pos.profit:.2f} | {latency_ms:.1f}ms")
         
         # Guardar razón para re-entrada inmediata v18.9.106
         LAST_CLOSE_REASON[pos.symbol] = reason
@@ -2243,11 +2242,14 @@ def process_symbol_task(sym, active, mission_state):
             LAST_OLLAMA_CALL[sym] = time.time()
             prompt = f"Analyze Vector: {sym} | V1:{rsi_val:.1f} | V2:{bb_pos:.2f} | D:{sig}. Output 'YES' if V1 and V2 align with D, else 'NO'. Strict 1 word."
             ai_reply, model_used = call_ollama(prompt)
-            LAST_OLLAMA_CACHE[sym] = {'rsi': rsi_val, 'bb': bb_pos, 'sig': target_sig, 'res': ai_reply, 'model': model_used}
             with state_lock: STATE["last_ollama_res"] = f"[{model_used}] {ai_reply}"
             
             if "YES" in ai_reply.upper() or "SI" in ai_reply.upper():
                 log(f"🧠 IA CONFIRMA: {ai_reply[:50]}...")
+            
+            # v18.9.458: NO CACHEAR ERRORES (Solo cachear YES/NO reales)
+            if "YES" in ai_reply.upper() or "NO" in ai_reply.upper() or "SI" in ai_reply.upper():
+                LAST_OLLAMA_CACHE[sym] = {'rsi': rsi_val, 'bb': bb_pos, 'sig': target_sig, 'res': ai_reply, 'model': model_used}
                 conf *= 1.1 # Bono por IA positiva
             else:
                 log(f"🛡️ IA VETO: {ai_reply[:50]}...")

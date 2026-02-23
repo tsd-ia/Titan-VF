@@ -41,7 +41,7 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Optimizar precisión de señales Oro en sesión asiática ($80k threshold).
 - [x] Verificar Trailing Unificado +$0.30 y Freno de Margen 100%.
 - [x] Sincronizar Lotajes SAFE MODE: 0.01 Universal / 0.10 ETH-SOL.
-- [x] Implementar Auditor de Salud IA (Purga preventiva cada 5 min).
+- [x] Implementar Auditor de Salud IA Hiper-Agresivo (Purga cada 2 min).
 - [x] Protocolo GIGA-FIRE 2.0: Bypass total IA para Oráculos.
 - [x] Blindaje Atómico Anti-Metralleta (Límite 3 balas/activo).
 - [x] ORO MASTER v18.9.450: Activación 5 balas y precisión 90%.
