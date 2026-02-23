@@ -19,7 +19,8 @@ FIREBASE_FLAG_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/oro
 
 STATE = {
     "window": {"buys": [], "sells": [], "price": 0.0},
-    "last_signal_time": 0.0
+    "last_signal_time": 0.0,
+    "last_pulse_time": 0.0
 }
 
 def is_brain_on():
@@ -86,7 +87,23 @@ async def gold_oracle():
                             }
                             with open(FILE_SIGNAL, "w") as f: json.dump(data_sig, f)
                             print(f"🔱 BALLENA ORO: {sig} | Vol: ${vol/1000:.1f}k {'[GOD MODE]' if vol >= GOD_MODE_THRESHOLD else ''}")
+                        
+                        # v18.9.400: PULSO DE VIDA (Heartbeat) para dar confianza al Comandante
+                        if now - STATE["last_pulse_time"] > 10.0:
+                            STATE["last_pulse_time"] = now
+                            v_total = (vol_buy + vol_sell)
+                            print(f"📡 [PULSO] Oráculo Oro escaneando... | Rumor actual: ${v_total/1000:.1f}k")
+                            # Actualizar el archivo también para que el Brain sepa que está vivo
+                            pulse_data = {
+                                "symbol": "XAUUSDm", "signal": "HEARTBEAT", "volume": v_total,
+                                "price": price, "timestamp": now
+                            }
+                            with open(FILE_SIGNAL, "w") as f: json.dump(pulse_data, f)
                     except asyncio.TimeoutError:
+                        # v18.9.850: PULSO DE VIDA INCLUSO EN TIMEOUT
+                        if time.time() - STATE["last_pulse_time"] > 5.0:
+                            STATE["last_pulse_time"] = time.time()
+                            print(f"📡 [RADAR] Oro escaneando... | Mercado en Calma... | OK")
                         continue 
         except Exception as e:
             print(f"⚠️ Error Oro: {e}")

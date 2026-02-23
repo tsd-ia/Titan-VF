@@ -1140,7 +1140,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.800 | ORO ROCKET AIR | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.850 | ORO PULSO REAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2996,11 +2996,11 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v18.9.800: PARACAÍDAS DE GANANCIAS (ANTI-DRENAJE) ===
-                    # Ajustado a 75% | ORO ROCKET: 60% (Cierre si perdemos un 40% del pico máximo)
-                    parachute_ratio = 0.60 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
+                    # === v18.9.850: PARACAÍDAS DE GANANCIAS (HI-TOLERANCE ORO) ===
+                    # Ajustado a 75% | ORO ROCKET: 40% (Solo cierra si perdemos el 60% del pico)
+                    parachute_ratio = 0.40 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
                     if max_p > 1.05 and profit < (max_p * parachute_ratio):
-                        log(f"🪂 PARACAÍDAS {'ROCKET' if parachute_ratio==0.6 else ''} ACTIVADO: {sym} protegiendo ${profit:.2f} tras caída desde ${max_p:.2f}.")
+                        log(f"🪂 PARACAÍDAS {'ROCKET' if parachute_ratio==0.4 else ''} ACTIVADO: {sym} protegiendo ${profit:.2f} tras caída desde ${max_p:.2f}.")
                         close_ticket(p, "PROFIT_PARACHUTE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
