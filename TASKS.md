@@ -44,7 +44,7 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Implementar Auditor de Salud IA Hiper-Agresivo (Purga cada 2 min).
 - [x] Protocolo GIGA-FIRE 2.0: Bypass total IA para Oráculos.
 - [x] Blindaje Atómico Anti-Metralleta (Límite 3 balas/activo).
-- [x] ORO MASTER v18.9.450: Activación 5 balas y precisión 90%.
+- [x] ORO IMPERIAL v18.9.475: Lote 0.03 + 5 Balas + Aire -$25.
 - [x] Oráculo Oro Hiper-Sensible: Umbral $30k (Sesión Asia).
 - [x] Fix Bridge Universal: Símbolo Case-Sensitive y 0/1 (Doble Puente).
 
