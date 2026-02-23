@@ -687,7 +687,8 @@ def perform_ai_health_audit():
              log(f"🧊 LENTITUD DETECTADA: {p.symbol} estancado en ${p.profit:.2f}. Cortando para recuperar margen.")
              close_ticket(p, "SCALPING_PURGE"); continue
 
-        if trade_life < 240 and p.profit > -2.0: continue 
+        # v18.11.500: PULMÓN DE ACERO (600s de Vida)
+        if trade_life < 600 and p.profit > -4.0: continue
         
         # Preparar diagnóstico para la IA
         duration_min = int(trade_life / 60)
@@ -1176,7 +1177,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v18.10.950 | SUELO DE CRISTAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v18.11.400 | PULMÓN DE ACERO (FUEGO TOTAL) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -2049,27 +2050,13 @@ def process_symbol_task(sym, active, mission_state):
             spread = (tick.ask - tick.bid) / mt5.symbol_info(sym).point
             n_balas_actuales = len(pos_list)
             
-            if spread > MAX_EXPLORATION_SPREAD and not is_oracle_signal:
-                block_action = True
-                block_reason = f"SPREAD PROHIBITIVO ({spread:.1f} pts)"
-            elif is_oracle_signal and spread > 1500: # Protocolo v18.9.134: Límite prudente $15 USD
-                block_action = True
-                block_reason = f"SPREAD BALLENA INVIABLE (${spread/100:.2f} USD)"
-                if now % 60 < 1: # Para no spamear Telegram cada segundo de la misma señal
-                    try:
-                        tg_token = os.getenv('TELEGRAM_TOKEN', '8217691336:AAFWduUGkO_f-QRF6MN338HY-MA46CjzHMg')
-                        tg_chat = os.getenv('TELEGRAM_CHAT_ID', '8339882349')
-                        msg = f"⛔ TITAN BLOQUEO DE ORÁCULO\nActivo: {sym}\nEl broker(Exness) está cobrando ${spread/100:.2f} USD de Spread (Comisión Oculta). Disparo Abortado por precaución al capital."
-                        requests.get(f"https://api.telegram.org/bot{tg_token}/sendMessage?chat_id={tg_chat}&text={msg}", timeout=2)
-                    except: pass
+            # v18.11.300: BLOQUEOS DE SPREAD ELIMINADOS
+            if False:
+                pass
 
-            elif spread > MAX_SKEW_SPREAD:
-                if n_balas_actuales < MAX_BULLETS: # v18.9.13: Permitir las 5 balas incluso con spread alto
-                    is_exploring = (n_balas_actuales == 0) # La primera es 0.01 si es spread alto
-                    pass
-                else:
-                    block_action = True
-                    block_reason = f"MAX BALAS ({MAX_BULLETS}) PARA SPREAD {spread:.1f}"
+            # v18.11.200: SPREAD SKEW LIBERADO
+            if False: # Bloqueo desactivado
+                pass
 
         # v18.8: Conteo físico preservado de la inicialización
         # n_balas_reales ya viene definido desde el inicio de la tarea
