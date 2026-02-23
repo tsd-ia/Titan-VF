@@ -1108,7 +1108,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.280 | GIGA-FIRE TOTAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.300 | GIGA-FIRE WHALE-SENSE | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1878,8 +1878,8 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = True
                     block_reason = "CORRIENTE EN CONTRA (M5/EMA/VELA): Venta bloqueada."
 
-            # --- REGLA DE ORO DEL COMANDANTE v18.9.250: GOD MODE $80k UNIFICADO ---
-            if is_oracle_signal and oracle_volume >= 80000:
+            # --- REGLA DE ORO DEL COMANDANTE v18.9.290: GOD MODE $220k ---
+            if is_oracle_signal and oracle_volume >= 220000:
                 block_action = False # BYPASS TOTAL DE GRILLETES
                 log(f"🔱 GOD MODE ACTIVADO: Señal de ${oracle_volume/1000:.0f}k detectada. Ignorando grilletes técnicos.")
 
@@ -2502,6 +2502,7 @@ def process_symbol_task(sym, active, mission_state):
                     if should_send:
                         # v18.9.45: VALIDACIÓN DE EXCLUSIÓN DE PRECIO (Anti-Metralleta)
                         tick = mt5.symbol_info_tick(sym)
+                        if not tick: return
                         price = tick.ask if target_sig == "BUY" else tick.bid
                         
                         # Escanear precios de posiciones actuales
@@ -2516,34 +2517,33 @@ def process_symbol_task(sym, active, mission_state):
                             if now % 10 < 1: log(f"⏳ ZONA PROHIBIDA: Precio demasiado cerca de bala existente. Esperando espacio...")
                             return
                     
-                    # v18.9.115: REGLA BUNKER $25 USD (Recuperación/Stacking)
-                    # v18.9.170: Lote Dinámico (Smart Lot) según balance
-                    side_mt5 = mt5.ORDER_TYPE_BUY if target_sig == "BUY" else mt5.ORDER_TYPE_SELL
-                    final_lot = smart_lot if smart_lot > 0 else (ASSET_CONFIG.get(sym, DEFAULT_CONFIG).get("lot", 0.01))
-                    sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
+                        # v18.9.115: REGLA BUNKER $25 USD (Recuperación/Stacking)
+                        # v18.9.170: Lote Dinámico (Smart Lot) según balance
+                        side_mt5 = mt5.ORDER_TYPE_BUY if target_sig == "BUY" else mt5.ORDER_TYPE_SELL
+                        final_lot = smart_lot if smart_lot > 0 else (ASSET_CONFIG.get(sym, DEFAULT_CONFIG).get("lot", 0.01))
+                        sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
 
-                    request = {
-                        "action": mt5.TRADE_ACTION_DEAL,
-                        "symbol": sym, "volume": final_lot,
-                        "type": side_mt5,
-                        "price": price, "sl": sl_price, "magic": 777,
-                        "comment": f"TITAN-BUNKER-25USD",
-
-                        "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC,
-                    }
-                    
-                    res = mt5.order_send(request)
-                    if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                        log(f"✅ RECUPERACIÓN EXITOSA: {target_sig} (#{res.order})")
-                        with state_lock: STATE[f"firing_{sym}"] = now
-                        LAST_ENTRY[sym] = now
-                        time.sleep(10) # Seguro de 10s contra metralleta
-                    else:
-                        log(f"⚠️ Fallo API: {res.comment if res else 'Error'}. Usando bridge...")
-                        send_signal(sym, target_sig, force=should_fire)
-                LAST_ENTRY_PRICE[sym] = float(tick.ask if target_sig == "BUY" else tick.bid)
-                if target_sig not in ["NONE", "HOLD"]:
-                    log(f"⚡ {sym} -> {target_sig} ({conf*100:.1f}%) [{trigger_type}]")
+                        request = {
+                            "action": mt5.TRADE_ACTION_DEAL,
+                            "symbol": sym, "volume": final_lot,
+                            "type": side_mt5,
+                            "price": price, "sl": sl_price, "magic": 777,
+                            "comment": f"TITAN-BUNKER-25USD",
+                            "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC,
+                        }
+                        
+                        res = mt5.order_send(request)
+                        if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                            log(f"✅ RECUPERACIÓN EXITOSA: {target_sig} (#{res.order})")
+                            with state_lock: STATE[f"firing_{sym}"] = now
+                            LAST_ENTRY[sym] = now
+                            time.sleep(1) # Seguro contra metralleta
+                        else:
+                            log(f"⚠️ Fallo API: {res.comment if res else 'Error'}. Usando bridge...")
+                            send_signal(sym, target_sig, force=should_fire)
+                        
+                        LAST_ENTRY_PRICE[sym] = float(price)
+                        log(f"⚡ {sym} -> {target_sig} ({conf*100:.1f}%) [{trigger_type}]")
 
         return {
             "symbol": sym, "signal": target_sig if target_sig != "HOLD" else LAST_SIGNALS.get(sym, "WAIT"),

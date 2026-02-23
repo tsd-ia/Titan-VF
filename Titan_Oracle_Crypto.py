@@ -13,10 +13,10 @@ except ImportError:
 # CONFIGURACIÓN DEL ORÁCULO CRYPTO
 SYMBOLS_BINANCE = ["solusdt", "ethusdt", "mstrusdt", "opnusdt"]
 WHALES_CONFIG = {
-    "solusdt": {"whale": 150000, "mini": 50000},
-    "ethusdt": {"whale": 250000, "mini": 80000},
-    "mstrusdt": {"whale": 100000, "mini": 30000},
-    "opnusdt": {"whale": 80000, "mini": 20000}
+    "solusdt": {"whale": 220000, "mini": 90000},
+    "ethusdt": {"whale": 220000, "mini": 100000},
+    "mstrusdt": {"whale": 220000, "mini": 50000},
+    "opnusdt": {"whale": 220000, "mini": 40000}
 }
 FILE_SIGNAL = "titan_crypto_signals.json"
 FIREBASE_FLAG_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/crypto_brain_on.json"
