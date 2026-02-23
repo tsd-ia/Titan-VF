@@ -205,6 +205,8 @@ PNL_MEMORIA = {}
 
 for sym_init in SYMBOLS: init_memories(sym_init)
 
+LAST_AI_PURGE_CHECK = 0    # v18.9.368: Auditoría de Salud IA cada 5 min
+COOLDOWN_AFTER_CLOSE = 15  # v15.30: Reducido para scalping rápido
 OLLAMA_COOLDOWN = 600   # 10 MINUTOS DE SILENCIO (v18.9.980)
 GLOBAL_ADVICE = {} 
 MIRROR_MODE = False 
