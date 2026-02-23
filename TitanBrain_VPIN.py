@@ -96,7 +96,7 @@ print("✅ LIMPIEZA COMPLETA.")
 PORT = 8000
 # LISTA DE ACTIVOS MONITORIZADOS (RADAR MÚLTIPLE v7.8)
 # CEREBRO TRIPLE: ORO, BTC y CRYPTO (SOL/ETH/MSTR/OPN)
-SYMBOLS = ["XAUUSDm", "SOLUSDm", "XRPUSDm", "BTCUSDm", "ETHUSDm"] 
+SYMBOLS = ["XAUUSDm", "BTCUSDm", "ETHUSDm"] 
 
 # REPARACIÓN DE RUTA (Basada en LOGS del Robot)
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
@@ -1172,7 +1172,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.999 | ORO QUIRÚRGICO | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v18.10.000 | ESTABILIDAD PURA | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
