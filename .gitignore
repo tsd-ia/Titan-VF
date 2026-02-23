@@ -23,6 +23,9 @@ titan_command.txt
 *.log
 logs/
 titan_telemetry.csv
+titan_*_signals.json
+titan_oracle_signal.json
+titan_gold_signals.json
 
 # Keep models for portability
 !models/*.h5

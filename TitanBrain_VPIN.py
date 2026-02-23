@@ -326,7 +326,7 @@ mission_state = {
 ASSET_CONFIG = {
     "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
-    "SOLUSDm": {"lot": 0.01, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
+    "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
@@ -627,8 +627,8 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     # 1. Definir Balas por Categoría (REDUCIDO POR EMERGENCIA v18.9.360)
     max_bullets = 3
     
-    # 2. Definir Lotaje según Balance (SEGURO TOTAL 0.01 | ETH REQUERIMIENTO ESPECIAL)
-    smart_lot = 0.1 if "ETH" in sym else 0.01
+    # 2. Definir Lotaje según Balance (SEGURO TOTAL 0.01 | ETH/SOL REQUERIMIENTO ESPECIAL)
+    smart_lot = 0.1 if any(c in sym for c in ["ETH", "SOL"]) else 0.01
         
     return max_bullets, smart_lot
 

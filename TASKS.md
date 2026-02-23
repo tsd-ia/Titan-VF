@@ -37,9 +37,10 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Protocolo ANTI-SPAM TOTAL y Paracaídas Profit 75% (v18.9.330).
 
 ## 🚀 FASE 5: MANTENIMIENTO Y AUDITORÍA
-- [ ] Implementar rotación de logs automática para evitar archivos de 2GB.
-- [ ] Optimizar precisión de señales Oro en sesión asiática.
-- [ ] Refinar salida de "Paracaídas" para evitar slippage en Crypto.
+- [x] Implementar rotación de logs automática (Sincronizado v18.9.235).
+- [x] Optimizar precisión de señales Oro en sesión asiática ($80k threshold).
+- [x] Verificar Trailing Unificado +$0.30 y Freno de Margen 100%.
+- [x] Sincronizar Lotajes SAFE MODE: 0.01 Universal / 0.10 ETH-SOL.
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*
