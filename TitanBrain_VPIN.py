@@ -96,7 +96,7 @@ print("✅ LIMPIEZA COMPLETA.")
 PORT = 8000
 # LISTA DE ACTIVOS MONITORIZADOS (RADAR MÚLTIPLE v7.8)
 # CEREBRO TRIPLE: ORO, BTC y CRYPTO (SOL/ETH/MSTR/OPN)
-SYMBOLS = ["XAUUSDm", "BTCUSDm", "ETHUSDm"] 
+SYMBOLS = ["XAUUSDm", "MSTRm", "OPNm", "BTCUSDm", "ETHUSDm"] 
 
 # REPARACIÓN DE RUTA (Basada en LOGS del Robot)
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
@@ -327,7 +327,9 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.03, "sl": 2000, "tp": 3000, "max_bullets": 3}, 
+    "XAUUSDm": {"lot": 0.03, "sl": 2000, "tp": 3000, "max_bullets": 3},
+    "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
+    "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000, "max_bullets": 3},
@@ -641,8 +643,15 @@ def perform_ai_health_audit():
             if now % 60 < 2: log(f"🌱 [AUDITOR] {p.symbol} recuperando con fuerza. Indulto.")
             continue
 
-        # 2. Criterios de entrada al tribunal de la IA (Más de 4 min para Oro rápido)
+        # 2. Criterios de entrada al tribunal de la IA
         trade_life = now - p.time
+        
+        # v18.9.530: PURGA POR ESTANCAMIENTO (Anti-ETH "muerto")
+        # Si en 3 minutos no ganamos al menos $0.10, la IA evalúa ejecución inmediata.
+        if trade_life > 180 and p.profit < 0.10:
+             log(f"🧊 ESTANCAMIENTO DETECTADO: {p.symbol} no se mueve. Llamando al verdugo.")
+             close_ticket(p, "ANTI_STAGNATION"); continue
+
         if trade_life < 240 and p.profit > -2.0: continue 
         
         # Preparar diagnóstico para la IA
@@ -1130,7 +1139,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.520 | ESCALERA IMPERIAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.530 | VOLATILITY HUNT | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
