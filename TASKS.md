@@ -65,6 +65,8 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Gold Floor $0.50 v18.9.900: Prohibido cerrar Oro con menos de medio dólar de profit.
 - [x] Blindaje de Aire Oro: Paracaídas del 40% para maximizar explosiones.
 - [x] Gold Hi-Sync v18.9.950: Pulse & Signal aislados + Timestamps de precisión.
+- [x] Estabilidad Total v18.9.995: Inicialización atómica (Fix SOL/XRP).
+- [x] Oro Quirúrgico v18.9.999: Filtros RSI y Bollinger (Prohibido comprar en techos).
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*
