@@ -23,7 +23,8 @@ FIREBASE_FLAG_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/cry
 
 STATE = {
     "windows": {s: {"buys": [], "sells": [], "price": 0.0} for s in SYMBOLS_BINANCE},
-    "last_signal_time": {s: 0.0 for s in SYMBOLS_BINANCE}
+    "last_signal_time": {s: 0.0 for s in SYMBOLS_BINANCE},
+    "active_signals": {} # Memoria persistente para no borrar un activo con otro
 }
 
 def is_brain_on():
@@ -72,8 +73,7 @@ async def crypto_oracle():
                         STATE["windows"][sym]["sells"] = [x for x in STATE["windows"][sym]["sells"] if now - x[0] < 1.5]
                         
                         conf = WHALES_CONFIG[sym]
-                        all_signals = {}
-                        
+                        all_signals_to_write = False
                         for s in SYMBOLS_BINANCE:
                             s_buy = sum(x[1] for x in STATE["windows"][s]["buys"])
                             s_sell = sum(x[1] for x in STATE["windows"][s]["sells"])
@@ -85,14 +85,21 @@ async def crypto_oracle():
                                 
                             if sig != "HOLD" and (now - STATE["last_signal_time"][s]) > 5:
                                 STATE["last_signal_time"][s] = now
-                                all_signals[s] = {
+                                sig_data = {
                                     "signal": sig, "volume": vol, "price": STATE["windows"][s]["price"], "timestamp": now
                                 }
+                                STATE["active_signals"][s] = sig_data
+                                all_signals_to_write = True
                         
-                        if all_signals:
-                            with open(FILE_SIGNAL, "w") as f: json.dump(all_signals, f)
-                            for s, d in all_signals.items():
-                                print(f"💎 [{s.upper()}] BALLENA {d['signal']}: ${d['volume']/1000:.1f}k | {datetime.now().strftime('%H:%M:%S')}")
+                        if all_signals_to_write:
+                            # v18.9.200: Limpieza de señales antiguas en memoria (>60s)
+                            STATE["active_signals"] = {k: v for k, v in STATE["active_signals"].items() if now - v["timestamp"] < 60}
+                            
+                            if STATE["active_signals"]:
+                                with open(FILE_SIGNAL, "w") as f: json.dump(STATE["active_signals"], f)
+                                for s, d in STATE["active_signals"].items():
+                                    if now - d["timestamp"] < 1: # Solo imprimir el nuevo
+                                        print(f"💎 [{s.upper()}] BALLENA {d['signal']}: ${d['volume']/1000:.1f}k | {datetime.now().strftime('%H:%M:%S')}")
                     except asyncio.TimeoutError:
                         continue
         except Exception as e:

@@ -26,7 +26,9 @@ def is_brain_on():
     try:
         res = requests.get(FIREBASE_FLAG_URL, timeout=2)
         if res.status_code == 200:
-            return bool(res.json())
+            val = res.json()
+            if val is None: return True # Default ON if null
+            return bool(val)
     except:
         return True # Default ON si falla internet
     return True

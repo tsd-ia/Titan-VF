@@ -281,7 +281,7 @@ def firebase_command_poller():
                                     STATE[flag] = val
                                     log(f"🧠 MANDO WEB (JSON): {flag} -> {'ACTIVADO' if val else 'DESACTIVADO'}")
             
-            # v18.9.270: Poll directo de flags raíz para evitar desincronización con el Dashboard
+            # v18.9.280: Poll directo de flags raíz para evitar desincronización con el Dashboard
             for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on"]:
                 res_f = requests.get(f"{FIREBASE_URL}/{flag}.json", timeout=3)
                 if res_f.status_code == 200:
@@ -291,21 +291,24 @@ def firebase_command_poller():
                         if val != STATE.get(flag):
                             STATE[flag] = val
                             log(f"📡 SYNC FIREBASE [{flag}]: {'ON' if val else 'OFF'}")
-                        if "auto_mode" in cmds:
-                            val = bool(cmds["auto_mode"])
-                            if val != STATE.get("auto_mode", False):
-                                STATE["auto_mode"] = val
-                                log(f"🔫 MANDO WEB: Autonomous Fire {'ON' if val else 'OFF'}")
-                        if "start_mission" in cmds and cmds["start_mission"]:
-                            log("🎯 MANDO WEB: FORCING START MISSION!")
-                            start_mission(target_profit=500.0)
-                            requests.patch(url, json={"start_mission": False})
-                        if "panic" in cmds and cmds["panic"]:
-                            log("🚨 MANDO WEB: ¡BOTÓN DE PÁNICO ACTIVADO!")
-                            stop_mission()
-                            # Resetear pánico en firebase para no loopear
-                            requests.patch(url, json={"panic": False})
-            time.sleep(1)
+
+            # Continuar con comandos JSON
+            if "auto_mode" in cmds:
+                val = bool(cmds["auto_mode"])
+                if val != STATE.get("auto_mode", False):
+                    STATE["auto_mode"] = val
+                    log(f"🔫 MANDO WEB: Autonomous Fire {'ON' if val else 'OFF'}")
+            if "start_mission" in cmds and cmds["start_mission"]:
+                log("🎯 MANDO WEB: FORCING START MISSION!")
+                start_mission(target_profit=500.0)
+                requests.patch(url, json={"start_mission": False})
+            if "panic" in cmds and cmds["panic"]:
+                log("🚨 MANDO WEB: ¡BOTÓN DE PÁNICO ACTIVADO!")
+                stop_mission()
+                # Resetear pánico en firebase para no loopear
+                requests.patch(url, json={"panic": False})
+            
+            time.sleep(10) # v18.9.280: Más rápido
         except:
             time.sleep(2)
 
@@ -1105,7 +1108,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.270 | MASTER SYNC | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.280 | GIGA-FIRE TOTAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1482,7 +1485,7 @@ def process_symbol_task(sym, active, mission_state):
             if os.path.exists("titan_oracle_signal.json"):
                 with open("titan_oracle_signal.json", "r") as f:
                     oracle_data = json.load(f)
-                    if time.time() - oracle_data["timestamp"] < 10.0:
+                    if time.time() - oracle_data["timestamp"] < 20.0:
                         if oracle_data["symbol"] == sym or (sym == "BTCUSDm" and oracle_data["symbol"] == "btcusdt"):
                             sig_pred = oracle_data["signal"]
                             conf_pred = 1.0 
@@ -1792,7 +1795,7 @@ def process_symbol_task(sym, active, mission_state):
             # v11.1: Usa skip_m5_veto (cubre override Y confianza alta IA)
             if not skip_m5_veto:
                 # v15.6 Titanium Shield: Escudo de Decisión Progresivo
-                if conf < 0.98: # Si IA no es absoluta (98%), requiere consenso técnico
+                if conf < 0.98 and not is_oracle_signal: # Si IA no es absoluta (98%), requiere consenso técnico
                     if council_sig != sig and conf < 0.80:
                         sig = "HOLD"
                         if now % 20 < 1: log(f"🛡️ BLOQUEO TÉCNICO: IA quiere {ia_intent} pero el Consejo dice {council_sig}. Esperando consenso.")
