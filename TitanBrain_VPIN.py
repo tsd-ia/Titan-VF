@@ -327,7 +327,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.03, "sl": 2500, "tp": 2500, "max_bullets": 5}, # Lote 0.03: Mayor velocidad de cuenta
+    "XAUUSDm": {"lot": 0.03, "sl": 2000, "tp": 3000, "max_bullets": 5}, # Oro de Sangre: Gana + de lo que pierde
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
@@ -630,20 +630,20 @@ def perform_ai_health_audit():
     log("🩺 [AUDITOR] Iniciando chequeo de salud de cuenta...")
     
     for p in positions:
-        # 1. INDULTO POR PERSPECTIVA (Dándole aire hasta los -$25)
-        # v18.9.480: FIX CRITICAL CRASH
+        # 1. INDULTO ULTRA-EXIGENTE (v18.9.490)
+        # Solo indultamos si recuperó el 25% del pozo. Si no, es basura.
         last_pnl = PNL_MEMORIA.get(p.ticket, p.profit)
-        recuperacion_minima = abs(last_pnl) * 0.15
-        is_improving = p.profit > last_pnl + recuperacion_minima or p.profit > -1.5
+        recuperacion_minima = abs(last_pnl) * 0.25
+        is_improving = p.profit > last_pnl + recuperacion_minima
         PNL_MEMORIA[p.ticket] = p.profit
         
         if is_improving and p.profit > -20.0:
-            if now % 60 < 2: log(f"🌱 [AUDITOR] {p.symbol} con aire para recuperar (${p.profit:.2f}). Indulto.")
+            if now % 60 < 2: log(f"🌱 [AUDITOR] {p.symbol} recuperando con fuerza. Indulto.")
             continue
 
-        # 2. Criterios de entrada al tribunal de la IA (Más de 15 min o pérdida seria)
+        # 2. Criterios de entrada al tribunal de la IA (Más de 4 min para Oro rápido)
         trade_life = now - p.time
-        if trade_life < 420 and p.profit > -3.0: continue # v18.9.455: Más agresivo (7 min / -$3)
+        if trade_life < 240 and p.profit > -2.0: continue 
         
         # Preparar diagnóstico para la IA
         duration_min = int(trade_life / 60)
