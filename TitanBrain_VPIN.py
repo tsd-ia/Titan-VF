@@ -96,7 +96,7 @@ print("✅ LIMPIEZA COMPLETA.")
 PORT = 8000
 # LISTA DE ACTIVOS MONITORIZADOS (RADAR MÚLTIPLE v7.8)
 # CEREBRO TRIPLE: ORO, BTC y CRYPTO (SOL/ETH/MSTR/OPN)
-SYMBOLS = ["XAUUSDm", "BTCUSDm", "SOLUSDm", "ETHUSDm"] # Añadidos SOL y ETH. MSTR/OPN sujetos a broker.
+SYMBOLS = ["XAUUSDm", "BTCUSDm", "ETHUSDm"] 
 
 # REPARACIÓN DE RUTA (Basada en LOGS del Robot)
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
@@ -329,7 +329,6 @@ mission_state = {
 ASSET_CONFIG = {
     "XAUUSDm": {"lot": 0.03, "sl": 2500, "tp": 2500, "max_bullets": 5}, # Lote 0.03: Mayor velocidad de cuenta
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
-    "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
@@ -632,7 +631,8 @@ def perform_ai_health_audit():
     
     for p in positions:
         # 1. INDULTO POR PERSPECTIVA (Dándole aire hasta los -$25)
-        # Ya no cerramos a -$10, dejamos que la IA decida si hay esperanza
+        # v18.9.480: FIX CRITICAL CRASH
+        last_pnl = PNL_MEMORIA.get(p.ticket, p.profit)
         recuperacion_minima = abs(last_pnl) * 0.15
         is_improving = p.profit > last_pnl + recuperacion_minima or p.profit > -1.5
         PNL_MEMORIA[p.ticket] = p.profit

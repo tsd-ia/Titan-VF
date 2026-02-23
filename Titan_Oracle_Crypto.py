@@ -11,9 +11,8 @@ except ImportError:
     import websockets
 
 # CONFIGURACIÓN DEL ORÁCULO CRYPTO
-SYMBOLS_BINANCE = ["solusdt", "ethusdt", "mstrusdt", "opnusdt"]
+SYMBOLS_BINANCE = ["ethusdt", "mstrusdt", "opnusdt"]
 WHALES_CONFIG = {
-    "solusdt": {"whale": 220000, "mini": 90000},
     "ethusdt": {"whale": 220000, "mini": 100000},
     "mstrusdt": {"whale": 220000, "mini": 50000},
     "opnusdt": {"whale": 220000, "mini": 40000}
