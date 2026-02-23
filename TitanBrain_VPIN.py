@@ -2144,27 +2144,33 @@ def process_symbol_task(sym, active, mission_state):
                 if conf < 0.80: # v18.9.14: Sincronizado con la regla de Élite (antes 0.96)
                     block_action = True; block_reason = f"TENDENCIA M5 CONTRARIA ({m5_trend_dir})"
                 else:
-                    # v18.10.500: FILTRO DE AGOTAMIENTO (PRECISIÓN COMANDANTE)
-                    if "XAU" in sym or "Gold" in sym:
-                        # 1. Filtro RSI Atómico
-                        # 1. Filtro RSI Atómico (Relajado para Oro v18.10.550)
-                        if target_sig == "BUY" and rsi_val > 70:
-                            block_action = True; block_reason = f"RSI AGOTADO-BUY ({rsi_val:.1f})"
-                        elif target_sig == "SELL" and rsi_val > 45:
-                            block_action = True; block_reason = f"SUELO DE CRISTAL: RSI ALTO PARA SELL ({rsi_val:.1f})"
-                        
-                        # 2. Filtro de Momentum (No entrar contra la vela actual)
-                        curr_candle = df['close'].iloc[-1] - df['open'].iloc[-1]
-                        if target_sig == "BUY" and curr_candle < -50: # Vela roja fuerte en M1
-                             block_action = True; block_reason = "MOMENTUM EN CONTRA (M1 ROJA)"
-                        elif target_sig == "SELL" and curr_candle > 50: # Vela verde fuerte en M1
-                             block_action = True; block_reason = "MOMENTUM EN CONTRA (M1 VERDE)"
-
+                    # v18.11.800: FILTRO DE AGOTAMIENTO (PRECISIÓN COMANDANTE) RESTAURADO
                     if not block_action:
                         if now % 300 < 1: log(f"🧠 IA-OVERRIDE: M5 en contra pero IA 80%+ confident. ¡ENTRANDO!")
                         block_action = False 
+        
+        # --- SUELO DE CRISTAL Y MOMENTUM M1 (VETO RIGUROSO ORO) ---
+        if target_sig != "HOLD" and ("XAU" in sym or "Gold" in sym):
+            curr_candle = df['close'].iloc[-1] - df['open'].iloc[-1]
+            
+            # Filtros de agotamiento de RSI
+            if target_sig == "BUY" and rsi_val > 70:
+                block_action = True; block_reason = f"RSI AGOTADO-BUY ({rsi_val:.1f})"
+                is_hard_blocked = True
+            elif target_sig == "SELL" and rsi_val > 45:
+                block_action = True; block_reason = f"SUELO DE CRISTAL: RSI ALTO PARA SELL ({rsi_val:.1f})"
+                is_hard_blocked = True
+            
+            # Filtro de Momentum M1 Inmediato
+            if target_sig == "BUY" and curr_candle < -50:
+                 block_action = True; block_reason = "MOMENTUM EN CONTRA (M1 ROJA)"
+                 is_hard_blocked = True
+            elif target_sig == "SELL" and curr_candle > 50:
+                 block_action = True; block_reason = "MOMENTUM EN CONTRA (M1 VERDE)"
+                 is_hard_blocked = True
 
         # 6. FILTRO DE MOMENTUM (MOMENTUM RIDER v18.9.19)
+
         # Si el precio se mueve demasiado rápido, dejamos de ser "tercos" y seguimos la ola.
         if not is_exploring and len(df) >= 3:
             last_3_move = (df['close'].iloc[-1] - df['open'].iloc[-3]) / mt5.symbol_info(sym).point
@@ -2293,13 +2299,27 @@ def process_symbol_task(sym, active, mission_state):
             except: pass
 
         if is_oracle_signal and oracle_sig != "HOLD":
-            ai_reply = "YES" # Bypass absoluto
-            model_used = "ORACLE_MODE"
-            conf = 1.0
-            last_god_log = STATE.get(f"last_god_log_{sym}", 0)
-            if now - last_god_log > 15.0:
-                log(f"🔱 GIGA-FIRE [{sym}]: Oráculo manda. Bypass IA.")
-                STATE[f"last_god_log_{sym}"] = now
+            # v18.11.900: VALIDACIÓN DE PODER (Solo bypass real si es ballena de verdad)
+            oracle_power = 0
+            if sym == "XAUUSDm" and os.path.exists("titan_gold_signals.json"):
+                try: 
+                    with open("titan_gold_signals.json", "r") as f:
+                        osig_data = json.load(f)
+                        oracle_power = osig_data.get("volume", 0)
+                except: pass
+            
+            # v18.11.910: Si es ballena pequeña (<$80k), NO bypass parcial. Requiere IA Confirmación.
+            if sym == "XAUUSDm" and oracle_power < 80000:
+                is_oracle_signal = False # Relegar a señal técnica normal
+                log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Requiere confirmación técnica.")
+            else:
+                ai_reply = "YES" # Bypass absoluto para Ballenas Giga
+                model_used = "ORACLE_MODE"
+                conf = 1.0
+                last_god_log = STATE.get(f"last_god_log_{sym}", 0)
+                if now - last_god_log > 15.0:
+                    log(f"🔱 GIGA-FIRE [{sym}]: Ballena Real (${oracle_power/1000:.1f}k). Bypass IA.")
+                    STATE[f"last_god_log_{sym}"] = now
         elif conf >= 0.70 and (not use_cache or (time.time() - last_call_ts > 180)):
             # PROMPT MATEMÁTICO (Anti-Veto de Ollama)
             LAST_OLLAMA_CALL[sym] = time.time()
@@ -2912,7 +2932,12 @@ def metralleta_loop():
                 # v18.9.21: Modo Co-Piloto - Vigilar también posiciones manuales (magic 0) del Comandante
                 open_positions = [pos for pos in positions if (pos.magic == 777 or (pos.magic == 0 and pos.symbol in SYMBOLS))]
                 current_open_pnl = sum(p.profit for p in open_positions)
-                with state_lock: STATE["open_pnl"] = current_open_pnl
+                
+                # v18.11.900: FIX DASHBOARD CEGUERA (Sincronización de Balas)
+                total_bullets = len(open_positions)
+                with state_lock: 
+                    STATE["bullets"] = total_bullets
+                    STATE["open_pnl"] = current_open_pnl
 
                 # === v18.9.362: PROTECCIÓN DE MARGEN AL 100% (ANTI-QUEMA) ===
                 acc = mt5.account_info()
@@ -2982,7 +3007,7 @@ def metralleta_loop():
                             elif profit >= 1.00: locked_p = 0.50
                             elif profit >= 0.50: 
                                 if "XAU" in sym or "Gold" in sym:
-                                    locked_p = 0.51 # Suelo Comandante
+                                    locked_p = 0.75 # v18.11.900: Suelo Comandante Elevado (Anti-Migaja)
                                 else:
                                     locked_p = 0.10
                             else: 
