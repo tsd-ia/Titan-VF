@@ -62,5 +62,8 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 
 - [x] Oro Rocket Air v18.9.800: Trailing stop con 40% de aire durante explosiones.
 
+- [x] Gold Floor $0.50 v18.9.900: Prohibido cerrar Oro con menos de medio dólar de profit.
+- [x] Blindaje de Aire Oro: Paracaídas del 40% para maximizar explosiones.
+
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*

@@ -737,11 +737,14 @@ def get_bunker_sl_price(sym, lot, side, price):
 
 
 def close_ticket(pos, reason="UNK"):
-    # v18.5: LEY DE PROTECCIÓN DE CAPITAL - PROHIBIDO CERRAR EN NEGATIVO
+    # v18.9.900: SUELO DE PROFIT ORO (Solicitud Comandante: Nunca menos de $0.50)
     profit = pos.profit + getattr(pos, 'swap', 0.0) + getattr(pos, 'commission', 0.0)
     
-    # Solo permitimos cierre en rojo si es una instrucción de pánico, purga de la IA o cierre de mercado
-    is_safe_close = profit > 0.01 or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "PURGE", "AI"])
+    is_gold = "XAU" in pos.symbol or "Gold" in pos.symbol
+    min_floor = 0.50 if is_gold else 0.01
+    
+    # Solo permitimos cierre en rojo si es una instrucción de pánico, purga crítica de la IA o cierre de mercado
+    is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC"])
     
     if not is_safe_close:
         # log(f"🛡️ BLOQUEO DE CIERRE: Se intentó cerrar {pos.symbol} en negativo (${profit:.2f}). ABORTADO.")
@@ -1140,7 +1143,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.850 | ORO PULSO REAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.900 | GOLD FLOOR $0.50 | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2996,11 +2999,11 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v18.9.850: PARACAÍDAS DE GANANCIAS (HI-TOLERANCE ORO) ===
-                    # Ajustado a 75% | ORO ROCKET: 40% (Solo cierra si perdemos el 60% del pico)
+                    # === v18.9.900: PARACAÍDAS ORO AGRESIVO (SUELO 0.50) ===
                     parachute_ratio = 0.40 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
-                    if max_p > 1.05 and profit < (max_p * parachute_ratio):
-                        log(f"🪂 PARACAÍDAS {'ROCKET' if parachute_ratio==0.4 else ''} ACTIVADO: {sym} protegiendo ${profit:.2f} tras caída desde ${max_p:.2f}.")
+                    # El paracaídas solo actúa si ya aseguramos nuestro suelo de $0.50
+                    if max_p > 1.05 and profit < (max_p * parachute_ratio) and profit >= 0.50:
+                        log(f"🪂 PARACAÍDAS ORO $0.50: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
                         close_ticket(p, "PROFIT_PARACHUTE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
