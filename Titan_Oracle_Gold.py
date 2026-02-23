@@ -58,7 +58,9 @@ async def gold_oracle():
                         
                         price = float(data['p'])
                         col = float(data['q']) * price
-                        side = "SELL" if data['m'] else "BUY"
+                        # INVERSIÓN COMANDANTE: Seguir a la Institución (Maker), no al Pececillo Atrapado (Taker)
+                        # data['m'] = True significa que el TAKER vendió (Maker compró).
+                        side = "BUY" if data['m'] else "SELL"
                         ts = data['T'] / 1000.0
                         
                         STATE["window"]["price"] = price
