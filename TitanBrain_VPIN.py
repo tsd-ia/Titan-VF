@@ -1105,7 +1105,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.365 | HYPER-TRAIL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.366 | UNIFIED TRAIL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2752,37 +2752,32 @@ def metralleta_loop():
                         log(f"🚨 HARD STOP ACTIVADO: {sym} alcanzó límite de -$25.00. Cerrando.")
                         close_ticket(p, "HARD_STOP_USER"); continue
 
-                    # === PROTOCOLO DE TRIPLE TRAILING (v18.9.80) ===
-                    m_speed_current = STATE.get("market_speed_val", 20.0)
-                    is_fast = m_speed_current > 100 # Mercado volátil/rápido
-                    
-                    # 0. MODO KAMIKAZE: TRAILING RELÁMPAGO INTELIGENTE
-                    # A medida que sube la ganancia, vamos ajustando el SL de forma escalonada.
-                    # Mientras más sube, más agresivo es el cierre detrás del precio.
-                    if profit >= 0.30 and (now_loop - p.time) < 60: 
+                    # === PROTOCOLO DE TRIPLE TRAILING (Unificado v18.9.366) ===
+                    # Trailing Permanente: Asegura desde los $0.30 y no tiene límite de tiempo (60s eliminado)
+                    if profit >= 0.30: 
                         symbol_info = mt5.symbol_info(sym)
                         if symbol_info:
                             dist_sl = 1 / (lot * symbol_info.trade_contract_size)
                             
-                            # Trailing Inteligente Escalonado (Kamikaze Adaptativo - v18.9.365)
-                            if profit >= 1.50: locked_p = profit - 0.40   
+                            # Niveles de Protección Escalonada
+                            if profit >= 1.60: locked_p = profit - 0.50 # v18.9.366: Mayor espacio para dejar correr arriba
                             elif profit >= 1.00: locked_p = profit - 0.25 
                             elif profit >= 0.60: locked_p = profit - 0.15 
-                            elif profit >= 0.30: locked_p = profit - 0.10 # Asegurar centavos rápido
+                            else: locked_p = profit - 0.10               # v18.9.365: Asegurar rápido al entrar en zona
                             
-                            new_sl_kamikaze = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
+                            new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
-                            new_sl_kamikaze = round(new_sl_kamikaze, symbol_info.digits)
+                            new_sl_trail = round(new_sl_trail, symbol_info.digits)
                             
                             is_better = False
                             if p.type == mt5.ORDER_TYPE_BUY:
-                                if curr_sl == 0 or new_sl_kamikaze > curr_sl + symbol_info.point * 10: is_better = True
+                                if curr_sl == 0 or new_sl_trail > curr_sl + symbol_info.point * 10: is_better = True
                             else:
-                                if curr_sl == 0 or (0 < new_sl_kamikaze < curr_sl - symbol_info.point * 10): is_better = True
+                                if curr_sl == 0 or (0 < new_sl_trail < curr_sl - symbol_info.point * 10): is_better = True
                                 
                             if is_better:
-                                update_sl(p.ticket, new_sl_kamikaze, f"KAMI-TRL (${profit:.2f})")
-                                continue # Cortar el loop si ya le movimos el SL a nivel de ganancia
+                                update_sl(p.ticket, new_sl_trail, f"TRL-SAFE (${profit:.2f})")
+                                continue 
 
                     # 1. Trailing Dinámico para mercados rápidos
                     if is_fast and profit >= 1.05:
