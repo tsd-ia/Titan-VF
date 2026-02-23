@@ -1130,7 +1130,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.510 | RECUPERACIÓN TOTAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.520 | ESCALERA IMPERIAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2868,11 +2868,21 @@ def metralleta_loop():
                         if symbol_info:
                             dist_sl = 1 / (lot * symbol_info.trade_contract_size)
                             
-                            # Niveles de Protección Escalonada
-                            if profit >= 1.60: locked_p = profit - 0.50 # v18.9.366: Mayor espacio para dejar correr arriba
-                            elif profit >= 1.00: locked_p = profit - 0.25 
-                            elif profit >= 0.60: locked_p = profit - 0.15 
-                            else: locked_p = profit - 0.10               # v18.9.365: Asegurar rápido al entrar en zona
+                            # === ESCALERA TITÁN v18.9.520 (SOLICITUD COMANDANTE) ===
+                            if profit >= 9.0: locked_p = 8.50
+                            elif profit >= 8.0: locked_p = 7.50
+                            elif profit >= 7.0: locked_p = 6.50
+                            elif profit >= 6.0: locked_p = 5.50
+                            elif profit >= 5.0: locked_p = 4.50
+                            elif profit >= 4.0: locked_p = 3.50
+                            elif profit >= 3.50: locked_p = 3.00
+                            elif profit >= 3.00: locked_p = 2.50
+                            elif profit >= 2.50: locked_p = 2.00
+                            elif profit >= 2.00: locked_p = 1.50
+                            elif profit >= 1.50: locked_p = 1.00
+                            elif profit >= 1.00: locked_p = 0.50
+                            elif profit >= 0.50: locked_p = 0.10  # Breakeven Plus
+                            else: locked_p = profit - 0.20
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
@@ -2898,13 +2908,13 @@ def metralleta_loop():
                             log(f"🧠 GIRO IA RÁPIDO: Cerrando {sym} con ${profit:.2f} por señal contraria.")
                             close_ticket(p, "QUANTUM_FLIP"); continue
                     
-                    # 2. Cierre de Hierro Normal (Meta de $0.85 en Kamikaze)
-                    elif not is_fast and profit >= 0.85:
+                    # 2. Cierre de Hierro (Aumentado para dejar correr)
+                    elif not is_fast and profit >= 15.0: # v18.9.520: Subido de 0.85 a 15.0 para no asfixiar
                         adv = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
                         is_contrarian = (p.type == mt5.ORDER_TYPE_BUY and adv["sig"] == "SELL") or (p.type == mt5.ORDER_TYPE_SELL and adv["sig"] == "BUY")
-                        if is_contrarian or (now_loop % 45 < 1):
-                            log(f"💰 META CERRADA: {sym} protegiendo ${profit:.2f}. (M. Estable)")
-                            close_ticket(p, "IRON_PROFIT_v21"); continue
+                        if is_contrarian:
+                            log(f"💰 META CERRADA: {sym} protegiendo ${profit:.2f} por señal contraria.")
+                            close_ticket(p, "IRON_PROFIT_v520"); continue
                     
                     # 3. Cierre Micro en mercado estancado (Trailing Ultra-Corto)
                     # v18.9.129: DESACTIVADO. Generaba cierres fantasma en BTC que se comían ganancias por slippage.
@@ -2922,25 +2932,7 @@ def metralleta_loop():
                     new_sl = 0.0
                     comment = ""
                     
-                    # --- RATCHET SUIZO v16.1 (ULTRA-GRANULAR) ---
-                    if profit >= 9.0:
-                        locked_p = profit - 1.2 
-                        new_sl = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
-                        comment = f"SUIZO-9K"
-                    elif profit >= 5.0:
-                        new_sl = entry + (dist_sl * 4.0) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * 4.0)
-                        comment = "SUIZO-5K ($4.0)"
-                    elif profit >= 3.0:
-                        new_sl = entry + (dist_sl * 2.5) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * 2.5)
-                        comment = "SUIZO-3K ($2.5)"
-                    elif profit >= 2.2:
-                        new_sl = entry + (dist_sl * 1.5) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * 1.5)
-                        comment = "SUIZO-2.2K ($1.5)"
-                    elif profit >= 1.6:
-                        # v18.9.2: Nivel mínimo de blindaje asegurando al menos $1.0
-                        new_sl = entry + (dist_sl * 1.05) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * 1.05)
-                        comment = "SUIZO-1.6K ($1.0)"
-                    # Niveles inferiores eliminados para cumplir con la regla de >$1 USD
+                    # --- RATCHET SUIZO (Eliminado - Integrado en Escalera Superior) ---
                     
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
