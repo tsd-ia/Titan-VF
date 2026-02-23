@@ -1568,7 +1568,7 @@ def process_symbol_task(sym, active, mission_state):
 
         if is_oracle_signal:
             log(f"🔱 FAST-PATH [{sym}]: Gatillo Instantáneo (${oracle_volume/1000:.1f}k)")
-            rsi_val = 50.0; raw_prob = 1.0
+            rsi_val = 50.0; raw_prob = 1.0; adx_val = 25.0 # Bypass de cálculos
         else:
             # Solo si no hay oráculo, seguimos con la parsimonia técnica
             sig_pred, conf_pred, rsi_val, raw_prob, adx_val = predecir(sym)
