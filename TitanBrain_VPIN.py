@@ -375,7 +375,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 500, "tp": 2000, "max_bullets": 3},
+    "XAUUSDm": {"lot": 0.01, "sl": 300, "tp": 2000, "max_bullets": 3},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -657,7 +657,7 @@ def perform_ai_health_audit():
     """ Analiza posiciones estancadas y decide purgas preventivas """
     global LAST_AI_PURGE_CHECK
     now = time.time()
-    if (now - LAST_AI_PURGE_CHECK) < 120: return # Cada 2 min para mayor fluidez
+    if (now - LAST_AI_PURGE_CHECK) < 5: return # Auditoría ultra-rápida v18.10.950
     
     LAST_AI_PURGE_CHECK = now
     positions = mt5.positions_get()
@@ -777,8 +777,8 @@ def close_ticket(pos, reason="UNK"):
     is_gold = "XAU" in pos.symbol or "Gold" in pos.symbol
     min_floor = 0.50 if is_gold else 0.01
     
-    # Solo permitimos cierre en rojo si es una instrucción de pánico, purga crítica de la IA o cierre de mercado
-    is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC"])
+    # Solo permitimos cierre en rojo si es una instrucción de pánico, purga crítica de la IA, martillo o cierre de mercado
+    is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "PURGE", "WORST"])
     
     if not is_safe_close:
         # log(f"🛡️ BLOQUEO DE CIERRE: Se intentó cerrar {pos.symbol} en negativo (${profit:.2f}). ABORTADO.")
@@ -1176,7 +1176,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v18.10.600 | MODO RESCATE HEDGE | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v18.10.950 | SUELO DE CRISTAL | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -2127,7 +2127,11 @@ def process_symbol_task(sym, active, mission_state):
                 if now - last_god_log > 30.0:
                     log(f"🔱 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por ORÁCULO (${oracle_volume/1000:.0f}k).")
                     STATE[f"last_god_log_{sym}"] = now
-                block_action = False # LIBERTAD ABSOLUTA
+                if "XAU" in sym or "Gold" in sym:
+                    # En Oro, el Momentum M1 es SAGRADO. El Oráculo no puede ignorarlo.
+                    pass 
+                else:
+                    block_action = False # LIBERTAD ABSOLUTA para otros activos
                 is_hard_blocked = False
                 STATE[f"oracle_active_{sym}"] = True
         else:
@@ -2157,10 +2161,10 @@ def process_symbol_task(sym, active, mission_state):
                     if "XAU" in sym or "Gold" in sym:
                         # 1. Filtro RSI Atómico
                         # 1. Filtro RSI Atómico (Relajado para Oro v18.10.550)
-                        if target_sig == "BUY" and rsi_val > 75:
+                        if target_sig == "BUY" and rsi_val > 70:
                             block_action = True; block_reason = f"RSI AGOTADO-BUY ({rsi_val:.1f})"
-                        elif target_sig == "SELL" and rsi_val < 25:
-                            block_action = True; block_reason = f"RSI AGOTADO-SELL ({rsi_val:.1f})"
+                        elif target_sig == "SELL" and rsi_val > 45:
+                            block_action = True; block_reason = f"SUELO DE CRISTAL: RSI ALTO PARA SELL ({rsi_val:.1f})"
                         
                         # 2. Filtro de Momentum (No entrar contra la vela actual)
                         curr_candle = df['close'].iloc[-1] - df['open'].iloc[-1]
