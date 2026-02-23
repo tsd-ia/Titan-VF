@@ -327,7 +327,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
+    "XAUUSDm": {"lot": 0.01, "sl": 1500, "tp": 2500}, # TP más corto para rotación rápida
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
@@ -915,12 +915,12 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
         final_lot = 0.01
         log(f"🛡️ SPREAD ALTO: Lote 0.01 por seguridad.")
     
-    # FORMATOS BRIDGE (Doble compatibilidad)
+    # FORMATOS BRIDGE (Doble compatibilidad v18.9.420)
     mode_num = 0 if mode == "BUY" else 1
-    # 1. Formato Legacy: type|lot|sl|tp|ts
-    payload_legacy = f"{mode}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
-    # 2. Formato Multi: symbol|type|lot|sl|tp|ts
-    payload_multi = f"{norm_sym}|{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
+    # 1. Formato Legacy: type_num|lot|sl|tp|ts
+    payload_legacy = f"{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
+    # 2. Formato Multi: symbol_original|type_num|lot|sl|tp|ts
+    payload_multi = f"{symbol}|{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
 
     # Escribir en archivos de misión y comando
     f_mission = os.path.join(MQL5_FILES_PATH, 'titan_mission.txt')
@@ -2085,12 +2085,15 @@ def process_symbol_task(sym, active, mission_state):
         if adx_val > 25: # Alta tendencia/volatilidad
             atr_factor = 1.5 if adx_val < 40 else 2.5
         
-        # v18.9.410: INDULTO SOLANA (Reducido log para evitar spam)
+        # v18.9.420: INDULTO SOLANA (Throttling por Candado)
         if "SOL" in sym:
             block_action = False
             block_reason = ""
             is_hard_blocked = False
-            if now % 30 < 1: log(f"🔓 MODO GATILLO: SOLANA liberada de bloqueos.")
+            last_sol_log = STATE.get("last_sol_log", 0)
+            if now - last_sol_log > 30:
+                log(f"🔓 MODO GATILLO: SOLANA liberada de bloqueos.")
+                STATE["last_sol_log"] = now
         
         # 4. FILTRO DE TENDENCIA MAYOR (M5 ALIGNMENT v15.35 BLINDADO)
         # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
