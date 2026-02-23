@@ -1177,7 +1177,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN v18.10.000 | ESTABILIDAD PURA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v18.10.300 | PRECISIÓN TOTAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2110,8 +2110,12 @@ def process_symbol_task(sym, active, mission_state):
             block_reason = f"MARGEN CRÍTICO ({margin_level:.1f}%)"
 
         # === v18.9.750: GATILLO DE DIOS (GOD MODE) - FILTRO ANTI-SUICIDIO ORO ===
-        min_whale_vol = 40000 if "XAU" in sym else 300000 
+        min_whale_vol = 18000 if "XAU" in sym else 50000 
         is_god_entry = is_oracle_signal and oracle_volume >= min_whale_vol
+        
+        # v18.10.300: SILENCIAR RUIDO BTC
+        if not is_god_entry and oracle_volume < 1000 and "BTC" in sym:
+            is_oracle_signal = False # Es solo un latido de vida
         
         # v18.9.750: MODERACIÓN DE VENTAS EN ORO (No ir contra tendencia fuerte)
         if is_god_entry and "XAU" in sym and target_sig == "SELL":
