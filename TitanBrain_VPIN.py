@@ -869,20 +869,9 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
     if tp_to_use == 0 or tp_to_use is None: tp_to_use = 999999 
     sl_to_use = cfg['sl']
 
-    # --- v15.0: AUTO-SURVIVAL LOT (Protección de Margen) ---
+    # v18.9.505: ELIMINACIÓN DE LOTE DE SUPERVIVENCIA (Respeto total al Comandante)
     lot_to_use = cfg['lot']
-    try:
-        acc = mt5.account_info()
-        if acc:
-            free = acc.margin_free
-            if lot_to_use >= 0.03 and free < 110.0:
-                lot_to_use = 0.02
-                if free < 75.0: lot_to_use = 0.01
-            elif lot_to_use >= 0.02 and free < 75.0:
-                lot_to_use = 0.01
-            elif free < 35.0:
-                lot_to_use = 0.01
-    except: pass
+    # Lógica de protección eliminada para permitir 0.03 real.
     
     # v18.9.405: PROTECCIÓN LOTE MÍNIMO SOLANA (Exness requiere 0.1)
     if "SOL" in symbol and lot_to_use < 0.1:
@@ -2268,11 +2257,13 @@ def process_symbol_task(sym, active, mission_state):
             conf = 1.0
             block_action = False
             
-        if target_sig != "HOLD" and (conf > 0.70 or "SOL" in sym):
+        if target_sig != "HOLD" and (conf > 0.70 or "SOL" in sym or is_oracle_signal):
             last_valid_log = STATE.get(f"last_valid_log_{sym}", 0)
             if now - last_valid_log > 15.0:
                 log(f"🚨 OPORTUNIDAD VALIDADA: {sym} {target_sig} ({conf*100:.1f}%)")
                 STATE[f"last_valid_log_{sym}"] = now
+            # v18.9.505: Forzar bypass de bloqueos web si es Oráculo
+            if is_oracle_signal: block_action = False 
         
         elif use_cache:
             ai_reply = cache['res']
@@ -2621,6 +2612,21 @@ def process_symbol_task(sym, active, mission_state):
                     elif is_heartbeat and target_sig == LAST_SIGNALS.get(sym): should_send = True # Heartbeat normal
                     
                     if should_send:
+                        # v18.9.505: FILTRO DE MOMENTUM (Entrar solo si el precio acompaña)
+                        tick = mt5.symbol_info_tick(sym)
+                        if not tick: return
+                        
+                        # Guardar historial de precios para momentum (v18.9.505)
+                        if not hasattr(process_symbol_task, "price_hist"): process_symbol_task.price_hist = deque(maxlen=5)
+                        process_symbol_task.price_hist.append(tick.bid if target_sig == "BUY" else tick.ask)
+                        
+                        if len(process_symbol_task.price_hist) >= 3:
+                            move = process_symbol_task.price_hist[-1] - process_symbol_task.price_hist[0]
+                            is_aligned = (target_sig == "BUY" and move > 0) or (target_sig == "SELL" and move < 0)
+                            if not is_aligned:
+                                if now % 5 < 1: log(f"⏳ ESPERANDO IMPULSO: {sym} señal {target_sig} pero precio en contra ({move:.4f}).")
+                                return
+
                         # v18.9.45: VALIDACIÓN DE EXCLUSIÓN DE PRECIO (Anti-Metralleta)
                         tick = mt5.symbol_info_tick(sym)
                         if not tick: return
