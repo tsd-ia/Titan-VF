@@ -1176,9 +1176,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append("="*75)
-    lines.append(f" 🛡️ TITAN v18.10.300 | PRECISIÓN TOTAL | PORT: {PORT}")
-    lines.append("="*75)
+    lines.append(f" 🛡️ TITAN v18.10.550 | MODO REZUMANTE | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -2155,18 +2153,21 @@ def process_symbol_task(sym, active, mission_state):
                 if conf < 0.80: # v18.9.14: Sincronizado con la regla de Élite (antes 0.96)
                     block_action = True; block_reason = f"TENDENCIA M5 CONTRARIA ({m5_trend_dir})"
                 else:
-                    # v18.9.999: FILTRO QUIRÚRGICO DE CALIDAD (No comprar caro, no vender barato)
+                    # v18.10.500: FILTRO DE AGOTAMIENTO (PRECISIÓN COMANDANTE)
                     if "XAU" in sym or "Gold" in sym:
+                        # 1. Filtro RSI Atómico
+                        # 1. Filtro RSI Atómico (Relajado para Oro v18.10.550)
                         if target_sig == "BUY" and rsi_val > 75:
-                            block_action = True; block_reason = f"RSI SOBRECOMPRADO ({rsi_val:.1f})"
+                            block_action = True; block_reason = f"RSI AGOTADO-BUY ({rsi_val:.1f})"
                         elif target_sig == "SELL" and rsi_val < 25:
-                            block_action = True; block_reason = f"RSI SOBREVENDIDO ({rsi_val:.1f})"
+                            block_action = True; block_reason = f"RSI AGOTADO-SELL ({rsi_val:.1f})"
                         
-                        # Filtro de Bollinger
-                        if target_sig == "BUY" and bb_pos > 0.90:
-                            block_action = True; block_reason = "PRECIO EN TECHO BOLLINGER"
-                        elif target_sig == "SELL" and bb_pos < 0.10:
-                            block_action = True; block_reason = "PRECIO EN SUELO BOLLINGER"
+                        # 2. Filtro de Momentum (No entrar contra la vela actual)
+                        curr_candle = df['close'].iloc[-1] - df['open'].iloc[-1]
+                        if target_sig == "BUY" and curr_candle < -50: # Vela roja fuerte en M1
+                             block_action = True; block_reason = "MOMENTUM EN CONTRA (M1 ROJA)"
+                        elif target_sig == "SELL" and curr_candle > 50: # Vela verde fuerte en M1
+                             block_action = True; block_reason = "MOMENTUM EN CONTRA (M1 VERDE)"
 
                     if not block_action:
                         if now % 300 < 1: log(f"🧠 IA-OVERRIDE: M5 en contra pero IA 80%+ confident. ¡ENTRANDO!")
@@ -2997,8 +2998,14 @@ def metralleta_loop():
                             elif profit >= 2.00: locked_p = 1.50
                             elif profit >= 1.50: locked_p = 1.00
                             elif profit >= 1.00: locked_p = 0.50
-                            elif profit >= 0.50: locked_p = 0.10  # Breakeven Plus
-                            else: locked_p = profit - 0.20
+                            elif profit >= 0.50: 
+                                if "XAU" in sym or "Gold" in sym:
+                                    locked_p = 0.51 # Suelo Comandante
+                                else:
+                                    locked_p = 0.10
+                            else: 
+                                if "XAU" in sym or "Gold" in sym: continue
+                                locked_p = profit - 0.20
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
