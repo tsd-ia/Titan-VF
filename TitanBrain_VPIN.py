@@ -1105,7 +1105,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.310 | INDEPENDENCIA TOTAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.320 | DASHBOARD PRO | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1129,7 +1129,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
 
     lines.append(f" PnL:     ${pnl:.2f} / Meta: ${target:.0f} | RACHA: 🔥 {wins_today}")
     lines.append(f" TRAIL:   Max ${max_p:.2f} (Lim Drop: ${limit_drop:.2f})")
-    lines.append(f" BALAS:   {STATE['bullets']} / {MAX_BULLETS} | SPREAD: ⚡ {spread_pts:.0f}")
+    lines.append(f" BALAS:   {STATE['bullets']} / {MAX_BULLETS} | LATENCIA: {margin_pct/100:.1f}x")
     
     # v15.63: VELOCIDAD DEL DINERO & TICKS
     # Calcular volatilidad simple (High - Low de ultimos 20 ticks guardados)
@@ -1157,7 +1157,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     lines.append(f" MARKET:  {market_line}")
 
     lines.append("-" * 75)
-    lines.append(f" {'ACTIVO':<10} | {'SEÑAL':<8} | {'CONF.':<8} | {'IA':<5} | {'RSI':<5} | {'LOTE':<6} | {'ESTADO'}")
+    lines.append(f" {'ACTIVO':<10} | {'SGN':<4} | {'CONF':<5} | {'SPREAD':<6} | {'RSI':<3} | {'LOTE':<5} | {'ESTADO'}")
     lines.append("-" * 75)
     
     for i in report_list:
@@ -1174,11 +1174,23 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
         if confidence < 0.01 or signal == "WAIT":
              display_sig = "HOLD"
         
+        # Obtener spread en tiempo real para la tabla
+        tick_s = mt5.symbol_info_tick(symbol)
+        s_info = mt5.symbol_info(symbol)
+        spread_val = 0
+        if tick_s and s_info:
+            spread_val = (tick_s.ask - tick_s.bid) / s_info.point
+        
+        # v18.9.320: Marcador visual de Oráculo Activo
+        is_ora = STATE.get(f"oracle_active_{symbol}", False)
+        marker = "🐋" if is_ora else " "
+        
         # v16.0: Visibilidad de señal en READY
         if not mission_state.get("active", False) and display_sig != "HOLD":
-             display_sig = f"READY:{display_sig}"
+             display_sig = f"RDY"
 
         try:
+            line_f = f" {marker}{symbol:<9} | {display_sig:<4} | {confidence*100:>3.0f}% | {spread_val:>6.0f} | {rsi_val:>3.0f} | {lot:<5.2f} | "
             from colorama import Fore, Style
             sig_col = Fore.GREEN if "BUY" in display_sig else (Fore.RED if "SELL" in display_sig else Fore.YELLOW)
             reset_style = Style.RESET_ALL
@@ -1875,10 +1887,16 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = True
                     block_reason = "CORRIENTE EN CONTRA (M5/EMA/VELA): Venta bloqueada."
 
-            # --- REGLA DE ORO DEL COMANDANTE v18.9.290: GOD MODE $220k ---
+            # --- REGLA DE ORO DEL COMANDANTE v18.9.320: GOD MODE $220k ANTI-SPAM ---
             if is_oracle_signal and oracle_volume >= 220000:
                 block_action = False # BYPASS TOTAL DE GRILLETES
-                log(f"🔱 GOD MODE ACTIVADO: Señal de ${oracle_volume/1000:.0f}k detectada. Ignorando grilletes técnicos.")
+                last_god_log = STATE.get(f"last_god_log_{sym}", 0)
+                if now - last_god_log > 30.0:
+                    log(f"🔱 GOD MODE ACTIVADO [{sym}]: Señal de ${oracle_volume/1000:.0f}k detectada. Ignorando grilletes técnicos.")
+                    STATE[f"last_god_log_{sym}"] = now
+                STATE[f"oracle_active_{sym}"] = True
+            else:
+                STATE[f"oracle_active_{sym}"] = False
 
             
             # 2. BLOQUEO Bollinger (v18.7: MODO CONTRAGOLPE)
@@ -2798,21 +2816,11 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # --- v15.3: ESTRATEGIA DE REDUCCIÓN DE DAÑO (STRATEGIC EXIT) ---
-                    min_p = STATE.get(f"min_p_{p.ticket}", 0.0)
-                    if profit < min_p: STATE[f"min_p_{p.ticket}"] = profit # Guardamos el punto más bajo
-                    
-                    # Lógica: Si estuvimos en -$15 o peor, y recuperamos hasta -$5, evaluamos salida digna
-                    # v18.9.129: DESACTIVADO para Bitcoin. Se necesita dejar que respire más y esperar Oráculo o Meta Fija.
-                    # if not MIRROR_MODE and min_p < -15.0 and profit > -5.0:
-                    #     advice = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
-                    #     t_sig = advice["sig"]
-                    #     recover_pct = abs(profit - min_p) / abs(min_p)
-                    #     is_contrarian = (p.type == mt5.ORDER_TYPE_BUY and t_sig == "SELL") or (p.type == mt5.ORDER_TYPE_SELL and t_sig == "BUY")
-                        
-                    #     if recover_pct > 0.70 and (is_contrarian or now_loop % 30 < 1):
-                    #         log(f"✂️ SALIDA ESTRATÉGICA: Reduciendo daño de {min_p:.2f} a {profit:.2f} ({recover_pct:.1%})")
-                    #         close_ticket(p, "STRATEGIC_REAVE"); continue
+                    # === v18.9.320: PARACAÍDAS DE GANANCIAS (ANTI-DRENAJE) ===
+                    # Si la ganancia fue >$1.50 y cae más del 40% del pico máximo, cerramos.
+                    if max_p > 1.50 and profit < (max_p * 0.60):
+                        log(f"🪂 PARACAÍDAS ACTIVADO: {sym} protegiendo ${profit:.2f} tras caída desde ${max_p:.2f}.")
+                        close_ticket(p, "PROFIT_PARACHUTE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
                     if MIRROR_MODE:
