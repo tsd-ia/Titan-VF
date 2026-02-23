@@ -677,8 +677,9 @@ def perform_ai_health_audit():
         # v18.9.650: PURGA SELECTIVA (Oro es Inmune)
         # Solo purgamos ETH/BTC si se quedan estancados. El Oro tiene aire total.
         is_stagnation_candidate = any(x in p.symbol for x in ["ETH", "BTC", "SOL"])
-        if is_stagnation_candidate and trade_life > 300 and p.profit < 1.00:
-             log(f"🧊 LENTITUD DETECTADA: {p.symbol} estancado en ${p.profit:.2f}. Cortando para recuperar margen.")
+        # v18.11.955: PURGA RELAJADA PARA CUENTAS DE $100+ (Comandante Mode)
+        if is_stagnation_candidate and trade_life > 900 and p.profit < -3.50:
+             log(f"🧊 LENTITUD REAL: {p.symbol} agotó sus 15m en ${p.profit:.2f}. Purga ejecutada.")
              close_ticket(p, "SCALPING_PURGE"); continue
 
         # v18.11.500: PULMÓN DE ACERO (600s de Vida)
@@ -2329,9 +2330,10 @@ def process_symbol_task(sym, active, mission_state):
                 except: pass
             
             # v18.11.910: Si es ballena pequeña (<$80k), NO bypass parcial. Requiere IA Confirmación.
-            if sym == "XAUUSDm" and oracle_power < 80000:
+            # v18.11.960: UMBRAL ORO BAJADO A $40k (A pedido del Comandante)
+            if sym == "XAUUSDm" and oracle_power < 40000:
                 is_oracle_signal = False # Relegar a señal técnica normal
-                log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Requiere confirmación técnica.")
+                log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Umbral mínimo es $40k.")
             else:
                 ai_reply = "YES" # Bypass absoluto para Ballenas Giga
                 model_used = "ORACLE_MODE"
