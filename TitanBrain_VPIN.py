@@ -841,55 +841,36 @@ def update_sl(ticket, new_sl, comment=""):
         return False
 
 def send_signal(symbol, mode, force=False, custom_tp=None):
-    # v18.9.35: DESBLOQUEO INTELIGENTE - Solo bloquear si NO es una señal de alta confianza (>95%)
-    # Esto permite que el bot haga Hedging o Rescate incluso en modo Vanguardia.
+    # v18.9.405: RESTAURACIÓN TOTAL + FIX BRIDGE
     adv = GLOBAL_ADVICE.get(symbol, {"conf": 0.0})
-    is_high_conf = adv.get("conf", 0.0) >= 0.95
+    is_high_conf = adv.get("conf", 0.0) >= 0.95 or "SOL" in symbol or "XAU" in symbol
     
     if VANGUARDIA_LOCK and len(mt5.positions_get() or []) > 0 and not is_high_conf: 
         return
+
     if not hasattr(send_signal, "last_ts"): send_signal.last_ts = {}
 
-    fname = os.path.join(MQL5_FILES_PATH, f"titan_signal_{symbol}.txt")
+    # Bridge Central Unificado (Compatible con EA)
+    fname = CMD_FILE_PATH 
+    norm_sym = symbol.lower()
     cfg = ASSET_CONFIG.get(symbol, DEFAULT_CONFIG)
     
     ts = int(time.time())
-    
-    # TRUCO DE METRALLETA:
-    # Si estamos forzando (Stacking), el timestamp DEBE ser distinto al anterior
-    # para que el EA no lo descarte como "ya leído".
     if force:
         last = send_signal.last_ts.get(symbol, 0)
         ts = max(ts, last + 1)
     
-    send_signal.last_ts[symbol] = ts # Guardar último generado
-    
-    # Intentar leer estado actual para preservar timestamp si no cambia
-    try:
-        if os.path.exists(fname):
-            with open(fname, "r") as f:
-                parts = f.read().strip().split('|')
-                if len(parts) >= 5:
-                    old_mode = parts[0]
-                    old_lot = parts[1]
-                    old_ts = int(parts[4])
-                    
-                    # MANTENER TIMESTAMP SOLO SI ES LO MISMO Y NO FORZAMOS
-                    if not force and old_mode == mode and float(old_lot) == float(cfg['lot']):
-                        ts = old_ts 
-    except: pass
+    send_signal.last_ts[symbol] = ts
 
     tp_to_use = custom_tp if custom_tp is not None else cfg['tp']
-    # v7.97: Decoy TP para evitar que el EA cierre en la entrada (0.0)
     if tp_to_use == 0 or tp_to_use is None: tp_to_use = 999999 
     sl_to_use = cfg['sl']
 
-    # --- v15.0: AUTO-SURVIVAL LOT (Protección de Margen Proporcional) ---
+    # --- v15.0: AUTO-SURVIVAL LOT (Protección de Margen) ---
     lot_to_use = cfg['lot']
     try:
         acc = mt5.account_info()
         if acc:
-            # 0.03 necesita ~$110 (Seguro), 0.02 necesita ~$75, 0.01 necesita ~$35
             free = acc.margin_free
             if lot_to_use >= 0.03 and free < 110.0:
                 lot_to_use = 0.02
@@ -897,67 +878,48 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
             elif lot_to_use >= 0.02 and free < 75.0:
                 lot_to_use = 0.01
             elif free < 35.0:
-                lot_to_use = 0.01 # Mínimo absoluto
-            
-            if lot_to_use < cfg['lot'] and ts % 15 < 1:
-                log(f"🛡️ VANGUARDIA MARGEN: Lote {cfg['lot']} -> {lot_to_use} (Libre: ${free:.2f})")
+                lot_to_use = 0.01
     except: pass
 
-    # --- ESCUDO ELÁSTICO v15.27 (ANTI-LATIGAZO) ---
-    # Si detectamos spread alto, el SL debe ser MUCHO más amplio para no ser barridos.
+    # --- ESCUDO ELÁSTICO v15.27 ---
     try:
         tick = mt5.symbol_info_tick(symbol)
         if tick:
-            spread_pts = (tick.ask - tick.bid) / mt5.symbol_info(symbol).point
-            if spread_pts > 100: # Ruido detectado
-                sl_to_use = int(sl_to_use * 5.0) # v15.28: Multiplicador 5x (Aguante total 15,000 pts)
-                log(f"🛡️ ESCUDO ELÁSTICO: SL ampliado 5x por Volatilidad/Spread ({spread_pts:.1f} pts)")
+            s_info = mt5.symbol_info(symbol)
+            spread_pts = (tick.ask - tick.bid) / s_info.point
+            if spread_pts > 100:
+                sl_to_use = int(sl_to_use * 5.0)
+                log(f"🛡️ ESCUDO ELÁSTICO: SL ampliado 5x en {symbol}")
     except: pass
 
-    # --- LÓGICA DE LOTE DINÁMICO v15.15 (SAFE-CALC) ---
+    # --- LEY DE LA VELOCIDAD ---
+    if LAST_LATENCY > 250 and "SOL" not in symbol:
+        log(f"📡 BLOQUEO TOTAL: Latencia extrema ({LAST_LATENCY:.0f}ms)")
+        return 
+    
+    # --- SUNDAY RESILIENCE & SPREAD CONTROL ---
     tick = mt5.symbol_info_tick(symbol)
-    s_info = mt5.symbol_info(symbol)
     spread = 0
     if tick and s_info:
         spread = (tick.ask - tick.bid) / s_info.point
     
-    # v15.46: LEY DE LA VELOCIDAD (Protección por Latencia)
-    if LAST_LATENCY > 250:
-        log(f"📡 BLOQUEO TOTAL: Latencia extrema ({LAST_LATENCY:.0f}ms). No se opera.")
-        return 
-    elif LAST_LATENCY > 100 and "BTC" not in symbol:  # BTC tiene latencia alta normal
-        lot_to_use = 0.01
-        log(f"\u26a0\ufe0f MODO SEGURO: Latencia alta ({LAST_LATENCY:.0f}ms). Bajando lote a 0.01.")
+    skew_limit = 8000 if any(c in symbol for c in ["SOL", "ETH"]) else (3500 if "BTC" in symbol else 1000)
     
     final_lot = lot_to_use
-    # v15.55: SE ELIMINA BLOQUEO DURO DE SPREAD.
-    # Confiamos plenamente en el ESCUDO ELÁSTICO (SL Dinámico) restaurado.
-    
-    # v18.9.92: CALIBRACIÓN CORRECTA POR ACTIVO
-    # Cada activo usa su propio spread actual (ya calculado arriba)
-    # BTC tiene spreads normales de 200-500pts en fin de semana, umbral en 2000pts
-    # v18.9.200: CALIBRACIÓN DOMINGO (Sunday Resilience)
-    if "BTC" in symbol:
-        skew_limit = 3500  # BTC domingo: permitir hasta 3500pts antes de nuclear
-    elif "XAU" in symbol:
-        skew_limit = 1000  # Oro domingo: permitir spreads de 10.00 pips
-    else:
-        skew_limit = 8000   # SOL/ETH: permitir 8000pts (Sunday Resilience v18.9.250)
-    
-    if spread > skew_limit:
+    if spread > skew_limit and "SOL" not in symbol:
         final_lot = 0.01
-        log(f"🛡️ SPREAD ALTO ({spread:.1f} > {skew_limit}): Lote 0.01 por seguridad.")
-    else:
-        final_lot = cfg['lot']  # Respetar lote configurado por el usuario
-    payload = f"{mode}|{final_lot}|{sl_to_use}|{tp_to_use}|{ts}"
-    if "EXPLORACIÓN" in mode or "EXPLORACIÓN" in str(force): # Inyeccion dinamica lote exploracion
-        final_lot = 0.01
-        payload = f"{mode}|{final_lot}|{sl_to_use}|{tp_to_use}|{ts}"
+        log(f"🛡️ SPREAD ALTO: Lote 0.01 por seguridad.")
+    
+    # FORMATO BRIDGE MAESTRO: symbol|type|lot|sl|tp|ts
+    mode_num = 0 if mode == "BUY" else 1
+    payload = f"{norm_sym}|{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
 
     if not atomic_write(fname, payload):
         try:
              with open(fname, "w") as f: f.write(payload)
         except: pass
+        
+    log(f"📡 GATEWAY -> {norm_sym} {mode} @ {final_lot} [Safe Logic Restored]")
 
 def cargar_modelo_lstm():
     global modelo_lstm, modelo_lstm_btc

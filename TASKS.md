@@ -42,6 +42,9 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Verificar Trailing Unificado +$0.30 y Freno de Margen 100%.
 - [x] Sincronizar Lotajes SAFE MODE: 0.01 Universal / 0.10 ETH-SOL.
 - [x] Implementar Auditor de Salud IA (Purga preventiva cada 5 min).
+- [x] Protocolo GIGA-FIRE 2.0: Bypass total IA para Oráculos.
+- [x] Blindaje Atómico Anti-Metralleta (Límite 3 balas/activo).
+- [x] Fix Bridge GateWay v18.9.405: Comunicación SOL/ORO unificada.
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*
