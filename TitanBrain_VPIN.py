@@ -1139,7 +1139,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.530 | VOLATILITY HUNT | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.600 | IMPERIAL PRIORITY | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2627,10 +2627,28 @@ def process_symbol_task(sym, active, mission_state):
                         if has_hedging:
                             if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE: {sym} ya tiene posiciones en contra. No abriendo {target_sig}.")
                             return
-                        # v18.9.505: FILTRO DE MOMENTUM (Entrar solo si el precio acompaña)
+                        # v18.9.600: OPTIMIZACIÓN DE LATENCIA (Cache Tick)
                         tick = mt5.symbol_info_tick(sym)
                         if not tick: return
                         
+                        # v18.9.600: FILTRO DE CALIDAD SUPERIOR (COMANDANTE)
+                        if sym == "ETHUSDm":
+                            # 1. Confianza 95% + Señal Oráculo
+                            if conf < 0.95 and not is_oracle_signal:
+                                if now % 15 < 1: log(f"🧘 FILTRO CALIDAD ETH: Confianza {conf:.2f} insuficiente (<0.95).")
+                                return
+                        
+                        # 2. Gatillo de Volatilidad Mínima (BTC/ETH)
+                        if sym in ["BTCUSDm", "ETHUSDm"]:
+                            # Verificar si el activo tiene "sangre" (movimiento real)
+                            history = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 5)
+                            if history is not None and len(history) > 0:
+                                m1_range = max([x['high'] for x in history]) - min([x['low'] for x in history])
+                                min_vol = 0.50 if "ETH" in sym else 15.0 # BTC requiere más rango
+                                if m1_range < min_vol:
+                                    if now % 20 < 1: log(f"🧘 FILTRO VOLATILIDAD: {sym} mercado plano ({m1_range:.2f} < {min_vol}). Saltando.")
+                                    return
+
                         # Guardar historial de precios para momentum (v18.9.505)
                         if not hasattr(process_symbol_task, "price_hist"): process_symbol_task.price_hist = deque(maxlen=5)
                         process_symbol_task.price_hist.append(tick.bid if target_sig == "BUY" else tick.ask)
@@ -2638,6 +2656,12 @@ def process_symbol_task(sym, active, mission_state):
                         if len(process_symbol_task.price_hist) >= 3:
                             move = process_symbol_task.price_hist[-1] - process_symbol_task.price_hist[0]
                             is_aligned = (target_sig == "BUY" and move > 0) or (target_sig == "SELL" and move < 0)
+                            
+                            # v18.9.600: EXPLOSIÓN LOCAL PARA ETH (Doble exigencia)
+                            if sym == "ETHUSDm" and abs(move) < 0.15:
+                                if now % 10 < 1: log(f"⏳ ETH SIN EXPLOSIÓN: Movimiento {abs(move):.2f} insuficiente para $1 rápido.")
+                                return
+
                             if not is_aligned:
                                 if now % 5 < 1: log(f"⏳ ESPERANDO IMPULSO: {sym} señal {target_sig} pero precio en contra ({move:.4f}).")
                                 return
@@ -3168,6 +3192,12 @@ def metralleta_loop():
                         log(f"🛑 MERCADO {sym} CERRADO - Durmiendo octopus...")
                     continue
                 
+                # v18.9.600: PRIORIDAD DE CAPITAL (ORO > MSTR > OPN > RESTO)
+                # Si detectamos señales en el "Trío Imperial", pausamos ETH para ahorrar margen.
+                if sym == "ETHUSDm":
+                    imperial_active = any(s in ACTIVE_TASKS_VPIN for s in ["XAUUSDm", "MSTRm", "OPNm"])
+                    if imperial_active: continue 
+
                 # v18.9.220: GUARDA DE TAREA ACTIVA (Evita que el mismo símbolo corra 2 veces si hay lag)
                 if sym in ACTIVE_TASKS_VPIN: continue
                 ACTIVE_TASKS_VPIN.add(sym)

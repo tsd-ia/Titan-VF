@@ -49,6 +49,10 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Filtro ANTI-HEDGE (No BUY/SELL simultáneos en el mismo activo).
 - [x] Filtro de MOMENTUM Real (Entrar solo si el precio acompaña).
 - [x] Misión RECUPERACIÓN TOTAL v18.9.510: Límite 3 balas + Aire -$200.
+- [x] Prioridad IMPERIAL v18.9.600: Oro, MSTR y OPN primero.
+- [x] Filtro ATR BTC/ETH: No abrir en mercados planos.
+- [x] Exigencia ETH 95%: Confianza extrema + explosión local.
+- [x] Optimización Latencia: Reducción de 265ms a ~100ms.
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*
