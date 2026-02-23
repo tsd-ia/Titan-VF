@@ -327,7 +327,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 1500, "tp": 2500, "max_bullets": 5}, # 5 Balas + TP agresivo
+    "XAUUSDm": {"lot": 0.03, "sl": 2500, "tp": 2500, "max_bullets": 5}, # Lote 0.03: Mayor velocidad de cuenta
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
@@ -631,14 +631,14 @@ def perform_ai_health_audit():
     log("🩺 [AUDITOR] Iniciando chequeo de salud de cuenta...")
     
     for p in positions:
-        # v18.9.370: Detectar si la posición está MEJORANDO
-        last_pnl = PNL_MEMORIA.get(p.ticket, p.profit)
-        is_improving = p.profit > last_pnl + 0.05 # Ha mejorado al menos 5 centavos desde el último check
+        # 1. INDULTO POR PERSPECTIVA (Dándole aire hasta los -$25)
+        # Ya no cerramos a -$10, dejamos que la IA decida si hay esperanza
+        recuperacion_minima = abs(last_pnl) * 0.15
+        is_improving = p.profit > last_pnl + recuperacion_minima or p.profit > -1.5
         PNL_MEMORIA[p.ticket] = p.profit
         
-        # 1. SI ESTÁ MEJORANDO, INDULTO AUTOMÁTICO (No molestar al gráfico)
-        if is_improving and p.profit > -15.0:
-            if now % 60 < 2: log(f"🌱 [AUDITOR] {p.symbol} mejorando (${p.profit:.2f} > ${last_pnl:.2f}). Indulto concedido.")
+        if is_improving and p.profit > -20.0:
+            if now % 60 < 2: log(f"🌱 [AUDITOR] {p.symbol} con aire para recuperar (${p.profit:.2f}). Indulto.")
             continue
 
         # 2. Criterios de entrada al tribunal de la IA (Más de 15 min o pérdida seria)
@@ -664,11 +664,14 @@ def perform_ai_health_audit():
         """
         
         res, model = call_ollama(prompt)
-        if "PURGA: SI" in res.upper():
-            log(f"💀 SENTENCIA IA ({model}): Purga confirmada para #{p.ticket}. Razón: {res[:120]}...")
+        # v18.9.470: Si la IA falla o no responde claro, purga preventiva si hay riesgo serio
+        purgar = "PURGA: SI" in res.upper() or (model == "FALLBACK_FAILED" and p.profit < -5.0)
+        
+        if purgar:
+            log(f"💀 SENTENCIA IA ({model}): Purga ejecutada para #{p.ticket}. Profit: {p.profit:.2f}")
             close_ticket(p, "AI_HEALTH_PURGE")
         else:
-            log(f"🩺 AUDITOR: #{p.ticket} mantenida por potencial de recuperación detectado.")
+            log(f"🩺 AUDITOR: #{p.ticket} bajo vigilancia (Potencial Detectado).")
            
     # Limpiar memoria de tickets que ya no existen
     current_tickets = [pos.ticket for pos in positions]
