@@ -552,12 +552,17 @@ def log(msg):
         try:
             now = time.time()
             # Throttling de mensajes técnicos repetitivos
-            is_repetitive = any(x in msg for x in ["LATENCIA", "BLOQUEO", "VIGILANCIA", "ESCUDO", "CEREBRO", "MERCADO", "BALLENA", "IA-OVERRIDE", "ORÁCULO"])
+            repetitive_keywords = ["LATENCIA", "BLOQUEO", "VIGILANCIA", "ESCUDO", "CEREBRO", "MERCADO", "BALLENA", "IA-OVERRIDE", "ORÁCULO", "CACHE", "GOD", "SCALP", "VALIDADA", "OLLAMA"]
+            is_repetitive = any(x in msg.upper() for x in repetitive_keywords)
             if is_repetitive:
                 cache_key = msg.split(":")[0] 
                 if cache_key in LOG_THROTTLE_CACHE and (now - LOG_THROTTLE_CACHE[cache_key]) < 10.0:
                     return
                 LOG_THROTTLE_CACHE[cache_key] = now
+            
+            # v18.9.330: Auto-Limpieza de log gigante
+            if os.path.exists("titan_vanguardia.log") and os.path.getsize("titan_vanguardia.log") > 50*1024*1024:
+                with open("titan_vanguardia.log", "w") as f: f.write("--- LOG ROTATED (TITAN AUTO-CLEAN) ---\n")
 
             ts = time.strftime("%H:%M:%S")
             thread_name = threading.current_thread().name
@@ -1105,7 +1110,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.320 | DASHBOARD PRO | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.330 | ANTI-SPAM TOTAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2161,29 +2166,45 @@ def process_symbol_task(sym, active, mission_state):
             
             if "SI" in ai_reply.upper() or is_god_mode:
                 if is_god_mode: 
-                    log(f"⚡ GOD MODE ACTIVADO: Ignorando veto IA por volumen masivo (${oracle_volume/1000:.0f}k)")
+                    last_god_ai = STATE.get(f"last_god_ai_{sym}", 0)
+                    if now - last_god_ai > 45.0: # Throttling extendido
+                        log(f"⚡ GOD MODE ACTIVADO: Ignorando veto IA por volumen masivo (${oracle_volume/1000:.0f}k)")
+                        STATE[f"last_god_ai_{sym}"] = now
                     conf = 1.0 # Fuerza total
-                log(f"🧠 OLLAMA CONFIRMA ({model_used}): {ai_reply}")
+                
+                last_conf_log = STATE.get(f"last_conf_log_{sym}", 0)
+                if now - last_conf_log > 20.0:
+                    log(f"🧠 OLLAMA CONFIRMA ({model_used}): {ai_reply}")
+                    STATE[f"last_conf_log_{sym}"] = now
             else:
-                # v18.9.200: Si es Oráculo, el veto solo quita 5% (Amortiguación). Si es IA pura, quita 20%.
+                last_veto_log = STATE.get(f"last_veto_log_{sym}", 0)
                 penalty = 0.95 if is_oracle_signal else 0.8
-                log(f"🛡️ OLLAMA VETO ({model_used}): {ai_reply}. {'Amortiguado' if is_oracle_signal else 'Aplicado'}.")
+                if now - last_veto_log > 30.0:
+                    log(f"🛡️ OLLAMA VETO ({model_used}): {ai_reply}. {'Amortiguado' if is_oracle_signal else 'Aplicado'}.")
+                    STATE[f"last_veto_log_{sym}"] = now
                 conf *= penalty
             
-            msg = f"🎯 OPORTUNIDAD VALIDADA IA: {sym} en {target_sig} ({conf*100:.1f}%)"
-            log(f"🚨 {msg}"); send_ntfy(msg)
+            last_valid_log = STATE.get(f"last_valid_log_{sym}", 0)
+            if now - last_valid_log > 15.0:
+                msg = f"🎯 OPORTUNIDAD VALIDADA IA: {sym} en {target_sig} ({conf*100:.1f}%)"
+                log(f"🚨 {msg}"); send_ntfy(msg)
+                STATE[f"last_valid_log_{sym}"] = now
         
         elif use_cache:
             ai_reply = cache['res']
             model_used = cache['model']
-            if "SI" not in ai_reply.upper(): conf *= 0.8
-            if now % 120 < 1: # Reducir frecuencia de log de caché a cada 2 minutos
+            last_cache_log = STATE.get(f"last_cache_log_{sym}", 0)
+            if now - last_cache_log > 60.0: # Reducir frecuencia de log de caché
                 log(f"🧠 IA CACHE ({sym}): Reutilizando decisión previa ({ai_reply[:30]}...)")
+                STATE[f"last_cache_log_{sym}"] = now
+            if "SI" not in ai_reply.upper(): conf *= 0.8
 
         if active and target_sig != "HOLD":
-            # v18.9.32: MIRROR_MODE ELIMINADO POR SEGURIDAD
-            v_str = " | ".join(map(str, razones[:4]))
-            log(f"⚡ SCALP: {target_sig} ({conf*100:.1f}%) [{v_str}]")
+            last_scalp_log = STATE.get(f"last_scalp_log_{sym}", 0)
+            if now - last_scalp_log > 10.0:
+                v_str = " | ".join(map(str, razones[:4]))
+                log(f"⚡ SCALP: {target_sig} ({conf*100:.1f}%) [{v_str}]")
+                STATE[f"last_scalp_log_{sym}"] = now
 
         # 3. LÓGICA DE DISPARO (CAMBIO O ACUMULAR)
         should_fire = False
@@ -2816,9 +2837,9 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v18.9.320: PARACAÍDAS DE GANANCIAS (ANTI-DRENAJE) ===
-                    # Si la ganancia fue >$1.50 y cae más del 40% del pico máximo, cerramos.
-                    if max_p > 1.50 and profit < (max_p * 0.60):
+                    # === v18.9.330: PARACAÍDAS DE GANANCIAS (ANTI-DRENAJE) ===
+                    # Ajustado a 75% (Cierre si perdemos un 25% del pico máximo)
+                    if max_p > 1.05 and profit < (max_p * 0.75):
                         log(f"🪂 PARACAÍDAS ACTIVADO: {sym} protegiendo ${profit:.2f} tras caída desde ${max_p:.2f}.")
                         close_ticket(p, "PROFIT_PARACHUTE"); continue
 

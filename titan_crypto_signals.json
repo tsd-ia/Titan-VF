@@ -1,1 +1,1 @@
-{"ethusdt": {"signal": "BUY", "volume": 238577.21428, "price": 1943.58, "timestamp": 1771806873.8519263}, "solusdt": {"signal": "BUY", "volume": 280411.5241, "price": 81.98, "timestamp": 1771806874.1428702}}
+{"solusdt": {"signal": "SELL", "volume": 569665.8339999999, "price": 81.8, "timestamp": 1771807167.7414942}, "ethusdt": {"signal": "SELL", "volume": 233438.38115, "price": 1941.57, "timestamp": 1771807163.5996168}}
