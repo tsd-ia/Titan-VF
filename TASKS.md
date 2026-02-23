@@ -45,8 +45,10 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Protocolo GIGA-FIRE 2.0: Bypass total IA para Oráculos.
 - [x] Blindaje Atómico Anti-Metralleta (Límite 3 balas/activo).
 - [x] ORO IMPERIAL v18.9.475: Lote 0.03 + 5 Balas + Aire -$25.
-- [x] Oráculo Oro Hiper-Sensible: Umbral $30k (Sesión Asia).
-- [x] Fix Bridge Universal: Símbolo Case-Sensitive y 0/1 (Doble Puente).
+- [x] Fix LOTE OCULTO (Survival Lot removido).
+- [x] Filtro ANTI-HEDGE (No BUY/SELL simultáneos en el mismo activo).
+- [x] Filtro de MOMENTUM Real (Entrar solo si el precio acompaña).
+- [x] Misión RECUPERACIÓN TOTAL v18.9.510: Límite 3 balas + Aire -$200.
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*

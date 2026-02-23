@@ -138,7 +138,7 @@ def global_health_check():
 # --- CONFIGURACIÓN DE GESTIÓN ---
 MAX_BULLETS = 20 # v18.9.260: Límite extendido para GIGA-FIRE Domingo
 MAX_DAILY_LOSS = 0.85 # -85% equidad = Stop loss global (Sobrevivencia = Mínimo $15.0)9
-MAX_SESSION_LOSS = -50.0  # v18.9.260: Margen de maniobra ampliado para 0.8 lots
+MAX_SESSION_LOSS = -200.0  # v18.9.510: Aire total para recuperación desde $51
 MIN_EQUITY_TO_TRADE = 10.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $10, bot se congela
 LAST_ENTRY_PRICE = {} # Memoria de precio para evitar apilar en el mismo punto
 LAST_HEARTBEAT = {} 
@@ -327,13 +327,13 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.03, "sl": 2000, "tp": 3000, "max_bullets": 5}, # Oro de Sangre: Gana + de lo que pierde
+    "XAUUSDm": {"lot": 0.03, "sl": 2000, "tp": 3000, "max_bullets": 3}, 
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
-    "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
-    "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
-    "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000},
-    "NAS100m": {"lot": 0.02, "sl": 12500, "tp": 10000}
+    "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000, "max_bullets": 3},
+    "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000, "max_bullets": 3},
+    "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000, "max_bullets": 3},
+    "NAS100m": {"lot": 0.02, "sl": 12500, "tp": 10000, "max_bullets": 3}
 }
 DEFAULT_CONFIG = {"lot": 0.01, "sl": 1000, "tp": 250}
 
@@ -1130,7 +1130,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.490 | IMPERIAL GOLD | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.510 | RECUPERACIÓN TOTAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2612,6 +2612,12 @@ def process_symbol_task(sym, active, mission_state):
                     elif is_heartbeat and target_sig == LAST_SIGNALS.get(sym): should_send = True # Heartbeat normal
                     
                     if should_send:
+                        # v18.9.510: FILTRO ANTI-HEDGE (No comprar y vender simultáneamente)
+                        opp_type = mt5.ORDER_TYPE_SELL if target_sig == "BUY" else mt5.ORDER_TYPE_BUY
+                        has_hedging = any(p.type == opp_type for p in pos_list)
+                        if has_hedging:
+                            if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE: {sym} ya tiene posiciones en contra. No abriendo {target_sig}.")
+                            return
                         # v18.9.505: FILTRO DE MOMENTUM (Entrar solo si el precio acompaña)
                         tick = mt5.symbol_info_tick(sym)
                         if not tick: return
@@ -2730,8 +2736,9 @@ def metralleta_loop():
             save_mission_state()
         else:
             # --- RESET ATÓMICO v15.36 ---
-            log("🧹 RESET TOTAL: Detectado estado sin posiciones. Limpiando PnL pegado.")
-            mission_state["active"] = False
+            # --- RESET CONTROLADO v18.9.510 ---
+            log("🧹 SIN POSICIONES: Manteniendo misión ACTIVE para nueva caza.")
+            mission_state["active"] = True # No apagar la misión solo por no tener posiciones
             mission_state["start_equity"] = float(get_equity())
             mission_state["target_profit"] = 50.0
             mission_state["last_pnl"] = 0.0
