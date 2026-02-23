@@ -32,19 +32,19 @@ while True:
             # 2. Verificar cada activo antes de lanzar
             if get_flag("btc_brain_on"):
                 print("🔥 Lanzando ORÁCULO BTC...")
-                subprocess.Popen(["cmd", "/c", 'start "TITAN_ORACLE" python Titan_Oracle_Binance.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+                subprocess.Popen('start "TITAN_ORACLE" cmd /k "python Titan_Oracle_Binance.py"', shell=True)
             
             if get_flag("oro_brain_on"):
                 print("🔥 Lanzando ORÁCULO ORO...")
-                subprocess.Popen(["cmd", "/c", 'start "TITAN_ORACLE_GOLD" python Titan_Oracle_Gold.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+                subprocess.Popen('start "TITAN_ORACLE_GOLD" cmd /k "python Titan_Oracle_Gold.py"', shell=True)
             
             if get_flag("crypto_brain_on"):
                 print("🔥 Lanzando ORÁCULO CRYPTO...")
-                subprocess.Popen(["cmd", "/c", 'start "TITAN_ORACLE_CRYPTO" python Titan_Oracle_Crypto.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+                subprocess.Popen('start "TITAN_ORACLE_CRYPTO" cmd /k "python Titan_Oracle_Crypto.py"', shell=True)
 
             # 3. Lanzar el Cerebro Core siempre si hubo comando
             print("🧠 Lanzando CORE ENGINE...")
-            subprocess.Popen(["cmd", "/c", 'start "TITAN_BRAIN" python TitanBrain_VPIN.py'], creationflags=subprocess.CREATE_NEW_CONSOLE)
+            subprocess.Popen('start "TITAN_BRAIN" cmd /k "python TitanBrain_VPIN.py"', shell=True)
             
             # Resetear la señal en Firebase
             requests.patch(f"{FIREBASE_URL}/commands.json", json={"remote_launch": False})

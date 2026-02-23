@@ -69,6 +69,6 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Titan v18.10.550: Precisión Comandante (RSI 75/25 + Momentum M1 + Suelo Blindado).
 - [x] Estabilidad Total v18.9.995: Inicialización atómica (Fix SOL/XRP).
 - [x] Oro Quirúrgico v18.9.999: Filtros RSI y Bollinger (Prohibido comprar en techos).
-
+- [x] Inversión de Espejo Oráculos v18.11.850: Seguir a Makers (Instituciones) y no a Takers (Atrapados).
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*
