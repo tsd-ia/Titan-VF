@@ -727,8 +727,8 @@ def close_ticket(pos, reason="UNK"):
     # v18.5: LEY DE PROTECCIÓN DE CAPITAL - PROHIBIDO CERRAR EN NEGATIVO
     profit = pos.profit + getattr(pos, 'swap', 0.0) + getattr(pos, 'commission', 0.0)
     
-    # Solo permitimos cierre en rojo si es una instrucción de pánico o cierre de mercado (decoy HARD/MERCADO)
-    is_safe_close = profit > 0.01 or "HARD" in reason or "MERCADO" in reason or "PANIC" in reason
+    # Solo permitimos cierre en rojo si es una instrucción de pánico, purga de la IA o cierre de mercado
+    is_safe_close = profit > 0.01 or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "PURGE", "AI"])
     
     if not is_safe_close:
         # log(f"🛡️ BLOQUEO DE CIERRE: Se intentó cerrar {pos.symbol} en negativo (${profit:.2f}). ABORTADO.")
@@ -795,7 +795,9 @@ def close_ticket(pos, reason="UNK"):
         LAST_CLOSE_REASON[pos.symbol] = reason
         LAST_CLOSE_TYPE_REAL[pos.symbol] = "BUY" if pos.type == mt5.POSITION_TYPE_BUY else "SELL"
     else:
-        log(f"⚠️ Error cerrando #{pos.ticket}: {res.comment if res else 'None'}")
+        log(f"⚠️ Error cerrando #{pos.ticket}: {res.comment if res else 'None'}. Usando bridge...")
+        # v18.9.415: Si falla la API (como en SOL), mandamos orden de cierre al bridge
+        send_signal(pos.symbol, "CLOSE", force=True)
     return res
 
 def update_sl(ticket, new_sl, comment=""):
