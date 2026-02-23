@@ -331,35 +331,29 @@ def firebase_command_poller():
                                     log(f"🧠 MANDO WEB (JSON): {flag} -> {'ACTIVADO' if val else 'DESACTIVADO'}")
             
             # v18.9.280: Poll directo de flags raíz para evitar desincronización con el Dashboard
-            for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on"]:
-                res_f = requests.get(f"{FIREBASE_URL}/{flag}.json", timeout=3)
+            for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on", "auto_mode"]:
+                res_f = requests.get(f"{FIREBASE_URL}/live/{flag}.json", timeout=3)
                 if res_f.status_code == 200:
                     val = res_f.json()
                     if val is not None:
                         val = bool(val)
                         if val != STATE.get(flag):
                             STATE[flag] = val
-                            log(f"📡 SYNC FIREBASE [{flag}]: {'ON' if val else 'OFF'}")
+                            if flag == "auto_mode": STATE["auto_pilot"] = val
+                            log(f"📡 SYNC-ROOT [{flag}]: {'ON' if val else 'OFF'}")
 
             # Continuar con comandos JSON
-            if "auto_mode" in cmds:
-                val = bool(cmds["auto_mode"])
-                if val != STATE.get("auto_mode", False):
-                    STATE["auto_mode"] = val
-                    STATE["auto_pilot"] = val
-                    save_settings()
-                    log(f"🔫 MANDO WEB: Autonomous Fire {'ON' if val else 'OFF'}")
-            if "start_mission" in cmds and cmds["start_mission"]:
-                log("🎯 MANDO WEB: FORCING START MISSION!")
-                start_mission(target_profit=500.0)
-                requests.patch(url, json={"start_mission": False})
-            if "panic" in cmds and cmds["panic"]:
-                log("🚨 MANDO WEB: ¡BOTÓN DE PÁNICO ACTIVADO!")
-                stop_mission()
-                # Resetear pánico en firebase para no loopear
-                requests.patch(url, json={"panic": False})
+            if cmds:
+                if "start_mission" in cmds and cmds["start_mission"]:
+                    log("🎯 MANDO WEB: FORCING START MISSION!")
+                    start_mission(target_profit=500.0)
+                    requests.patch(url, json={"start_mission": False})
+                if "panic" in cmds and cmds["panic"]:
+                    log("🚨 MANDO WEB: ¡BOTÓN DE PÁNICO ACTIVADO!")
+                    stop_mission()
+                    requests.patch(url, json={"panic": False})
             
-            time.sleep(10) # v18.9.280: Más rápido
+            time.sleep(1) # v18.11.950: Respuesta Instantánea (1s)
         except:
             time.sleep(2)
 
