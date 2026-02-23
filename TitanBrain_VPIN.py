@@ -375,7 +375,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.03, "sl": 2000, "tp": 3000, "max_bullets": 3},
+    "XAUUSDm": {"lot": 0.01, "sl": 500, "tp": 2000, "max_bullets": 3},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -1176,7 +1176,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v18.10.550 | MODO REZUMANTE | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v18.10.600 | MODO RESCATE HEDGE | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -2500,20 +2500,11 @@ def process_symbol_task(sym, active, mission_state):
                         recovery_trigger = False
                         stacking_trigger = False # v10.1
                         
-                        # v18.9.94: REGLA DE ORO - Solo acumular si la anterior gana
-                        if n_balas > 0:
-                            lp = pos_list[-1]  # Última posición abierta
-                            # BALA 2: Solo si la bala 1 está positiva
-                            # BALA 3: Solo si la bala 2 está positiva
-                            prev_is_positive = lp.profit > 0
-                            if prev_is_positive and ((now - LAST_ENTRY.get(sym, 0)) > 20.0 or (is_oracle_signal and (now - LAST_ENTRY.get(sym, 0)) > 5.0)):
-                                stacking_trigger = True
-                                r_text = 'ORÁCULO FORZA (Secuencial)' if is_oracle_signal else f'Anterior positiva (${lp.profit:.2f})'
-                                log(f"🟢 BALA {n_balas+1}: {r_text}. ACUMULANDO.")
-                            elif not prev_is_positive:
-                                stacking_trigger = False
-                                if now % 30 < 1:
-                                    log(f"🔴 BALA {n_balas+1} BLOQUEADA: Anterior en ${lp.profit:.2f} (necesita >$0). Esperando...")
+                        # v18.10.600: MODO HEDGE/RESCATE - Permitir balas aunque la anterior pierda
+                        if (now - LAST_ENTRY.get(sym, 0)) > 15.0 or (is_oracle_signal and (now - LAST_ENTRY.get(sym, 0)) > 4.0):
+                            stacking_trigger = True
+                            r_text = 'ORÁCULO FORZA' if is_oracle_signal else 'Tiempo cumplido'
+                            log(f"🟢 BALA {n_balas+1}: {r_text}. RECUPERANDO POSICIÓN.")
 
                         # --- LÓGICA DE RE-ENTRADA INMEDIATA (ANTI-NOISE) v18.9.106 ---
                         # Si cerramos por Trailing (SUIZO) pero la señal sigue siendo BRUTAL (>88%), 
