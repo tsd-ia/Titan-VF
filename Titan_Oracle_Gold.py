@@ -12,8 +12,8 @@ except ImportError:
 
 # CONFIGURACIÓN DEL ORÁCULO ORO (PAXG/USDT)
 SYMBOL_BINANCE = "paxgusdt"
-WHALE_THRESHOLD = 220000    
-GOD_MODE_THRESHOLD = 280000 
+WHALE_THRESHOLD = 80000    
+GOD_MODE_THRESHOLD = 150000 
 FILE_SIGNAL = "titan_gold_signals.json"
 FIREBASE_FLAG_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live/oro_brain_on.json"
 
@@ -34,7 +34,7 @@ def is_brain_on():
     return True
 
 async def gold_oracle():
-    print(f"🔱 ORÁCULO ORO v18.9.190 [DYNAMO]")
+    print(f"🔱 ORÁCULO ORO v18.9.350 [HYPER-SENSE]")
     
     while True:
         if not is_brain_on():

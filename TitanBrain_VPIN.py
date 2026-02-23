@@ -325,9 +325,9 @@ mission_state = {
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
     "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
-    "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 20},
-    "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 20},
-    "ETHUSDm": {"lot": 0.8, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 20},
+    "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
+    "SOLUSDm": {"lot": 0.01, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
+    "ETHUSDm": {"lot": 0.01, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000},
@@ -624,16 +624,11 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_gold = ("XAU" in sym or "Gold" in sym)
     is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
-    # 1. Definir Balas por Categoría (v18.9.310: Límite de 20 por instrumento solicitado)
-    max_bullets = 20
+    # 1. Definir Balas por Categoría (REDUCIDO POR EMERGENCIA v18.9.360)
+    max_bullets = 3
     
-    # 2. Definir Lotaje según Balance
-    if balance < 50.0:
-        smart_lot = 0.03 if is_btc else (0.1 if is_crypto else 0.01)
-    elif balance < 100.0:
-        smart_lot = 0.05 if is_btc else (0.8 if "ETH" in sym else 0.2 if is_crypto else 0.02)
-    else:
-        smart_lot = 0.06 if is_btc else (0.8 if "ETH" in sym else 0.3 if is_crypto else 0.03)
+    # 2. Definir Lotaje según Balance (SEGURO TOTAL 0.01)
+    smart_lot = 0.01
         
     return max_bullets, smart_lot
 
@@ -1110,7 +1105,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.340 | ZONA DINAMICA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.360 | SAFE MODE 0.01 | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1134,7 +1129,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
 
     lines.append(f" PnL:     ${pnl:.2f} / Meta: ${target:.0f} | RACHA: 🔥 {wins_today}")
     lines.append(f" TRAIL:   Max ${max_p:.2f} (Lim Drop: ${limit_drop:.2f})")
-    lines.append(f" BALAS:   {STATE['bullets']} / {MAX_BULLETS} | LATENCIA: {margin_pct/100:.1f}x")
+    lines.append(f" BALAS:   {STATE['bullets']} / {MAX_BULLETS} | MARGEN: {margin_pct:.1f}%")
     
     # v15.63: VELOCIDAD DEL DINERO & TICKS
     # Calcular volatilidad simple (High - Low de ultimos 20 ticks guardados)
@@ -2717,6 +2712,14 @@ def metralleta_loop():
                 open_positions = [pos for pos in positions if (pos.magic == 777 or (pos.magic == 0 and pos.symbol in SYMBOLS))]
                 current_open_pnl = sum(p.profit for p in open_positions)
                 with state_lock: STATE["open_pnl"] = current_open_pnl
+
+                # === v18.9.362: PROTECCIÓN DE MARGEN AL 100% (ANTI-QUEMA) ===
+                acc = mt5.account_info()
+                if acc and acc.margin_level > 0 and acc.margin_level < 100.0:
+                    log(f"🚨 EMERGENCIA: Nivel de Margen Crítico ({acc.margin_level:.1f}%). Liquidando posición más costosa.")
+                    worst_p = min(open_positions, key=lambda x: x.profit)
+                    close_ticket(worst_p, "MARGIN_CALL_PROTECTION")
+                    continue
 
                 # A. COSECHA DE RAÍZ DINÁMICA (v18.9.20)
                 # Cerrar al 95% de la meta para asegurar profit antes de retrocesos
