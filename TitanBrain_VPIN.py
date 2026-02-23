@@ -2113,6 +2113,13 @@ def process_symbol_task(sym, active, mission_state):
         if adx_val > 25: # Alta tendencia/volatilidad
             atr_factor = 1.5 if adx_val < 40 else 2.5
         
+        # v18.9.390: INDULTO ETERNO PARA SOLANA (Comandante Order)
+        if "SOL" in sym:
+            block_action = False
+            block_reason = ""
+            is_hard_blocked = False
+            log(f"🔓 INDULTO SOLANA: Saltando todas las restricciones de seguridad.")
+        
         # 4. FILTRO DE TENDENCIA MAYOR (M5 ALIGNMENT v15.35 BLINDADO)
         # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
         if not contragolpe_active and not is_exploring and target_sig != "HOLD":
@@ -2278,9 +2285,13 @@ def process_symbol_task(sym, active, mission_state):
             if "YES" not in ai_reply.upper() and "SI" not in ai_reply.upper():
                 conf *= 0.7
         
-        # Validar confianza final
-        conf = min(1.0, conf)
-        if target_sig != "HOLD" and conf > 0.70:
+        # v18.9.390: Bypass de veto IA para SOL
+        if "SOL" in sym:
+            ai_reply = "YES"
+            conf = 1.0
+            block_action = False
+            
+        if target_sig != "HOLD" and (conf > 0.70 or "SOL" in sym):
             last_valid_log = STATE.get(f"last_valid_log_{sym}", 0)
             if now - last_valid_log > 15.0:
                 log(f"🚨 OPORTUNIDAD VALIDADA: {sym} {target_sig} ({conf*100:.1f}%)")
