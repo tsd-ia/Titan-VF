@@ -44,8 +44,9 @@ Este archivo sirve para trackear el progreso real del proyecto. Marcaremos con [
 - [x] Implementar Auditor de Salud IA (Purga preventiva cada 5 min).
 - [x] Protocolo GIGA-FIRE 2.0: Bypass total IA para Oráculos.
 - [x] Blindaje Atómico Anti-Metralleta (Límite 3 balas/activo).
-- [x] Fix Bridge GateWay v18.9.425: Protocolo 0/1 + Símbolo Case-Sensitive.
-- [x] Oro Hiper-Agresivo Asia (Umbral $30k + TP Corto).
+- [x] ORO MASTER v18.9.450: Activación 5 balas y precisión 90%.
+- [x] Oráculo Oro Hiper-Sensible: Umbral $30k (Sesión Asia).
+- [x] Fix Bridge Universal: Símbolo Case-Sensitive y 0/1 (Doble Puente).
 
 ---
 *Nota: Antigravity marcará estas cajas a medida que avancemos.*

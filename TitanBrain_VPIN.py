@@ -327,7 +327,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 1500, "tp": 2500}, # TP más corto para rotación rápida
+    "XAUUSDm": {"lot": 0.01, "sl": 1500, "tp": 2500, "max_bullets": 5}, # 5 Balas + TP agresivo
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "SOLUSDm": {"lot": 0.1, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
@@ -915,7 +915,7 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
         final_lot = 0.01
         log(f"🛡️ SPREAD ALTO: Lote 0.01 por seguridad.")
     
-    # v18.9.425: PROTOCOLO BRIDGE FINAL (Doble compatibilidad)
+    # v18.9.450: PROTOCOLO BRIDGE FINAL (Doble compatibilidad)
     mode_num = 0 if mode == "BUY" else 1
     # 1. Formato Legacy: type_num|lot|sl|tp|ts
     payload_legacy = f"{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
@@ -2085,15 +2085,12 @@ def process_symbol_task(sym, active, mission_state):
         if adx_val > 25: # Alta tendencia/volatilidad
             atr_factor = 1.5 if adx_val < 40 else 2.5
         
-        # v18.9.420: INDULTO SOLANA (Throttling por Candado)
+        # v18.9.410: INDULTO SOLANA (Reducido log para evitar spam)
         if "SOL" in sym:
             block_action = False
             block_reason = ""
             is_hard_blocked = False
-            last_sol_log = STATE.get("last_sol_log", 0)
-            if now - last_sol_log > 30:
-                log(f"🔓 MODO GATILLO: SOLANA liberada de bloqueos.")
-                STATE["last_sol_log"] = now
+            if now % 30 < 1: log(f"🔓 MODO GATILLO: SOLANA liberada de bloqueos.")
         
         # 4. FILTRO DE TENDENCIA MAYOR (M5 ALIGNMENT v15.35 BLINDADO)
         # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
@@ -2658,7 +2655,7 @@ def process_symbol_task(sym, active, mission_state):
                             with state_lock: STATE[f"firing_{sym}"] = now
                             LAST_ENTRY[sym] = now
                         else:
-                            # v18.9.425: Salto silencioso al bridge para cryptos (Falla API por broker)
+                            # v18.9.450: Salto silencioso al bridge para cryptos/metales (Doble Sincro)
                             send_signal(sym, target_sig, force=should_fire)
                         
                         LAST_ENTRY_PRICE[sym] = float(price)
