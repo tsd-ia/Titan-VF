@@ -685,10 +685,11 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_gold = ("XAU" in sym or "Gold" in sym)
     is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
-    # 1. Definir Balas por Categoría (REDUCIDO POR EMERGENCIA v18.9.360)
+    # 1. Definir Balas por Categoría (ESTRICTO v18.9.380)
     max_bullets = 3
     
-    # 2. Definir Lotaje según Balance (SEGURO TOTAL 0.01 | ETH/SOL REQUERIMIENTO ESPECIAL)
+    # 2. Definir Lotaje según Balance
+    # ETH/SOL a 0.10 por orden del Comandante. Oro/BTC a 0.01 por seguridad.
     smart_lot = 0.1 if any(c in sym for c in ["ETH", "SOL"]) else 0.01
         
     return max_bullets, smart_lot
@@ -1468,16 +1469,21 @@ def stop_mission():
     log("🏁 MISIÓN FINALIZADA | EA Restaurado y Posiciones Cerradas.")
 
 def process_symbol_task(sym, active, mission_state):
-    """ Tarea individual para cada activo en paralelo """
-    global LAST_LATENCY_UPDATE # v15.50: Fix Scope Error
+    """ Tarea individual para cada activo en paralelo [v18.9.380] """
+    global LAST_LATENCY_UPDATE
     try:
         now = time.time()
-        now_dt = datetime.fromtimestamp(now)
-        acc = mt5.account_info() # v18.8.1: Definición externa proactiva
         
+        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 3 BALAS
         positions = mt5.positions_get() or []
-        # v18.9.175: VIGILANCIA POR SÍMBOLO (No bloquea a los demás)
         pos_list = [p for p in positions if p.symbol == sym]
+        if len(pos_list) >= 3:
+            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} ya tiene {len(pos_list)}/3 balas. Deteniendo octopus.")
+            return None
+            
+        now_dt = datetime.fromtimestamp(now)
+        acc = mt5.account_info()
+        sym_pnl = sum(p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0) for p in pos_list)
         sym_pnl = sum(p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0) for p in pos_list)
 
         if sym_pnl <= MAX_SESSION_LOSS and len(pos_list) > 0:
@@ -2207,43 +2213,78 @@ def process_symbol_task(sym, active, mission_state):
         # v18.9.103: Reducimos a 180s (3m) el refresco forzado para scalping minuto a minuto.
         # v18.9.123: Salto de IA si es señal de Oráculo (Confianza ciega en ballenas)
         # v18.9.250: Permitir IA incluso en misión para confirmar oráculos
-        if conf >= 0.70 and (not use_cache or (time.time() - last_call_ts > 180)):
+        # v18.9.375: PROTOCOLO GIGA-FIRE 2.0 (BYPASS TOTAL)
+        is_oracle_signal = False
+        oracle_sig = "HOLD"
+        
+        # 1. ORÁCULO ORO (XAUUSDm)
+        if sym == "XAUUSDm":
+            try:
+                if os.path.exists("titan_gold_signals.json"):
+                    with open("titan_gold_signals.json", "r") as f:
+                        osig = json.load(f)
+                        if (time.time() - osig.get("timestamp", 0)) < 15: # Vigencia 15s
+                            is_oracle_signal = True
+                            oracle_sig = osig.get("signal", "HOLD")
+                            if oracle_sig != "HOLD":
+                                log(f"🔱 GOD MODE ACTIVADO [ORO]: Ignorando vetos por volumen.")
+                                sig = oracle_sig
+                                conf = 1.0 # Confianza ciega en el Oráculo
+            except: pass
 
+        # 2. ORÁCULO CRYPTO (BTC/ETH/SOL)
+        elif any(c in sym for c in ["BTC", "ETH", "SOL"]):
+            try:
+                if os.path.exists("titan_crypto_signals.json"):
+                    with open("titan_crypto_signals.json", "r") as f:
+                        csigs = json.load(f)
+                        # Símbolo normalizado (solusdt -> SOLUSDm)
+                        s_key = sym.lower().replace("usdm", "usdt")
+                        if s_key in csigs:
+                            csig = csigs[s_key]
+                            if (time.time() - csig.get("timestamp", 0)) < 15:
+                                is_oracle_signal = True
+                                oracle_sig = csig.get("signal", "HOLD")
+                                if oracle_sig != "HOLD":
+                                    log(f"🔱 GOD MODE ACTIVADO [{sym}]: Señal de Oráculo Detectada.")
+                                    sig = oracle_sig
+                                    conf = 1.0
+            except: pass
+
+        # v18.9.375: INTEGRACIÓN GIGA-FIRE 2.0 (Bypass IA)
+        if is_oracle_signal and oracle_sig != "HOLD":
+            ai_reply = "GOD_MODE: ORACLE_FIRE"
+            model_used = "ORACLE"
+            conf = 1.0
+            last_god_log = STATE.get(f"last_god_log_{sym}", 0)
+            if now - last_god_log > 15.0:
+                log(f"🔱 GIGA-FIRE [{sym}]: Oráculo manda. Saltando IA lenta.")
+                STATE[f"last_god_log_{sym}"] = now
+        elif conf >= 0.70 and (not use_cache or (time.time() - last_call_ts > 180)):
+            # Throttling IA: Solo si no hay Oráculo y la confianza base es media-alta
             LAST_OLLAMA_CALL[sym] = time.time()
-            bb_txt = "TOPE" if bb_pos > 0.8 else "SUELO" if bb_pos < 0.2 else "CENTRO"
-            prompt = f"Trader HFT: {sym} en {target_sig}. RSI:{rsi_val:.1f}, BB:{bb_txt}, Momentum:{delta:.2f}. ¿Confirmas entrada? Responde solo SI o NO y breve por qué."
-            
+            prompt = f"Trader 2026: {sym} {sig} | RSI:{rsi_val:.1f} BB:{bb_pos:.2f}. Proceed? (YES/NO)"
             ai_reply, model_used = call_ollama(prompt)
             LAST_OLLAMA_CACHE[sym] = {'rsi': rsi_val, 'bb': bb_pos, 'sig': target_sig, 'res': ai_reply, 'model': model_used}
             with state_lock: STATE["last_ollama_res"] = f"[{model_used}] {ai_reply}"
             
-            # v18.9.240: GOD MODE BYPASS - Umbral Crypto adaptado a SOL ($80k)
-            is_god_mode = oracle_volume >= 80000 
-            
-            if "SI" in ai_reply.upper() or is_god_mode:
-                if is_god_mode: 
-                    last_god_ai = STATE.get(f"last_god_ai_{sym}", 0)
-                    if now - last_god_ai > 45.0: # Throttling extendido
-                        log(f"⚡ GOD MODE ACTIVADO: Ignorando veto IA por volumen masivo (${oracle_volume/1000:.0f}k)")
-                        STATE[f"last_god_ai_{sym}"] = now
-                    conf = 1.0 # Fuerza total
-                
-                last_conf_log = STATE.get(f"last_conf_log_{sym}", 0)
-                if now - last_conf_log > 20.0:
-                    log(f"🧠 OLLAMA CONFIRMA ({model_used}): {ai_reply}")
-                    STATE[f"last_conf_log_{sym}"] = now
+            if "YES" in ai_reply.upper() or "SI" in ai_reply.upper():
+                log(f"🧠 IA CONFIRMA: {ai_reply[:50]}...")
+                conf *= 1.1 # Bono por IA positiva
             else:
-                last_veto_log = STATE.get(f"last_veto_log_{sym}", 0)
-                penalty = 0.95 if is_oracle_signal else 0.8
-                if now - last_veto_log > 30.0:
-                    log(f"🛡️ OLLAMA VETO ({model_used}): {ai_reply}. {'Amortiguado' if is_oracle_signal else 'Aplicado'}.")
-                    STATE[f"last_veto_log_{sym}"] = now
-                conf *= penalty
-            
+                log(f"🛡️ IA VETO: {ai_reply[:50]}...")
+                conf *= 0.5 # Penalización por IA negativa
+        elif use_cache:
+            ai_reply = cache['res']
+            if "YES" not in ai_reply.upper() and "SI" not in ai_reply.upper():
+                conf *= 0.7
+        
+        # Validar confianza final
+        conf = min(1.0, conf)
+        if target_sig != "HOLD" and conf > 0.70:
             last_valid_log = STATE.get(f"last_valid_log_{sym}", 0)
             if now - last_valid_log > 15.0:
-                msg = f"🎯 OPORTUNIDAD VALIDADA IA: {sym} en {target_sig} ({conf*100:.1f}%)"
-                log(f"🚨 {msg}"); send_ntfy(msg)
+                log(f"🚨 OPORTUNIDAD VALIDADA: {sym} {target_sig} ({conf*100:.1f}%)")
                 STATE[f"last_valid_log_{sym}"] = now
         
         elif use_cache:
