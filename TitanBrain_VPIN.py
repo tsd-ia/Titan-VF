@@ -327,7 +327,7 @@ ASSET_CONFIG = {
     "XAUUSDm": {"lot": 0.01, "sl": 2500, "tp": 999999}, # $25 stop individual
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "SOLUSDm": {"lot": 0.01, "tp": 999999, "sl": 50000, "step": 80000, "max_bullets": 3},
-    "ETHUSDm": {"lot": 0.01, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
+    "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
     "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000},
     "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000},
@@ -627,8 +627,8 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     # 1. Definir Balas por Categoría (REDUCIDO POR EMERGENCIA v18.9.360)
     max_bullets = 3
     
-    # 2. Definir Lotaje según Balance (SEGURO TOTAL 0.01)
-    smart_lot = 0.01
+    # 2. Definir Lotaje según Balance (SEGURO TOTAL 0.01 | ETH REQUERIMIENTO ESPECIAL)
+    smart_lot = 0.1 if "ETH" in sym else 0.01
         
     return max_bullets, smart_lot
 
@@ -1105,7 +1105,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.360 | SAFE MODE 0.01 | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.365 | HYPER-TRAIL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2759,16 +2759,16 @@ def metralleta_loop():
                     # 0. MODO KAMIKAZE: TRAILING RELÁMPAGO INTELIGENTE
                     # A medida que sube la ganancia, vamos ajustando el SL de forma escalonada.
                     # Mientras más sube, más agresivo es el cierre detrás del precio.
-                    if profit >= 0.50 and (now_loop - p.time) < 45: 
+                    if profit >= 0.30 and (now_loop - p.time) < 60: 
                         symbol_info = mt5.symbol_info(sym)
                         if symbol_info:
                             dist_sl = 1 / (lot * symbol_info.trade_contract_size)
                             
-                            # Trailing Inteligente Escalonado (Kamikaze Adaptativo)
-                            if profit >= 1.50: locked_p = profit - 0.40   # Si va muy arriba, damos $0.40 de espacio (para dejarlo volar)
-                            elif profit >= 1.00: locked_p = profit - 0.30 # Damos $0.30 de oxígeno
-                            elif profit >= 0.80: locked_p = profit - 0.20 # Damos $0.20 de oxígeno
-                            else: locked_p = profit - 0.15                # Entre $0.50 y $0.80, ajustamos a solo $0.15 de distancia
+                            # Trailing Inteligente Escalonado (Kamikaze Adaptativo - v18.9.365)
+                            if profit >= 1.50: locked_p = profit - 0.40   
+                            elif profit >= 1.00: locked_p = profit - 0.25 
+                            elif profit >= 0.60: locked_p = profit - 0.15 
+                            elif profit >= 0.30: locked_p = profit - 0.10 # Asegurar centavos rápido
                             
                             new_sl_kamikaze = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
