@@ -646,11 +646,11 @@ def perform_ai_health_audit():
         # 2. Criterios de entrada al tribunal de la IA
         trade_life = now - p.time
         
-        # v18.9.530: PURGA POR ESTANCAMIENTO (Anti-ETH "muerto")
-        # Si en 3 minutos no ganamos al menos $0.10, la IA evalúa ejecución inmediata.
-        if trade_life > 180 and p.profit < 0.10:
-             log(f"🧊 ESTANCAMIENTO DETECTADO: {p.symbol} no se mueve. Llamando al verdugo.")
-             close_ticket(p, "ANTI_STAGNATION"); continue
+        # v18.9.610: PURGA POR ESTANCAMIENTO AGRESIVA (Scalping Real)
+        # Si en 5 minutos no hemos llegado a la zona de $1.0, la posición es basura.
+        if trade_life > 300 and p.profit < 1.00:
+             log(f"🧊 LENTITUD DETECTADA: {p.symbol} estancado en ${p.profit:.2f}. Cortando para liberar capital.")
+             close_ticket(p, "SCALPING_PURGE"); continue
 
         if trade_life < 240 and p.profit > -2.0: continue 
         
@@ -1139,7 +1139,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.600 | IMPERIAL PRIORITY | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.610 | REAL SCALPING | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
