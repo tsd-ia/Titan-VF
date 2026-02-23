@@ -727,8 +727,9 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_gold = ("XAU" in sym or "Gold" in sym)
     is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
-    # 1. Definir Balas por Categoría (ESTRICTO v18.9.380)
-    max_bullets = 3
+    # 1. Definir Balas por Categoría (MODO BERSERKER v19.0)
+    # El Comandante pide 6 balas por instrumento.
+    max_bullets = 6 if conf > 0.80 else 4
     
     # 2. Definir Lotaje según Balance
     # ETH/SOL a 0.10 por orden del Comandante. Oro/BTC a 0.01 por seguridad.
@@ -2743,7 +2744,10 @@ def process_symbol_task(sym, active, mission_state):
                         price = tick.ask if target_sig == "BUY" else tick.bid
                         
                         # v18.9.340: ZONA PROHIBIDA DINÁMICA (Distancia entre balas)
-                        dist_min = 0.85 if "XAU" in sym else (25.0 if "BTC" in sym else 0.45) # BTC requiere más espacio, Oro menos
+                        # v19.0: REDUCCIÓN PARA STACKING AGRESIVO
+                        base_dist = 0.55 if "XAU" in sym else (12.0 if "BTC" in sym else 0.25)
+                        dist_min = base_dist / 2 if conf > 0.90 else base_dist
+                        
                         too_close = False
                         for p in pos_list:
                             dist_to_pos = abs(price - p.price_open)
