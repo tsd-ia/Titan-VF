@@ -140,35 +140,70 @@ MAX_BULLETS = 20 # v18.9.260: Límite extendido para GIGA-FIRE Domingo
 MAX_DAILY_LOSS = 0.85 # -85% equidad = Stop loss global (Sobrevivencia = Mínimo $15.0)9
 MAX_SESSION_LOSS = -200.0  # v18.9.510: Aire total para recuperación desde $51
 MIN_EQUITY_TO_TRADE = 10.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $10, bot se congela
-LAST_ENTRY_PRICE = {} # Memoria de precio para evitar apilar en el mismo punto
-LAST_HEARTBEAT = {} 
-LAST_SIGNALS = {} # Memoria para no repetir órdenes (RSI extremo)
-LAST_ENTRY = {}   # Memoria de tiempo para RE-ENTRADAS
-LAST_INSTINTO_LOG = {} # NEW v7.43
-MARKET_CLOSED_UNTIL = {} # Memoria temporal para Mercados Cerrados (Error 10044)
-LAST_PROBS = {}   # Memoria de probabilidades IA para Dashboard
-CONSECUTIVE_LOSSES = {} # {symbol: count}
-COOL_DOWN_UNTIL = {}     # {symbol: timestamp}
-LAST_STABLE_SIG = {}     # {symbol: (signal, first_seen_ts)}
-CONRARY_COUNT = {}      # NEW v7.61 - estabilidad anti-ruido
-LAST_OLLAMA_CALL = {}   # v18.9.95: Throttling Ollama (10m cooldown)
-LAST_OLLAMA_CACHE = {}  # v18.9.101: Cognitive Cache (RSI, BB, Sig -> Res)
+# === v18.9.995: MOTOR DE INICIALIZACIÓN UNIVERSAL (CERO KEY-ERRORS) ===
+def init_memories(s):
+    if s not in LAST_ENTRY_PRICE: LAST_ENTRY_PRICE[s] = 0.0
+    if s not in LAST_HEARTBEAT: LAST_HEARTBEAT[s] = time.time()
+    if s not in LAST_SIGNALS: LAST_SIGNALS[s] = "HOLD"
+    if s not in LAST_ENTRY: LAST_ENTRY[s] = 0
+    if s not in LAST_INSTINTO_LOG: LAST_INSTINTO_LOG[s] = 0
+    if s not in MARKET_CLOSED_UNTIL: MARKET_CLOSED_UNTIL[s] = 0
+    if s not in LAST_PROBS: LAST_PROBS[s] = 0.5
+    if s not in CONSECUTIVE_LOSSES: CONSECUTIVE_LOSSES[s] = 0
+    if s not in COOL_DOWN_UNTIL: COOL_DOWN_UNTIL[s] = 0
+    if s not in LAST_STABLE_SIG: LAST_STABLE_SIG[s] = ("HOLD", 0)
+    if s not in CONRARY_COUNT: CONRARY_COUNT[s] = 0
+    if s not in LAST_OLLAMA_CALL: LAST_OLLAMA_CALL[s] = 0
+    if s not in LAST_OLLAMA_CACHE: LAST_OLLAMA_CACHE[s] = {}
+    if s not in TICK_FREQUENZ: TICK_FREQUENZ[s] = 1.0
+    if s not in LAST_CLOSE_TS: LAST_CLOSE_TS[s] = 0.0
+    if s not in LAST_NOTIF_CONF: LAST_NOTIF_CONF[s] = 0
+    if s not in LAST_NOTIF_TIME: LAST_NOTIF_TIME[s] = 0
+    if s not in LAST_CLOSE_PRICE: LAST_CLOSE_PRICE[s] = 0.0
+    if s not in LAST_CLOSE_DIR: LAST_CLOSE_DIR[s] = ""
+    if s not in LAST_CLOSE_REASON: LAST_CLOSE_REASON[s] = "INIT"
+    if s not in LAST_CLOSE_TYPE_REAL: LAST_CLOSE_TYPE_REAL[s] = ""
+    if s not in SMOOTH_CONF: SMOOTH_CONF[s] = 0.5
+    if s not in LAST_CLOSE_TYPE: LAST_CLOSE_TYPE[s] = ""
+    if s not in LAST_CLOSE_TIME: LAST_CLOSE_TIME[s] = 0
+    if s not in PNL_MEMORIA: PNL_MEMORIA[s] = 0.0
+    if f"price_history_{s}" not in STATE: STATE[f"price_history_{s}"] = []
+
+LAST_ENTRY_PRICE = {}
+LAST_HEARTBEAT = {}
+LAST_SIGNALS = {}
+LAST_ENTRY = {}
+LAST_INSTINTO_LOG = {}
+MARKET_CLOSED_UNTIL = {}
+LAST_PROBS = {}
+CONSECUTIVE_LOSSES = {}
+COOL_DOWN_UNTIL = {}
+LAST_STABLE_SIG = {}
+CONRARY_COUNT = {}
+LAST_OLLAMA_CALL = {}
+LAST_OLLAMA_CACHE = {}
+TICK_FREQUENZ = {}
+LAST_CLOSE_TS = {}
+LAST_NOTIF_CONF = {}
+LAST_NOTIF_TIME = {}
+LAST_CLOSE_PRICE = {}
+LAST_CLOSE_DIR = {}
+LAST_CLOSE_REASON = {}
+LAST_CLOSE_TYPE_REAL = {}
+SMOOTH_CONF = {}
+LAST_CLOSE_TYPE = {}
+LAST_CLOSE_TIME = {}
+PNL_MEMORIA = {}
+
+for sym_init in SYMBOLS: init_memories(sym_init)
+
 OLLAMA_COOLDOWN = 600   # 10 MINUTOS DE SILENCIO (v18.9.980)
-TICK_FREQUENZ = {}      # v18.9.103: Monitor de frecuencia de ticks
-LAST_CLOSE_TS = {}  # Memoria anti-reentrada (v6.4)
-LAST_STABLE_SIG = {} # Memoria de estabilidad (v7.72)
-LAST_NOTIF_CONF = {} # Memoria de alertas v7.15
-LAST_NOTIF_TIME = {} # Memoria de tiempo alertas v7.15
-LAST_CLOSE_PRICE = {} 
-LAST_CLOSE_DIR = {} 
-LAST_CLOSE_REASON = {} # v18.9.106: Para re-entrada inmediata
-LAST_CLOSE_TYPE_REAL = {} # v18.9.106: BUY/SELL real de la posicion cerrada
-GLOBAL_ADVICE = {} # NEW v7.99: Para sincronizar Cerebro y PACMAN
-MIRROR_MODE = False # v18.9.32: BLOQUEADO EN FALSE PERMANENTE (Causa de pérdidas críticas)
+GLOBAL_ADVICE = {} 
+MIRROR_MODE = False 
 
 BURST_DELAY = 0.1          
 PACMAN_DELAY = 1           # Cosecha cada 1s (v7.04 SPEED)
-SMOOTH_CONF = {} # NEW v8.2: Memoria de suavizado de confianza
+SMOOTH_CONF = {s: 0.5 for s in SYMBOLS}
 # v18.9.94: Variables consolidadas arriba
 # MAX_DAILY_LOSS ya definido
 
@@ -180,11 +215,7 @@ MAX_EXPLORATION_SPREAD = 3000 # Ajustado para BTC Fin de Semana
 VANGUARDIA_LOCK = False    
 
 # --- v18.9.78: MEMORIA DE ACCIÓN ---
-LAST_CLOSE_TYPE = {} # {symbol: "BUY"/"SELL"}
-COOLDOWN_AFTER_CLOSE = 15  # v15.30: Reducido para scalping rápido (antes 90s)
-LAST_CLOSE_TIME = {}       # Memoria para el cooldown
-LAST_AI_PURGE_CHECK = 0    # v18.9.368: Auditoría de Salud IA cada 5 min
-PNL_MEMORIA = {}          # v18.9.370: Memoria de evolución para evitar purgar lo que mejora
+# v18.9.990: Variables ya auto-inicializadas arriba
 
 
 # --- CONFIGURACIÓN DE FIREBASE (SENTINEL v7.0) ---
@@ -1144,7 +1175,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.980 | ORO HI-SYNC SYNC | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.995 | ESTABILIDAD TOTAL | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -2744,7 +2775,9 @@ def process_symbol_task(sym, active, mission_state):
             "bb_pos": bb_pos, "m5_trend": m5_trend_label, "h1_trend": h1_trend
         }
     except Exception as e:
-        log(f"💥 Error task {sym}: {e}")
+        log(f"💥 ERROR CRÍTICO TASK {sym}: {e}")
+        import traceback
+        # log(traceback.format_exc()) # Solo para debug profundo
         return None
     finally:
         # v18.9.220: Liberar guarda de tarea al finalizar
