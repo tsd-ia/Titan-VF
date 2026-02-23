@@ -182,6 +182,8 @@ VANGUARDIA_LOCK = False
 LAST_CLOSE_TYPE = {} # {symbol: "BUY"/"SELL"}
 COOLDOWN_AFTER_CLOSE = 15  # v15.30: Reducido para scalping rápido (antes 90s)
 LAST_CLOSE_TIME = {}       # Memoria para el cooldown
+LAST_AI_PURGE_CHECK = 0    # v18.9.368: Auditoría de Salud IA cada 5 min
+
 
 # --- CONFIGURACIÓN DE FIREBASE (SENTINEL v7.0) ---
 FIREBASE_URL = "https://titan-sentinel-default-rtdb.firebaseio.com"
@@ -613,6 +615,47 @@ def init_mt5():
         return False
     for s in SYMBOLS: mt5.symbol_select(s, True)
     return True
+
+# --- v18.9.368: AUDITOR DE SALUD DE CUENTA (EL PURGADOR) ---
+def perform_ai_health_audit():
+    """ Analiza posiciones estancadas y decide purgas preventivas """
+    global LAST_AI_PURGE_CHECK
+    now = time.time()
+    if (now - LAST_AI_PURGE_CHECK) < 300: return # Cada 5 min
+    
+    LAST_AI_PURGE_CHECK = now
+    positions = mt5.positions_get()
+    if not positions: return
+
+    log("🩺 [AUDITOR] Iniciando chequeo de salud de cuenta...")
+    
+    for p in positions:
+        # Solo auditar posiciones con más de 10 minutos de vida o que estén perdiendo > $5
+        trade_life = now - p.time
+        if trade_life < 600 and p.profit > -5.0: continue
+        
+        # Preparar diagnóstico para la IA
+        duration_min = int(trade_life / 60)
+        advice = GLOBAL_ADVICE.get(p.symbol, {})
+        trend_context = f"{advice.get('sig', 'HOLD')} ({advice.get('conf', 0)*100:.0f}%)"
+        
+        prompt = f"""
+        AUDITORÍA DE RIESGO TITAN 2026:
+        Posición: {p.symbol} ({'BUY' if p.type == 0 else 'SELL'})
+        Profit Actual: ${p.profit:.2f}
+        Tiempo Abierta: {duration_min} minutos
+        Contexto Mercado: {trend_context}
+        Instrucción: Si la posición está estancada, va contra la tendencia o no muestra signos de recuperación rápida para llegar a profit, ordena 'PURGA: SI'. 
+        Si crees que puede recuperarse en menos de 5 min, ordena 'PURGA: NO'. 
+        Explica brevemente por qué.
+        """
+        
+        res, model = call_ollama(prompt)
+        if "PURGA: SI" in res.upper():
+            log(f"💀 SENTENCIA IA ({model}): Purga confirmada para #{p.ticket} ({p.symbol}). Razón: {res[:120]}...")
+            close_ticket(p, "AI_HEALTH_PURGE")
+        else:
+            if now % 60 < 2: log(f"🩺 AUDITOR: Posición #{p.ticket} validada para continuar. ({model})")
 
 def get_equity():
     acc = mt5.account_info()
@@ -2704,6 +2747,7 @@ def metralleta_loop():
             with state_lock: STATE["market_speed_val"] = m_speed
 
             # --- GESTOR DE RIESGO HIPER-VELOCIDD (PACMAN) ---
+            perform_ai_health_audit() # v18.9.368: Auditoría Salud IA
             positions = mt5.positions_get()
             current_open_pnl = 0.0 
             
