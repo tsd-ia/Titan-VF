@@ -415,8 +415,8 @@ def get_market_warning():
         elif weekday == 6: 
             return "🛑 MERCADO CERRADO (Abre 20:00 Chile)" if now.hour < 18 else "🌅 SESIÓN ASIÁTICA ABIERTA"
 
-        # 2. Pausa Diaria (19:00 - 20:00 Chile)
-        if now.hour == 19: return "☕ PAUSA DIARIA: Mercado cerrado hasta 20:00"
+        # 2. Pausa Diaria (19:00 - 20:00 Chile) - Solo informativo para Metales/FX
+        if now.hour == 19: return "☕ PAUSA DIARIA (ORO/FX): Mercado Crypto 24/7 sigue ABIERTO"
 
         # 3. Feriados
         for m, d, desc, t, h in MARKET_HOLIDAYS_2026:
@@ -451,8 +451,8 @@ def is_market_closed(symbol):
     if weekday == 5: return True
     # Domingo antes de las 20:00 (Chile)
     if weekday == 6 and now.hour < 20: return True
-    # Pausa Diaria 19:00 - 20:00
-    if now.hour == 19: return True
+    # Pausa Diaria 19:00 - 20:00 (Solo afecta a Oro/Forex)
+    if now.hour == 19 and not any(c in symbol.upper() for c in crypto_patterns): return True
     
     return False
     
