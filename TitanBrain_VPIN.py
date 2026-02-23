@@ -141,6 +141,14 @@ MAX_DAILY_LOSS = 0.85 # -85% equidad = Stop loss global (Sobrevivencia = Mínimo
 MAX_SESSION_LOSS = -200.0  # v18.9.510: Aire total para recuperación desde $51
 MIN_EQUITY_TO_TRADE = 10.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $10, bot se congela
 # === v18.9.995: MOTOR DE INICIALIZACIÓN UNIVERSAL (CERO KEY-ERRORS) ===
+# --- GLOBALES DE CONTROL (Sincronización v18.9.999) ---
+STATE = {
+    "bullets": 0, "pnl": 0.0, "last_fire": 0, "active_pairs": [],
+    "market_warning": "OPEN 🟢", "last_ollama_res": "Ollama Sentinel Active",
+    "price_history": [], "oro_brain_on": True, "btc_brain_on": True,
+    "crypto_brain_on": True, "auto_mode": False, "start_mission": False
+}
+
 def init_memories(s):
     if s not in LAST_ENTRY_PRICE: LAST_ENTRY_PRICE[s] = 0.0
     if s not in LAST_HEARTBEAT: LAST_HEARTBEAT[s] = time.time()
@@ -450,20 +458,7 @@ def is_market_closed(symbol):
 # Extended State for Brain
 # --- GLOBALES DE CONTROL ---
 LAST_MISSION_TIME = 0  # Control de enfriamiento global
-STATE = {
-    "bullets": 0,
-    "pnl": 0.0,
-    "last_fire": 0,
-    "active_pairs": [],
-    "market_warning": "OPEN 🟢",
-    "last_ollama_res": "Ollama Sentinel Active",
-    "price_history": [],
-    "oro_brain_on": True,   
-    "btc_brain_on": True,    
-    "crypto_brain_on": True, # v18.9.150: 3er Cerebro Crypto
-    "auto_mode": False,      
-    "start_mission": False
-}
+# --- ESTADO YA DEFINIDO ARRIBA ---
 
 LOG_BUFFER = deque(maxlen=10)
 MISSION_HISTORY = deque(maxlen=1000) # v15.47: Fix Critical
