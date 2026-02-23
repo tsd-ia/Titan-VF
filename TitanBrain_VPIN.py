@@ -732,8 +732,13 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     max_bullets = 6 if conf > 0.80 else 4
     
     # 2. Definir Lotaje según Balance
-    # ETH/SOL a 0.10 por orden del Comandante. Oro/BTC a 0.01 por seguridad.
-    smart_lot = 0.1 if any(c in sym for c in ["ETH", "SOL"]) else 0.01
+    # ETH a 0.30, SOL a 0.10. Oro/BTC a 0.01 por seguridad.
+    if "ETH" in sym:
+        smart_lot = 0.3
+    elif "SOL" in sym:
+        smart_lot = 0.1
+    else:
+        smart_lot = 0.01
         
     return max_bullets, smart_lot
 
@@ -2707,9 +2712,9 @@ def process_symbol_task(sym, active, mission_state):
                         
                         # v18.9.600: FILTRO DE CALIDAD SUPERIOR (COMANDANTE)
                         if sym == "ETHUSDm":
-                            # 1. Confianza 95% + Señal Oráculo
-                            if conf < 0.95 and not is_oracle_signal:
-                                if now % 15 < 1: log(f"🧘 FILTRO CALIDAD ETH: Confianza {conf:.2f} insuficiente (<0.95).")
+                            # 1. Filtro de Calidad (Bajado a 0.85 para más acción)
+                            if conf < 0.85 and not is_oracle_signal:
+                                if now % 15 < 1: log(f"🧘 FILTRO CALIDAD ETH: Confianza {conf:.2f} insuficiente (<0.85).")
                                 return
                         
                         # 2. Gatillo de Volatilidad Mínima (BTC/ETH)
