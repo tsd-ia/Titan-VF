@@ -915,7 +915,7 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
         final_lot = 0.01
         log(f"🛡️ SPREAD ALTO: Lote 0.01 por seguridad.")
     
-    # FORMATOS BRIDGE (Doble compatibilidad v18.9.420)
+    # v18.9.425: PROTOCOLO BRIDGE FINAL (Doble compatibilidad)
     mode_num = 0 if mode == "BUY" else 1
     # 1. Formato Legacy: type_num|lot|sl|tp|ts
     payload_legacy = f"{mode_num}|{final_lot}|{int(sl_to_use)}|{int(tp_to_use)}|{ts}"
@@ -929,7 +929,7 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
     atomic_write(f_mission, payload_legacy)
     atomic_write(f_command, payload_multi)
         
-    log(f"📡 GATEWAY -> {norm_sym} {mode} @ {final_lot} [SOL_MIN_LOT_FIX]")
+    log(f"📡 GATEWAY -> {symbol} {mode} @ {final_lot} [LINK_OK]")
 
 def cargar_modelo_lstm():
     global modelo_lstm, modelo_lstm_btc
@@ -2654,12 +2654,11 @@ def process_symbol_task(sym, active, mission_state):
                         
                         res = mt5.order_send(request)
                         if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                            log(f"✅ RECUPERACIÓN EXITOSA: {target_sig} (#{res.order})")
+                            log(f"✅ ORDEN EXITOSA ({target_sig}) en {sym} @ {price}")
                             with state_lock: STATE[f"firing_{sym}"] = now
                             LAST_ENTRY[sym] = now
-                            time.sleep(1) # Seguro contra metralleta
                         else:
-                            log(f"⚠️ Fallo API: {res.comment if res else 'Error'}. Usando bridge...")
+                            # v18.9.425: Salto silencioso al bridge para cryptos (Falla API por broker)
                             send_signal(sym, target_sig, force=should_fire)
                         
                         LAST_ENTRY_PRICE[sym] = float(price)
