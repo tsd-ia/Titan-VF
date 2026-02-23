@@ -273,21 +273,24 @@ def firebase_command_poller():
                 cmds = res.json()
                 if cmds:
                     with state_lock:
-                        if "oro_brain_on" in cmds:
-                            val = bool(cmds["oro_brain_on"])
-                            if val != STATE.get("oro_brain_on"):
-                                STATE["oro_brain_on"] = val
-                                log(f"🧠 MANDO WEB: Cerebro ORO {'ACTIVADO' if val else 'DESACTIVADO'}")
-                        if "btc_brain_on" in cmds:
-                            val = bool(cmds["btc_brain_on"])
-                            if val != STATE.get("btc_brain_on"):
-                                STATE["btc_brain_on"] = val
-                                log(f"🧠 MANDO WEB: Cerebro BTC {'ACTIVADO' if val else 'DESACTIVADO'}")
-                        if "crypto_brain_on" in cmds:
-                            val = bool(cmds["crypto_brain_on"])
-                            if val != STATE.get("crypto_brain_on"):
-                                STATE["crypto_brain_on"] = val
-                                log(f"🧠 MANDO WEB: Cerebro CRYPTO {'ACTIVADO' if val else 'DESACTIVADO'}")
+                        # v18.9.270: Sincronización Maestra - Buscar flags tanto en /commands como en /root por consistencia
+                        for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on", "auto_mode"]:
+                            if flag in cmds:
+                                val = bool(cmds[flag])
+                                if val != STATE.get(flag):
+                                    STATE[flag] = val
+                                    log(f"🧠 MANDO WEB (JSON): {flag} -> {'ACTIVADO' if val else 'DESACTIVADO'}")
+            
+            # v18.9.270: Poll directo de flags raíz para evitar desincronización con el Dashboard
+            for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on"]:
+                res_f = requests.get(f"{FIREBASE_URL}/{flag}.json", timeout=3)
+                if res_f.status_code == 200:
+                    val = res_f.json()
+                    if val is not None:
+                        val = bool(val)
+                        if val != STATE.get(flag):
+                            STATE[flag] = val
+                            log(f"📡 SYNC FIREBASE [{flag}]: {'ON' if val else 'OFF'}")
                         if "auto_mode" in cmds:
                             val = bool(cmds["auto_mode"])
                             if val != STATE.get("auto_mode", False):
@@ -988,11 +991,11 @@ def predecir(symbol):
             scaler = joblib.load(SCALER_PATH_TEMPLATE.format("XAUUSDm"))
         
         # 3. Datos y Features
-        df = obtener_datos(symbol, 350)
-        if df.empty or len(df) < LOOKBACK_PERIOD + 10: return "NONE", 0.0, 50, 0.5, 0.0
+        df = obtener_datos(symbol, 200) # v18.9.270: Reducido para mayor agilidad en crypto
+        if df.empty or len(df) < 50: return "NONE", 0.0, 50, 0.5, 0.0 # Umbral mínimo real
         
         df = calculate_features(df)
-        if len(df) < LOOKBACK_PERIOD: return "NONE", 0.0, 50, 0.5, 0.0
+        if len(df) < 30: return "NONE", 0.0, 50, 0.5, 0.0
 
         # 4. Inferencia Protegida
         last_features = df[MASTER_FEATURES].tail(LOOKBACK_PERIOD)
@@ -1000,7 +1003,7 @@ def predecir(symbol):
         X_final = scaled_X.reshape(1, LOOKBACK_PERIOD, 9)
         
         try:
-            preds = modelo_lstm.predict(X_final, verbose=0)
+            preds = modelo.predict(X_final, verbose=0)
             prob = float(preds[0][0])
         except Exception as tf_err:
             # v18.9.91: MODO TECNICO PURO (Fallback para BTC/US30 cuando IA falla)
@@ -1102,7 +1105,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     limit_drop = abs(MAX_SESSION_LOSS)
 
     lines.append("="*75)
-    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.260 | GIGA-FIRE FIX | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN VANGUARDIA v18.9.270 | MASTER SYNC | PORT: {PORT}")
     lines.append("="*75)
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
@@ -1495,12 +1498,14 @@ def process_symbol_task(sym, active, mission_state):
                     bin_sym = sym.replace("USDm", "usdt").lower()
                     if bin_sym in crypto_signals:
                         c_sig = crypto_signals[bin_sym]
-                        if time.time() - c_sig["timestamp"] < 15.0: # Aumento cooldown contra spam
+                        if time.time() - c_sig["timestamp"] < 30.0: # v18.9.270: Tolerancia de 30s para crypto
                             sig_pred = c_sig["signal"]
-                            conf_pred = 0.95
+                            conf_pred = 0.98 # Subir a 98% para consistencia con Gold/BTC
                             is_oracle_signal = True
                             oracle_volume = c_sig.get("volume", 0) # Capturar volumen
                             if now % 10 < 1: log(f"💎 ORÁCULO CRYPTO [{sym}]: {sig_pred} | Vol: ${oracle_volume/1000:.0f}k")
+                        elif now % 30 < 1:
+                            log(f"⏳ ORÁCULO CRYPTO [{sym}] OBSOLETO ({int(time.time() - c_sig['timestamp'])}s).")
 
             # 3. Oráculo Oro (XAUUSDm) - v18.9.160
             if os.path.exists("titan_gold_signals.json") and ("XAU" in sym or "Gold" in sym):
