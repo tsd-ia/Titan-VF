@@ -43,8 +43,9 @@ while True:
             time.sleep(1)
 
             # 2. Resetear la señal en Firebase ANTES de lanzar (Evita bucles)
-            requests.patch(f"{FIREBASE_URL}/commands.json", json={"remote_launch": False})
             print("🎯 SEÑAL RECIBIDA: Iniciando Motores Selectivos...")
+            try: requests.patch(f"{FIREBASE_URL}/commands.json", json={"remote_launch": False}, timeout=5)
+            except: pass
             
             # 3. Verificar cada activo antes de lanzar
             if get_flag("btc_brain_on"):
@@ -67,7 +68,8 @@ while True:
             print("🦅 Lanzando OFICIAL DE PUENTE (Telegram IA)...")
             subprocess.Popen('start "TITAN_MESSENGER" cmd /k "python Titan_Messenger_IA.py"', shell=True)
             
-            print("✅ Despliegue completado. Volviendo a escucha...")
+            print("✅ Despliegue completado. Pausando escucha 15s para estabilizar...")
+            time.sleep(15)
                 
         time.sleep(5)
     except Exception as e:

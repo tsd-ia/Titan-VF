@@ -842,7 +842,7 @@ def close_ticket(pos, reason="UNK"):
         "type": mt5.ORDER_TYPE_SELL if pos.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY,
         "price": price,
         "magic": pos.magic,
-        "comment": f"TITAN-CLOSE: {reason}",
+        "comment": f"TN-{reason}"[:31], # v27.4.7: Fix 31-char limit
         "type_time": mt5.ORDER_TIME_GTC,
         "type_filling": mt5.ORDER_FILLING_IOC,
     }
