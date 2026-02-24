@@ -880,6 +880,9 @@ def update_sl(ticket, new_sl, comment=""):
             "symbol": pos.symbol,
             "sl": float(new_sl),
             "tp": pos.tp, # CRÍTICO: Mantener el TP actual
+            "type_filling": mt5.ORDER_FILLING_IOC, # v18.11.980: FIX ERROR 10011
+            "type_time": mt5.ORDER_TIME_GTC,
+            "expiration": 0,
             "comment": comment
         }
         
