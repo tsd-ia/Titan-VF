@@ -188,7 +188,8 @@ STATE = {
     "market_warning": "OPEN 🟢", "last_ollama_res": "Ollama Sentinel Active",
     "price_history": [], "oro_brain_on": True, "btc_brain_on": True,
     "crypto_brain_on": True, "auto_mode": True, "start_mission": True,
-    "auto_pilot": True
+    "auto_pilot": True,
+    "whale_memory": {"symbol": None, "signal": "HOLD", "power": 0, "timestamp": 0}
 }
 
 def init_memories(s):
@@ -806,6 +807,11 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
             smart_lot = 0.05 # MODO CAUTELOSO (PROTECCIÓN DE $94)
         else:
             smart_lot = 0.02 # MODO BUNKER (SUPERVIVENCIA)
+    elif is_gold:
+        if balance >= 100:
+            smart_lot = 0.02 # MODO VANGUARDIA SOLICITADO
+        else:
+            smart_lot = 0.01 # MODO BUNKER SUPERVIVENCIA
     else:
         smart_lot = 0.01
         
@@ -2457,9 +2463,34 @@ def process_symbol_task(sym, active, mission_state):
                 model_used = "ORACLE_MODE"
                 conf = 1.0
                 last_god_log = STATE.get(f"last_god_log_{sym}", 0)
-                if now - last_god_log > 15.0:
-                    log(f"🔱 GIGA-FIRE [{sym}]: Ballena Real (${oracle_power/1000:.1f}k). Bypass IA.")
-                    STATE[f"last_god_log_{sym}"] = now
+                
+                # v27.8.4: PROTOCOLO DE INERCIA INSTITUCIONAL
+                # Guardar en memoria si es una Giga-Ballena (> $1M)
+                if oracle_power > 1000000:
+                    STATE["whale_memory"] = {
+                        "symbol": sym,
+                        "signal": oracle_sig,
+                        "power": oracle_power,
+                        "timestamp": now
+                    }
+                    log(f"🧠 MEMORIA GIGA-BALLENA: Bloqueando tendencia {oracle_sig} por 5 min.")
+
+                # Verificar si hay una ballena más poderosa gobernando
+                w_mem = STATE.get("whale_memory", {})
+                if w_mem.get("symbol") == sym and (now - w_mem.get("timestamp", 0)) < 300:
+                    if oracle_sig != w_mem["signal"] and oracle_power < (w_mem["power"] * 0.5):
+                        log(f"🛡️ VETO DE INERCIA: Ignorando {oracle_sig} (${oracle_power/1000:.0f}k) porque manda GIGA-{w_mem['signal']} anterior.")
+                        is_oracle_signal = False
+                        oracle_sig = "HOLD"
+                    else:
+                        # Si la nueva ballena es poderosa o va a favor, actualizamos o seguimos
+                        if oracle_sig != "HOLD":
+                            log(f"🔱 GIGA-FIRE [{sym}]: Ballena Real (${oracle_power/1000:.1f}k). Bypass IA.")
+                            STATE[f"last_god_log_{sym}"] = now
+                else:
+                    if now - last_god_log > 15.0:
+                        log(f"🔱 GIGA-FIRE [{sym}]: Ballena Real (${oracle_power/1000:.1f}k). Bypass IA.")
+                        STATE[f"last_god_log_{sym}"] = now
         elif conf >= 0.70 and (not use_cache or (time.time() - last_call_ts > 180)):
             # PROMPT MATEMÁTICO (Anti-Veto de Ollama)
             LAST_OLLAMA_CALL[sym] = time.time()
@@ -3192,8 +3223,8 @@ def metralleta_loop():
                             elif profit >= 3.5: locked_p = 3.10
                             elif profit >= 3.0: locked_p = 2.60
                             elif profit >= 2.5: locked_p = 2.00
-                            elif profit >= 2.0: locked_p = 1.50
-                            elif profit >= 1.30: locked_p = 0.80 # v27.5: Ajuste Comandante
+                            elif profit >= 2.0: locked_p = 1.50 # v27.8.3: Asegurar $1.50 solicitado por Comandante
+                            elif profit >= 1.30: locked_p = 0.85 # v27.8.3: Subido a 0.85 para evitar cierres hormiga
                             else: 
                                 # v27.8.2: Blindaje Anti-Hormiga. 
                                 # Si ya ganamos el umbral mínimo ($0.30), asegurar $0.15 positivos.

@@ -6,9 +6,8 @@
 - **Oráculos:** BTC, Gold (XAUUSD), Crypto (Whales) - **ACTIVOS**
 
 - [x] **Blindaje de Entorno (v27.8.1):** Parche de supervivencia para Python 3.14+.
-- [x] **Especialización Oro (v27.8.2):** Foco 100% en XAUUSDm con lote 0.02 (Balance > $100).
-- [x] **Blindaje Anti-Hormiga:** Fix de Stop Loss dinámico para asegurar +$0.15 mínimos.
-- [x] **Auditoría BTC:** Umbral de Oráculo subido a $350k para filtrar ruido de absorción.
+- [x] **Inercia Institucional (v27.8.4):** Las ballenas Giga (>$1M) ahora "manchan" la tendencia por 5 min. Ballenas pequeñas no pueden borrar movimientos gigantes.
+- [x] **Fix Lote Oro 0.02:** Asegurado el lotaje dinámico para cuentas de $100+.
 
 ## 🛠️ TAREAS EN CURSO / PENDIENTES
 - [ ] **Validación de Lote 0.02:** Monitorear margen en Oro con el nuevo nivel de agresividad.
