@@ -23,21 +23,32 @@ import subprocess # NEW FOR PORT CLEANUP
 # --- UPGRADE: FASTAPI (v7.58 DEEP SCALPER) ---
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-try:
-    from fastapi import FastAPI, Request, BackgroundTasks
-    from fastapi.middleware.cors import CORSMiddleware
-    import uvicorn
-except ImportError:
-    pass # Se instalarán en el siguiente ciclo
+# --- AUTO-INSTALADOR DE DEPENDENCIAS (TITANIUM SHIELD v27.7) ---
+def install_dependencies():
+    deps = ["MetaTrader5", "pandas", "numpy", "tensorflow", "scikit-learn", "psutil", "requests", "fastapi", "uvicorn"]
+    print("📦 VERIFICANDO BLINDAJE DE LIBRERÍAS...")
+    for dep in deps:
+        try:
+            __import__(dep.replace("-", "_"))
+        except ImportError:
+            print(f"🔧 Reponiendo componente: {dep}...")
+            subprocess.check_call([sys.executable, "-m", "pip", "install", dep])
+
+install_dependencies()
 
 try:
     import MetaTrader5 as mt5
     import pandas as pd
     import numpy as np
+    import psutil
     from tensorflow.keras.models import load_model
     from sklearn.preprocessing import MinMaxScaler
+    from fastapi import FastAPI, Request, BackgroundTasks
+    from fastapi.middleware.cors import CORSMiddleware
+    import uvicorn
 except ImportError as e:
-    print(f"❌ ERROR LIBRERÍAS IA: {e}")
+    print(f"❌ ERROR CRÍTICO DE ENTORNO: {e}")
+    sys.exit(1)
 
 # --- FUNCIÓN DE LIMPIEZA DE PUERTO (ANTI-SQUATTER) ---
 def kill_port_process(port):

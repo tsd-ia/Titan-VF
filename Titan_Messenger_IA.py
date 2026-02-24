@@ -20,7 +20,10 @@ try:
         print("⚠️ ADVERTENCIA: No se encontró ffmpeg en la ruta esperada.")
 except ImportError:
     print("📦 Instalando dependencias de Evolución Sensorial...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI SpeechRecognition gTTS pydub static-ffmpeg"])
+    deps = ["pyTelegramBotAPI", "SpeechRecognition", "gTTS", "pydub", "static-ffmpeg", "MetaTrader5", "requests"]
+    for dep in deps:
+        subprocess.check_call([sys.executable, "-m", "pip", "install", dep])
+    
     import telebot
     import speech_recognition as sr
     from gtts import gTTS

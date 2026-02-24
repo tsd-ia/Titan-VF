@@ -1,7 +1,16 @@
+import sys
+import subprocess
 import json
 import time
 import os
-import websocket
+
+try:
+    import websocket
+except ImportError:
+    print("📦 Instalando websocket-client para Oráculo...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "websocket-client"])
+    import websocket
+
 import threading
 
 # --- TITAN ORACLE BINANCE v18.9.106 ---
