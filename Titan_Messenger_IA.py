@@ -12,12 +12,12 @@ try:
     from gtts import gTTS
     from pydub import AudioSegment
     import static_ffmpeg
-    # v27.3: FIX PATH PARA WINDOWS
-    static_ffmpeg.add_paths()
-    # Ruta estándar de instalación de static-ffmpeg en este entorno
     ff_path = os.path.join(os.environ['LOCALAPPDATA'], r"Python\pythoncore-3.14-64\Lib\site-packages\static_ffmpeg\bin\win32\ffmpeg.exe")
     if os.path.exists(ff_path):
         AudioSegment.converter = ff_path
+        print(f"🔊 MOTOR DE AUDIO DETECTADO: {ff_path}")
+    else:
+        print("⚠️ ADVERTENCIA: No se encontró ffmpeg en la ruta esperada.")
 except ImportError:
     print("📦 Instalando dependencias de Evolución Sensorial...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI SpeechRecognition gTTS pydub static-ffmpeg"])

@@ -902,19 +902,23 @@ def close_ticket(pos, reason="UNK"):
         LAST_CLOSE_REASON[pos.symbol] = reason
         LAST_CLOSE_TYPE_REAL[pos.symbol] = "BUY" if pos.type == mt5.POSITION_TYPE_BUY else "SELL"
     else:
-        # v18.9.21: BRIDGE EMERGENCY (v18.9.21)
-        err_msg = res.comment if res else "None (MT5_CRASH)"
+        # v27.4.4: DIAGNÓSTICO PROFUNDO
+        last_err = mt5.last_error()
+        err_msg = res.comment if res else f"None (LastErr: {last_err})"
         log(f"⚠️ Error cerrando #{pos.ticket}: {err_msg}. Usando bridge...")
         
         # v27.4.2: RE-INICIALIZACIÓN DE EMERGENCIA
         if res is None:
             API_FAILURE_COUNT = globals().get('API_FAILURE_COUNT', 0) + 1
             if API_FAILURE_COUNT >= 5:
-                log("🆘 CRÍTICO: API saturada. Re-conectando MT5 en 2 segundos...")
+                log("🆘 CRÍTICO: API saturada. Re-conectando MT5...")
                 mt5.shutdown()
-                time.sleep(2)
-                mt5.initialize()
-                API_FAILURE_COUNT = 0
+                time.sleep(3)
+                if mt5.initialize():
+                    log("✅ RE-CONEXIÓN EXITOSA. Reseteando contador.")
+                    API_FAILURE_COUNT = 0
+                else:
+                    log(f"❌ FALLO RE-INICIALIZACIÓN: {mt5.last_error()}")
             globals()['API_FAILURE_COUNT'] = API_FAILURE_COUNT
                 
         # v18.9.415: Si falla la API (como en SOL), mandamos orden de cierre al bridge
