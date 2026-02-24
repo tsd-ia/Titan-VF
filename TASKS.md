@@ -17,6 +17,8 @@
 - [x] **Fix Error 10016:** Buffer de seguridad en SL para evitar rechazos del broker.
 - [x] **Protocolo Aire Oro:** Bajado suelo de $0.75 a $0.25 para dejar correr beneficios.
 - [x] **Reliquia de Oro:** Copiado `Titan_Oracle_Gold.py` a `oro_ganador.py`.
+- [x] **Protocolo Oxígeno (Defensa):** Drawdown permitido hasta -$10 (Crypto) y -$12 (Oro).
+- [x] **Indulto de Tiempo:** Vida mínima de 20 min antes de auditoría de pánico.
 
 ---
 
