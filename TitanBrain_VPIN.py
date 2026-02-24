@@ -820,7 +820,8 @@ def close_ticket(pos, reason="UNK"):
         if now % 60 < 2: log(f"🛡️ LEY DEL ESCUDO #{pos.ticket}: Abortando cierre a mercado. SL físico está blindado.")
         return None
 
-    is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "PURGE", "WORST"])
+    # v23.5: Permitir cierres en negativo si la razón es autorizada (Agotamiento, Latigazo, IA, HardStop)
+    is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "PURGE", "WORST", "CUT", "EXHAUSTION", "WHIPSAW", "QUICK"])
     
     if not is_safe_close:
         # log(f"🛡️ BLOQUEO DE CIERRE: Se intentó cerrar {pos.symbol} en negativo (${profit:.2f}). ABORTADO.")

@@ -57,6 +57,10 @@ while True:
                 # 4. Lanzar el Cerebro Core siempre si hubo comando
                 print("🧠 Lanzando CORE ENGINE...")
                 subprocess.Popen('start "TITAN_BRAIN" cmd /k "python TitanBrain_VPIN.py"', shell=True)
+
+                # 5. Lanzar el Oficial de Puente (Telegram IA)
+                print("🦅 Lanzando OFICIAL DE PUENTE (Telegram IA)...")
+                subprocess.Popen('start "TITAN_MESSENGER" cmd /k "python Titan_Messenger_IA.py"', shell=True)
                 
                 print("✅ Despliegue completado. Volviendo a escucha...")
                 
