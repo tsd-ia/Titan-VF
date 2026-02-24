@@ -26,8 +26,12 @@ while True:
     try:
         # 1. Escuchar comando maestro (remote_launch) desde la ruta exacta de la web
         res = requests.get(f"{FIREBASE_URL}/commands.json", timeout=10)
-        if res.status_code == 200:
-            cmds = res.json()
+        if res.status_code != 200:
+            time.sleep(5); continue
+        
+        cmds = res.json()
+        if not cmds:
+            time.sleep(5); continue
             # v18.11.970: Manejo ultra-robusto de booleanos (acepta True, 1 o "true")
             launch_val = cmds.get("remote_launch", False)
             if launch_val in [True, 1, "true", "True"]:

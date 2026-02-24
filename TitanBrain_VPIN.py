@@ -198,6 +198,7 @@ LAST_NOTIF_TIME = {}
 LAST_CLOSE_PRICE = {}
 LAST_CLOSE_DIR = {}
 LAST_CLOSE_REASON = {}
+API_FAILURE_COUNT = 0 # v27.4.2: Reinicio automático si la API muere
 LAST_CLOSE_TYPE_REAL = {}
 SMOOTH_CONF = {}
 LAST_CLOSE_TYPE = {}
@@ -857,7 +858,9 @@ def close_ticket(pos, reason="UNK"):
     LAST_LATENCY_UPDATE = time.time() # Marcar frescura
 
     if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-        log(f"✅ CIERRE EXITOSO #{pos.ticket} [{reason}]: Profit {pos.profit:.2f} | {latency_ms:.1f}ms")
+        global API_FAILURE_COUNT
+        API_FAILURE_COUNT = 0 # Reset si hay éxito
+        log(f"✅ CIERRE EXITOSO #{pos.ticket} [{reason}]: Profit {profit:.2f} | {latency_ms:.1f}ms")
         
         # --- NOTIFICACIÓN TELEGRAM (CADA CIERRE) ---
         try:
@@ -899,7 +902,21 @@ def close_ticket(pos, reason="UNK"):
         LAST_CLOSE_REASON[pos.symbol] = reason
         LAST_CLOSE_TYPE_REAL[pos.symbol] = "BUY" if pos.type == mt5.POSITION_TYPE_BUY else "SELL"
     else:
-        log(f"⚠️ Error cerrando #{pos.ticket}: {res.comment if res else 'None'}. Usando bridge...")
+        # v18.9.21: BRIDGE EMERGENCY (v18.9.21)
+        err_msg = res.comment if res else "None (MT5_CRASH)"
+        log(f"⚠️ Error cerrando #{pos.ticket}: {err_msg}. Usando bridge...")
+        
+        # v27.4.2: RE-INICIALIZACIÓN DE EMERGENCIA
+        if res is None:
+            API_FAILURE_COUNT = globals().get('API_FAILURE_COUNT', 0) + 1
+            if API_FAILURE_COUNT >= 5:
+                log("🆘 CRÍTICO: API saturada. Re-conectando MT5 en 2 segundos...")
+                mt5.shutdown()
+                time.sleep(2)
+                mt5.initialize()
+                API_FAILURE_COUNT = 0
+            globals()['API_FAILURE_COUNT'] = API_FAILURE_COUNT
+                
         # v18.9.415: Si falla la API (como en SOL), mandamos orden de cierre al bridge
         send_signal(pos.symbol, "CLOSE", force=True)
     return res
@@ -3196,6 +3213,15 @@ def metralleta_loop():
                             
                         if is_better:
                             update_sl(p.ticket, new_sl, comment)
+
+                # v27.4: ESCUDO DE MARGEN (EMERGENCIA)
+                # Si el margen cae del 100%, matamos la peor posición para salvar la cuenta.
+                if acc_check and has_open_pos and 0.1 < m_level < 100:
+                    worst_pos = min(open_positions, key=lambda x: x.profit)
+                    if worst_pos.profit < -2.0: # Solo si realmente está restando
+                        log(f"🚨 ESCUDO DE MARGEN ACTIVADO ({m_level:.1f}%): Liquidando peor posición #{worst_pos.ticket} ({worst_pos.symbol}) para liberar margen.")
+                        close_ticket(worst_pos, "MARGIN_EMERGENCY_CUT")
+                        continue 
 
                 # C. COSECHA TACTICA (DESHABILITADA v15.25)
                 # El Ratchet Suizo individual maneja cada posición. 
