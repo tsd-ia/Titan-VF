@@ -680,12 +680,21 @@ def perform_ai_health_audit():
         # v18.11.955: PURGA RELAJADA PARA CUENTAS DE $100+ (Comandante Mode)
         # v18.11.903: DEFENSA RELAJADA (Respiro solicitado por Comandante)
         # Subimos de -$3.50 a -$10.00 para permitir que el drawdown respire.
-        if is_stagnation_candidate and trade_life > 1200 and p.profit < -10.00:
-             log(f"🧊 DEFENSA CEDIDA: {p.symbol} agotó sus 20m y -$10. Purga ejecutada.")
+        # v19.0.7: PURGA RELAJADA (AIRE DE BALLENA)
+        # Subimos de -$10.00 a -$25.00 y de 20m a 45m para permitir ráfagas de 0.1.
+        if is_stagnation_candidate and trade_life > 2700 and p.profit < -25.00:
+             log(f"🧊 DEFENSA CEDIDA: {p.symbol} agotó sus 45m y -$25. Purga ejecutada.")
              close_ticket(p, "SCALPING_PURGE"); continue
 
-        # v18.11.903: PULMÓN DE ACERO (1200s de Vida / -$12 de Umbral Pánico)
-        p_pánico = -12.0 if ("XAU" in p.symbol or "Gold" in p.symbol) else -8.0
+        # v19.0.7: PULMÓN DE HIERRO (BTC a -$35 / ORO a -$25)
+        # Incremento masivo solicitado por el Comandante para respetar el volumen.
+        if "BTC" in p.symbol:
+            p_pánico = -35.0
+        elif "XAU" in p.symbol or "Gold" in p.symbol:
+            p_pánico = -25.0
+        else:
+            p_pánico = -15.0 # ETH/SOL/Otros
+
         if trade_life < 1200 and p.profit > p_pánico: continue
         
         # Preparar diagnóstico para la IA
