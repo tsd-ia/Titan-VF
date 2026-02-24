@@ -684,8 +684,15 @@ def perform_ai_health_audit():
              log(f"🧊 DEFENSA CEDIDA: {p.symbol} agotó sus 20m y -$10. Purga ejecutada.")
              close_ticket(p, "SCALPING_PURGE"); continue
 
-        # v18.11.903: PULMÓN DE ACERO (1200s de Vida / -$12 de Umbral Pánico)
-        p_pánico = -12.0 if ("XAU" in p.symbol or "Gold" in p.symbol) else -8.0
+        # v18.11.975: PULMÓN DE HIERRO (Sincronización con Hard Stop Comandante)
+        # BTC a 0.1 lotes necesita aire. Solo juzgamos si baja de -$35.
+        if "BTC" in p.symbol:
+            p_pánico = -35.0
+        elif "XAU" in p.symbol or "Gold" in p.symbol:
+            p_pánico = -15.0 
+        else:
+            p_pánico = -12.0 # ETH/SOL/Otros
+
         if trade_life < 1200 and p.profit > p_pánico: continue
         
         # Preparar diagnóstico para la IA
