@@ -684,15 +684,8 @@ def perform_ai_health_audit():
              log(f"🧊 DEFENSA CEDIDA: {p.symbol} agotó sus 20m y -$10. Purga ejecutada.")
              close_ticket(p, "SCALPING_PURGE"); continue
 
-        # v18.11.975: PULMÓN DE HIERRO (Sincronización con Hard Stop Comandante)
-        # BTC a 0.1 lotes necesita aire. Solo juzgamos si baja de -$35.
-        if "BTC" in p.symbol:
-            p_pánico = -35.0
-        elif "XAU" in p.symbol or "Gold" in p.symbol:
-            p_pánico = -15.0 
-        else:
-            p_pánico = -12.0 # ETH/SOL/Otros
-
+        # v18.11.903: PULMÓN DE ACERO (1200s de Vida / -$12 de Umbral Pánico)
+        p_pánico = -12.0 if ("XAU" in p.symbol or "Gold" in p.symbol) else -8.0
         if trade_life < 1200 and p.profit > p_pánico: continue
         
         # Preparar diagnóstico para la IA
@@ -880,9 +873,6 @@ def update_sl(ticket, new_sl, comment=""):
             "symbol": pos.symbol,
             "sl": float(new_sl),
             "tp": pos.tp, # CRÍTICO: Mantener el TP actual
-            "type_filling": mt5.ORDER_FILLING_IOC, # v18.11.980: FIX ERROR 10011
-            "type_time": mt5.ORDER_TIME_GTC,
-            "expiration": 0,
             "comment": comment
         }
         
@@ -1500,11 +1490,11 @@ def process_symbol_task(sym, active, mission_state):
     try:
         now = time.time()
         
-        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 6 BALAS (v18.11.970)
+        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 3 BALAS
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
-        if len(pos_list) >= 6:
-            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} ya tiene {len(pos_list)}/6 balas. Deteniendo octopus.")
+        if len(pos_list) >= 3:
+            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} ya tiene {len(pos_list)}/3 balas. Deteniendo octopus.")
             return None
             
         now_dt = datetime.fromtimestamp(now)
@@ -2317,13 +2307,13 @@ def process_symbol_task(sym, active, mission_state):
                 try: 
                     with open("titan_gold_signals.json", "r") as f:
                         osig_data = json.load(f)
-                        oracle_power = float(osig_data.get("volume", 0))
+                        oracle_power = osig_data.get("volume", 0)
                 except: pass
             elif sym == "BTCUSDm" and os.path.exists("titan_oracle_signal.json"):
                 try:
                     with open("titan_oracle_signal.json", "r") as f:
                         osig_data = json.load(f)
-                        oracle_power = float(osig_data.get("volume", 0))
+                        oracle_power = 220000 # El oráculo de BTC solo escribe si superó WHALE_VOLUME_USD
                 except: pass
             
             # v18.11.910: Si es ballena pequeña (<$80k), NO bypass parcial. Requiere IA Confirmación.
@@ -3032,18 +3022,9 @@ def metralleta_loop():
                             elif profit >= 5.0: locked_p = 4.50
                             elif profit >= 4.0: locked_p = 3.50
                             elif profit >= 2.00: locked_p = 1.20
-                            elif profit >= 1.50: locked_p = 0.80
-                            elif profit >= 1.00: 
-                                if "XAU" in sym or "Gold" in sym:
-                                    locked_p = 0.20 # v18.11.902: PULMÓN DE BALLENA (Suelo inicial muy bajo para dejar correr)
-                                else:
-                                    locked_p = 0.50
-                            elif profit >= 0.50: 
-                                if "XAU" in sym or "Gold" in sym: continue # v18.11.902: Oro NO bloquea nada por debajo de $1.00
-                                locked_p = 0.10
+                            elif profit >= 1.50: locked_p = 0.50 # v18.11.995: Mínimo para absorber spread
                             else: 
-                                if "XAU" in sym or "Gold" in sym: continue
-                                locked_p = profit - 0.20
+                                locked_p = 0.0 # NADA DE CIERRES DE CENTAVOS
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
