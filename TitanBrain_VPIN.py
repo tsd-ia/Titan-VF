@@ -421,7 +421,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.02, "sl": 300, "tp": 2000, "max_bullets": 4},
+    "XAUUSDm": {"lot": 0.01, "sl": 300, "tp": 2000, "max_bullets": 8},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -817,8 +817,9 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
         else:
             smart_lot = 0.01 # v27.8.7: Reducido a 0.01 solicitado
     elif is_gold:
-        # v27.8.7: Oro siempre a 0.02 (Vanguardia) incluso con balance bajo
-        smart_lot = 0.02 
+        # v28.2: Lote 0.01 obligatorio por bajo apalancamiento (1:200) y balance < $100.
+        # Esto permite al menos 2 balas simultáneas.
+        smart_lot = 0.01 
     else:
         smart_lot = 0.01
         
