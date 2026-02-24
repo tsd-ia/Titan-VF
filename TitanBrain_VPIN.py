@@ -23,29 +23,59 @@ import subprocess # NEW FOR PORT CLEANUP
 # --- UPGRADE: FASTAPI (v7.58 DEEP SCALPER) ---
 import urllib3
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-# --- AUTO-INSTALADOR DE DEPENDENCIAS (TITANIUM SHIELD v27.7) ---
+# --- AUTO-INSTALADOR DE DEPENDENCIAS (TITANIUM SHIELD v27.8.1) ---
 def install_dependencies():
-    deps = ["MetaTrader5", "pandas", "numpy", "tensorflow", "scikit-learn", "psutil", "requests", "fastapi", "uvicorn"]
+    # v27.8.1: 'joblib' y 'ta' son CRÍTICOS para el modo técnico
+    core_deps = [
+        "MetaTrader5", "pandas", "numpy", "psutil", "requests", 
+        "fastapi", "uvicorn", "pytz", "tabulate", "joblib", "ta"
+    ]
+    optional_deps = ["tensorflow", "scikit-learn"]
+    
     print("📦 VERIFICANDO BLINDAJE DE LIBRERÍAS...")
-    for dep in deps:
+    for dep in core_deps:
         try:
             __import__(dep.replace("-", "_"))
         except ImportError:
-            print(f"🔧 Reponiendo componente: {dep}...")
-            subprocess.check_call([sys.executable, "-m", "pip", "install", dep])
+            print(f"🔧 Reponiendo componente core: {dep}...")
+            try:
+                subprocess.check_call([sys.executable, "-m", "pip", "install", dep])
+            except:
+                print(f"⚠️ Error instalando {dep}. El sistema podría ser inestable.")
+            
+    for dep in optional_deps:
+        try:
+            __import__(dep.replace("-", "_"))
+        except ImportError:
+            print(f"💡 Info: Componente inteligente {dep} no disponible para este Python. Usando modo Lite.")
 
 install_dependencies()
+
+# --- CARGA SEGURA DE MÓDULOS ---
+IA_LOCAL_ENABLED = False
+modelo_lstm = None
+modelo_lstm_btc = None
+scaler_lstm = None
 
 try:
     import MetaTrader5 as mt5
     import pandas as pd
     import numpy as np
     import psutil
-    from tensorflow.keras.models import load_model
-    from sklearn.preprocessing import MinMaxScaler
+    import joblib
+    import ta
     from fastapi import FastAPI, Request, BackgroundTasks
     from fastapi.middleware.cors import CORSMiddleware
     import uvicorn
+    
+    # Intento de carga de IA pesada
+    try:
+        from tensorflow.keras.models import load_model
+        from sklearn.preprocessing import MinMaxScaler
+        IA_LOCAL_ENABLED = True
+    except ImportError:
+        print("⚠️ MODO LITE: IA Local (.h5) desactivada por falta de librerías compatibles.")
+        
 except ImportError as e:
     print(f"❌ ERROR CRÍTICO DE ENTORNO: {e}")
     sys.exit(1)
@@ -1094,8 +1124,7 @@ def obtener_datos(symbol, num_ticks):
     # Retornamos todo (O/H/L/C) para ATR
     return df
 
-import joblib
-import ta
+# --- v11.3: TA Y JOBLIB YA CARGADOS AL INICIO ---
 
 SCALER_PATH_TEMPLATE = os.path.join(MQL5_FILES_PATH, 'scaler_{}.pkl')
 
@@ -1142,7 +1171,13 @@ def predecir(symbol):
     
     # Seleccionar modelo por activo
     modelo = modelo_lstm_btc if "BTC" in symbol else modelo_lstm
-    if modelo is None: return "NONE", 0.0, 50, 0.5, 0.0
+    if modelo is None:
+        # v27.8: Si no hay IA local, saltar directo al análisis técnico
+        df_tech = obtener_datos(symbol, 150)
+        if not df_tech.empty:
+            df_tech = calculate_features(df_tech)
+            return _technical_fallback(symbol, df_tech)
+        return "NONE", 0.0, 50, 0.5, 0.0
     
     try:
         # 1. Cargar Scaler

@@ -5,20 +5,14 @@
 - **Modo:** Bunker (1 Bala Máx / 0.01 Oro / 0.10 Eth)
 - **Oráculos:** BTC, Gold (XAUUSD), Crypto (Whales) - **ACTIVOS**
 
-## ✅ COMPLETADO ESTA SESIÓN
-- [x] **Evolución Sensorial (v27.1):** Integración de Audio (Escucha y Habla) en Telegram.
-- [x] **Reparación de Oídos (v27.3):** Fix de rutas FFMPEG en Windows.
-- [x] **Escudo de Margen (v27.4):** Cierre automático de peor posición si el margen cae del 100%.
-- [x] **Auto-Reset de API (v27.4.2):** Re-conexión automática si MT5 devuelve errores fatales.
-- [x] **Sincronización de Escalera:** Ajuste de Trail a $1.30 -> $0.80 (Comandante).
-- [x] **Protocolo Inmediato (v27.5):** ETH liberado del delay de 1s para gatillo rápido.
-- [x] **Suelo de Hierro (v27.5):** Prohibición de cierres técnicos en negativo (+$0.10 min).
-- [x] **Bozal de Élite (v27.6):** Silenciado spam de IA y desconexiones de Binance (1008).
+- [x] **Blindaje de Entorno (v27.8.1):** Parche de supervivencia para Python 3.14+. TensorFlow es opcional.
+- [x] **Modo Lite Inteligente:** El bot conmuta automáticamente a señales técnicas si los modelos .h5 no cargan.
+- [x] **Reparación de Oráculo/Messenger:** Corregidos errores de importación y sintaxis en instaladores.
 
 ## 🛠️ TAREAS EN CURSO / PENDIENTES
+- [ ] **Sincronización Messenger:** Verificar comandos de voz/texto para cierre remoto.
+- [ ] **Auditoría de Latigazo:** Validar efectividad del Veto de Latigazo en ráfagas de BTC.
 - [ ] **Auditoría de Latencia:** El puente muestra >250ms. Investigar saturación de red.
-- [ ] **Mantenimiento Local de Pesos:** Re-calibrar IA para evitar "hold" excesivo en BTC.
-- [ ] **Limpieza de Oráculo Crypto:** Consolidar señales para evitar ruido de ballenas pequeñas.
 
 ---
 *Documento actualizado en tiempo real por Antigravity (IA de Navegación).*
