@@ -72,6 +72,6 @@ while True:
             time.sleep(5)
                 
         time.sleep(2)
-    except Exception as e:
-        print(f"⚠️ Error Runner: {e}")
+    except Exception:
+        # v2.5: Silencio Total ante caídas de Firebase/Red (Evita spam SSLError)
         time.sleep(10)
