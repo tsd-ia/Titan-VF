@@ -426,8 +426,8 @@ ASSET_CONFIG = {
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
     "ETHUSDm": {"lot": 0.1, "tp": 999999, "sl": 35000, "step": 50000, "max_bullets": 3},
-    "GBPUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000, "max_bullets": 3},
-    "EURUSDm": {"lot": 0.02, "sl": 1250, "tp": 1000, "max_bullets": 3},
+    "GBPUSDm": {"lot": 0.01, "sl": 1250, "tp": 1000, "max_bullets": 3},
+    "EURUSDm": {"lot": 0.01, "sl": 1250, "tp": 1000, "max_bullets": 3},
     "US30m": {"lot": 0.02, "sl": 12500, "tp": 10000, "max_bullets": 3},
     "NAS100m": {"lot": 0.02, "sl": 12500, "tp": 10000, "max_bullets": 3}
 }
@@ -811,16 +811,14 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
         else: smart_lot = 0.05 # MODO BUNKER PARA $73
     elif "BTC" in sym or "SOL" in sym:
         if balance >= 110:
-            smart_lot = 0.1  # MODO BERSERKER (FUEGO TOTAL)
+            smart_lot = 0.1
         elif balance >= 90:
-            smart_lot = 0.05 # MODO CAUTELOSO (PROTECCIÓN DE $94)
+            smart_lot = 0.05
         else:
-            smart_lot = 0.02 # MODO BUNKER (SUPERVIVENCIA)
+            smart_lot = 0.01 # v27.8.7: Reducido a 0.01 solicitado
     elif is_gold:
-        if balance >= 100:
-            smart_lot = 0.02 # MODO VANGUARDIA SOLICITADO
-        else:
-            smart_lot = 0.01 # MODO BUNKER SUPERVIVENCIA
+        # v27.8.7: Oro siempre a 0.02 (Vanguardia) incluso con balance bajo
+        smart_lot = 0.02 
     else:
         smart_lot = 0.01
         
@@ -2994,7 +2992,7 @@ def process_symbol_task(sym, active, mission_state):
 
         return {
             "symbol": sym, "signal": target_sig if target_sig != "HOLD" else LAST_SIGNALS.get(sym, "WAIT"),
-            "confidence": conf, "ai": raw_prob, "rsi": rsi_val, "lot": ASSET_CONFIG[sym]["lot"],
+            "confidence": conf, "ai": raw_prob, "rsi": rsi_val, "lot": smart_lot,
             "state": "🚀" if should_fire else "💤", "profit": sym_pnl,
             "bb_pos": bb_pos, "m5_trend": m5_trend_label, "h1_trend": h1_trend
         }
