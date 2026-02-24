@@ -259,7 +259,7 @@ executor_orders = ThreadPoolExecutor(max_workers=5)
 LAST_TICKET_UPDATE = {} # {ticket: timestamp}
 
 LAST_AI_PURGE_CHECK = 0    # v18.9.368: Auditoría de Salud IA cada 5 min
-COOLDOWN_AFTER_CLOSE = 15  # v15.30: Reducido para scalping rápido
+COOLDOWN_AFTER_CLOSE = 5  # v28.0: Reducido de 15s a 5s para Metralleta.
 OLLAMA_COOLDOWN = 600   # 10 MINUTOS DE SILENCIO (v18.9.980)
 GLOBAL_ADVICE = {} 
 MIRROR_MODE = False 
@@ -831,8 +831,11 @@ def get_bunker_sl_price(sym, lot, side, price):
         s_info = mt5.symbol_info(sym)
         if not s_info: return 0.0
         
-        # REGLA MAESTRA: $25 USD de pérdida permitida
+        # REGLA MAESTRA: Riesgo calibrado por balance
+        # v28.0: Si el balance es bajo, no podemos arriesgar $25 por bala.
         target_loss = 25.0
+        if mt5.account_info().balance < 100:
+            target_loss = 5.0 # RIESGO SCALPER: $5 USD por bala.
         
         # Formula: PriceDelta = Loss / (Lot * ContractSize)
         cs = s_info.trade_contract_size
@@ -2944,10 +2947,11 @@ def process_symbol_task(sym, active, mission_state):
                         if not tick: return
                         price = tick.ask if target_sig == "BUY" else tick.bid
                         
-                        # v18.9.340: ZONA PROHIBIDA DINÁMICA (Distancia entre balas)
-                        # v19.0: REDUCCIÓN PARA STACKING AGRESIVO
-                        base_dist = 0.55 if "XAU" in sym else (12.0 if "BTC" in sym else 0.25)
-                        dist_min = base_dist / 2 if conf > 0.90 else base_dist
+                        # v28.0: MODO METRALLETA (FUEGO TOTAL)
+                        # Reducido de 0.55 a 0.10 para permitir stacking masivo
+                        base_dist = 0.10 if "XAU" in sym else (8.0 if "BTC" in sym else 0.15)
+                        # Stacking agresivo: Si hay confianza > 85%, permitimos entrar casi pegado
+                        dist_min = base_dist / 3 if conf > 0.85 else base_dist
                         
                         too_close = False
                         for p in pos_list:
