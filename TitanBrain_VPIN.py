@@ -2317,13 +2317,13 @@ def process_symbol_task(sym, active, mission_state):
                 try: 
                     with open("titan_gold_signals.json", "r") as f:
                         osig_data = json.load(f)
-                        oracle_power = osig_data.get("volume", 0)
+                        oracle_power = float(osig_data.get("volume", 0))
                 except: pass
             elif sym == "BTCUSDm" and os.path.exists("titan_oracle_signal.json"):
                 try:
                     with open("titan_oracle_signal.json", "r") as f:
                         osig_data = json.load(f)
-                        oracle_power = 220000 # El oráculo de BTC solo escribe si superó WHALE_VOLUME_USD
+                        oracle_power = float(osig_data.get("volume", 0))
                 except: pass
             
             # v18.11.910: Si es ballena pequeña (<$80k), NO bypass parcial. Requiere IA Confirmación.
