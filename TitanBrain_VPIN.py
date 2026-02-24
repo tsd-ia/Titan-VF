@@ -1020,21 +1020,6 @@ def close_ticket(pos, reason="UNK"):
 
 def update_sl(ticket, new_sl, comment=""):
     """ v27.8.6: Wrapper Asíncrono para no bloquear el cerebro """
-    # v28.8: Si el comentario indica protección de profit, avisar al Comandante
-    if "TRL-SAFE" in comment:
-        try:
-            p = mt5.positions_get(ticket=ticket)
-            if p:
-                sym = p[0].symbol
-                # Solo avisar si el profit es significativo (> $1.0) para no spamear
-                import re
-                profit_match = re.search(r'\(\$(.*?)\)', comment)
-                if profit_match:
-                    val = float(profit_match.group(1))
-                    if val >= 1.0:
-                        send_telegram(f"🛡️ *{sym} PROTEGIDO* \nProfit Asegurado: `${val:.2f}`\nTicket: `#{ticket}`")
-        except: pass
-
     # v27.8.6: Throttling por ticket (3s) para no saturar al broker
     now = time.time()
     if ticket in LAST_TICKET_UPDATE and (now - LAST_TICKET_UPDATE[ticket]) < 3.0:
