@@ -823,8 +823,16 @@ def close_ticket(pos, reason="UNK"):
         if now % 60 < 2: log(f"🛡️ LEY DEL ESCUDO #{pos.ticket}: Abortando cierre a mercado. SL físico está blindado.")
         return None
 
+    # v27.5: SUELO DE HIERRO (Solicitud Comandante: Prohibido cerrar en negativo por razones técnicas)
+    # Solo permitimos pérdidas si es pánico real, corte por agotamiento profundo o cierre de mercado.
+    # El paracaídas de ganancias y la IA NO pueden cerrar si no hay al menos +$0.10 asegurado.
+    tech_reasons = ["PARACHUTE", "WHIPSAW", "PURGE", "VETO", "TRAILING"]
+    if any(x in reason.upper() for x in tech_reasons) and profit < 0.10:
+        if now % 60 < 2: log(f"🛡️ SUELO DE HIERRO #{pos.ticket}: Abortando cierre {reason}. Blindando centavos (${profit:.2f})")
+        return None
+
     # v23.5: Permitir cierres en negativo si la razón es autorizada (Agotamiento, Latigazo, IA, HardStop)
-    is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "PURGE", "WORST", "CUT", "EXHAUSTION", "WHIPSAW", "QUICK"])
+    is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "WORST", "CUT", "EXHAUSTION", "QUICK", "MARGIN"])
     
     if not is_safe_close:
         # log(f"🛡️ BLOQUEO DE CIERRE: Se intentó cerrar {pos.symbol} en negativo (${profit:.2f}). ABORTADO.")
@@ -1964,15 +1972,10 @@ def process_symbol_task(sym, active, mission_state):
                     # Log movido al final para consistencia v8.7.1
                     LAST_INSTINTO_LOG[sym] = sig
                 
-                # === ESTABILIDAD TITANIUM v15.6 ===
-                wait_time = 1.0 # 1 Segundo de calma mínima
-                st_sig, st_ts = LAST_STABLE_SIG.get(sym, ("NONE", 0))
-                if sig == st_sig:
-                    if (now - st_ts) < wait_time: 
-                        sig = "HOLD" 
-                else:
-                    LAST_STABLE_SIG[sym] = (sig, now)
-                    sig = "HOLD" 
+                # === ESTABILIDAD TITANIUM (LIBERADA v27.5) ===
+                # wait_time = 1.0 # 1 Segundo de calma mínima ELIMINADO para ETH
+                LAST_STABLE_SIG[sym] = (sig, now)
+                # sig = "HOLD" # ELIMINADO: Disparo instantáneo
             else:
                 # IA OVERRIDE: Señal pasa directamente, sin filtros.
                 LAST_STABLE_SIG[sym] = (sig, now)
@@ -2326,7 +2329,7 @@ def process_symbol_task(sym, active, mission_state):
                 if os.path.exists("titan_gold_signals.json"):
                     with open("titan_gold_signals.json", "r") as f:
                         osig = json.load(f)
-                        if (time.time() - osig.get("timestamp", 0)) < 15: # Vigencia 15s
+                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
                             is_oracle_signal = True
                             oracle_sig = osig.get("signal", "HOLD")
                             if oracle_sig != "HOLD":
@@ -2344,7 +2347,7 @@ def process_symbol_task(sym, active, mission_state):
                         s_key = sym.lower().replace("usdm", "usdt")
                         if s_key in csigs:
                             csig = csigs[s_key]
-                            if (time.time() - csig.get("timestamp", 0)) < 15:
+                            if (time.time() - csig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
                                 is_oracle_signal = True
                                 oracle_sig = csig.get("signal", "HOLD")
                                 if oracle_sig != "HOLD":
@@ -2359,7 +2362,7 @@ def process_symbol_task(sym, active, mission_state):
                 if os.path.exists("titan_oracle_signal.json"):
                     with open("titan_oracle_signal.json", "r") as f:
                         osig = json.load(f)
-                        if (time.time() - osig.get("timestamp", 0)) < 15:
+                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
                             is_oracle_signal = True
                             oracle_sig = osig.get("signal", "HOLD")
                             if oracle_sig != "HOLD":
