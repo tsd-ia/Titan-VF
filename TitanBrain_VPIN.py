@@ -760,10 +760,13 @@ def get_bunker_sl_price(sym, lot, side, price):
         # Delta es el cambio en el precio que produce la pérdida deseada
         delta = target_loss / (lot * cs)
         
+        # v18.11.996: BUFFER ANTI-RECHAZO (Evitar Error 10016)
+        # Añadimos aire (200 puntos) para que el SL no esté pegado al precio por spread.
+        buffer_pts = 200 * s_info.point
         if side == mt5.ORDER_TYPE_BUY or side == "BUY":
-            sl_final = price - delta
+            sl_final = (price - delta) - buffer_pts
         else:
-            sl_final = price + delta
+            sl_final = (price + delta) + buffer_pts
             
         return round(sl_final, s_info.digits)
     except Exception as e:
@@ -1567,7 +1570,10 @@ def process_symbol_task(sym, active, mission_state):
         except: pass
 
         if is_oracle_signal:
-            log(f"🔱 FAST-PATH [{sym}]: Gatillo Instantáneo (${oracle_volume/1000:.1f}k)")
+            last_fp_log = STATE.get(f"last_fp_log_{sym}", 0)
+            if now - last_fp_log > 10.0:
+                log(f"🔱 FAST-PATH [{sym}]: Gatillo Instantáneo (${oracle_volume/1000:.1f}k)")
+                STATE[f"last_fp_log_{sym}"] = now
             rsi_val = 50.0; raw_prob = 1.0; adx_val = 25.0 # Bypass de cálculos
         else:
             # Solo si no hay oráculo, seguimos con la parsimonia técnica
@@ -1586,11 +1592,12 @@ def process_symbol_task(sym, active, mission_state):
         # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
         balance = acc.balance if acc else 0
         current_max_bullets, smart_lot = get_adaptive_risk_params(balance, conf, rsi_val, sym)
-        # v18.9.215: CERROJO ATÓMICO PREVENTIVO (Anti-Metralleta Reforzado)
-        # Si ya se disparó una bala en los últimos 3s, bloqueamos cualquier otro hilo del mismo símbolo
+        # v18.11.995: RÁFAGA HFT HABILITADA (Comandante Mode)
+        # Bajamos de 3s a 0.2s para permitir entradas tipo 'metralleta' en ballenas.
         last_fire_ts = STATE.get(f"firing_{sym}", 0)
-        if (now - last_fire_ts) < 3.0: 
-            return None # Silencio total si hay una bala en trámite
+        if (now - last_fire_ts) < 0.2: 
+            return None 
+
 
         # TP Dinámico v11.2: SIN TP FIJO - El trailing stop del EA maneja la salida
         # INCIDENTE: TP de 2000 pts ($6) cerraba trades que podían dar $10+
