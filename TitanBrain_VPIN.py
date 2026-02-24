@@ -2379,7 +2379,7 @@ def process_symbol_task(sym, active, mission_state):
         # v18.9.138: (BORRADO) Prohibición de Hedge removida a petición del Jefe.
         pass
 
-        is_hard_blocked = "MARGEN" in block_reason or "MAX BALAS" in block_reason or "SPREAD BALLENA" in block_reason or "SPREAD PROHIBITIVO" in block_reason or "ANTI-WHIPSAW" in block_reason
+        is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE"])
         
         if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
@@ -2851,32 +2851,29 @@ def process_symbol_task(sym, active, mission_state):
         bloqueo_entrada = False
 
         if hora_chile == 18:
-            if minuto_chile >= 45: mercado_cerrado = True # Hard Close
-            elif minuto_chile >= 40: bloqueo_entrada = True # Soft Close (solo 5 min antes)
+            if minuto_chile >= 45: mercado_cerrado = True # Hard Close: 18:45
+            elif minuto_chile >= 30: bloqueo_entrada = True # Soft Close: 18:30
         elif hora_chile == 19:
             mercado_cerrado = True
         elif hora_chile == 20 and minuto_chile < 5:
             mercado_cerrado = True
         
         if "XAU" in sym:
-            if mercado_cerrado:
-                if len(pos_list) > 0:
-                    log(f"🔒 CIERRE MERCADO (HARD): Cerrando {sym} antes del gap! (18:45)")
-                    for p in pos_list:
-                         close_ticket(p, "MERCADO_CERRADO")
-                    # v18.9.29: Detener misión para evitar reaperturas indeseadas
-                    log(f"🏁 MISIÓN FINALIZADA POR HORARIO. Retirada estratégica.")
-                    stop_mission()
-                    should_fire = False 
+                if mercado_cerrado:
                     block_action = True
-                if is_market_closed(sym):
-                    # v18.9.245: NO detener la misión completa por un cierre diario de un símbolo.
+                    block_reason = "MERCADO CERRADO (18:45)"
+                    if len(pos_list) > 0:
+                        log(f"🔒 CIERRE MERCADO (HARD): Cerrando {sym} antes del gap! (18:45)")
+                        for p in pos_list:
+                             close_ticket(p, "MERCADO_CERRADO")
+                        log(f"🏁 MISIÓN FINALIZADA POR HORARIO. Retirada estratégica.")
+                        stop_mission()
+                elif is_market_closed(sym):
                     block_action = True
                     block_reason = "CIERRE DIARIO (19:00 - 20:00)"
                 elif bloqueo_entrada:
-                    if len(pos_list) == 0:
-                        block_action = True
-                        block_reason = "RESTRICCIÓN PRE-CIERRE (18:30)"
+                    block_action = True
+                    block_reason = "RESTRICCIÓN PRE-CIERRE (18:30)"
 
         # --- BOTÓN DE PÁNICO (Última defensa - SUBIDO A $150) ---
         if sym_pnl <= -150.0 and len(pos_list) > 0:
