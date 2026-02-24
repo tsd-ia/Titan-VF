@@ -403,9 +403,22 @@ def firebase_command_poller():
                 if "panic" in cmds and cmds["panic"]:
                     log("🚨 MANDO WEB: ¡BOTÓN DE PÁNICO ACTIVADO!")
                     stop_mission()
+                    # v28.3: Cierre forzado de TODO
+                    for p in (mt5.positions_get() or []): close_ticket(p, "PANIC_WEB")
                     requests.patch(url, json={"panic": False})
             
-            time.sleep(1) # v18.11.950: Respuesta Instantánea (1s)
+            # v28.3: Sincronización proactiva de Cierre (Brain OFF = Close Pos)
+            for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on"]:
+                val = STATE.get(flag)
+                if val is False: # Cerebro apagado explícitamente
+                    sym_prefix = "XAU" if "oro" in flag else ("BTC" if "btc" in flag else None)
+                    if sym_prefix:
+                        for p in (mt5.positions_get() or []):
+                            if sym_prefix in p.symbol:
+                                log(f"🛑 CEREBRO {flag} OFF: Cerrando {p.symbol} por seguridad.")
+                                close_ticket(p, "BRAIN_OFF")
+
+            time.sleep(1) 
         except:
             time.sleep(2)
 
@@ -1630,11 +1643,12 @@ def process_symbol_task(sym, active, mission_state):
     try:
         now = time.time()
         
-        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 8 BALAS (MODO BERSERKER v28.1)
+        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 4 BALAS (MODO BERSERKER v28.3)
+        # Reducido de 8 a 4 para proteger cuentas de $50 de pérdidas en ráfaga.
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
-        if len(pos_list) >= 8:
-            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} cargador lleno ({len(pos_list)}/8).")
+        if len(pos_list) >= 4:
+            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} cargador lleno ({len(pos_list)}/4).")
             return None
             
         now_dt = datetime.fromtimestamp(now)
@@ -1999,12 +2013,13 @@ def process_symbol_task(sym, active, mission_state):
 
             if votos_buy > votos_sell:
                 # Veto BUY: Si estamos debajo de la EMA y la vela aún es roja
-                if precio_bajo_ema and ultima_vela_roja and m5_trend_dir == "SELL":
-                    block_council = True; block_council_reason = "VETO: Caída libre (M1 roja + EMA bajo)"
+                # v28.3: Si la confianza es brutal (>80%), ignoramos el veto del consejo
+                if precio_bajo_ema and ultima_vela_roja and m5_trend_dir == "SELL" and conf < 0.80:
+                    block_council = True; block_council_reason = "VETO: Caída libre (Council)"
             elif votos_sell > votos_buy:
                 # Veto SELL: Si estamos sobre la EMA y la vela aún es verde
-                if precio_sobre_ema and ultima_vela_verde and m5_trend_dir == "BUY":
-                    block_council = True; block_council_reason = "VETO: Subida vertical (M1 verde + EMA alto)"
+                if precio_sobre_ema and ultima_vela_verde and m5_trend_dir == "BUY" and conf < 0.80:
+                    block_council = True; block_council_reason = "VETO: Subida vertical (Council)"
 
                 # M5 Trend Penalty (v7.92) - Softened for Scalping
                 if sig == "BUY" and m5_trend_dir == "SELL":
@@ -2951,11 +2966,11 @@ def process_symbol_task(sym, active, mission_state):
                         if not tick: return
                         price = tick.ask if target_sig == "BUY" else tick.bid
                         
-                        # v28.0: MODO METRALLETA (FUEGO TOTAL)
-                        # Reducido de 0.55 a 0.10 para permitir stacking masivo
-                        base_dist = 0.10 if "XAU" in sym else (8.0 if "BTC" in sym else 0.15)
-                        # Stacking agresivo: Si hay confianza > 85%, permitimos entrar casi pegado
-                        dist_min = base_dist / 3 if conf > 0.85 else base_dist
+                        # v28.3: MODO METRALLETA OPTIMIZADO (0.25 dist)
+                        # Subido de 0.10 a 0.25 para evitar 'suicidio por spread' en Oro.
+                        base_dist = 0.25 if "XAU" in sym else (10.0 if "BTC" in sym else 0.15)
+                        # Stacking controlado: Si hay confianza > 85%, permitimos entrar más cerca
+                        dist_min = base_dist / 2 if conf > 0.85 else base_dist
                         
                         too_close = False
                         for p in pos_list:
