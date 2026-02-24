@@ -707,8 +707,9 @@ def perform_ai_health_audit():
         """
         
         res, model = call_ollama(prompt)
-        # v18.9.470: Si la IA falla o no responde claro, purga preventiva si hay riesgo serio
-        purgar = "PURGA: SI" in res.upper() or (model == "FALLBACK_FAILED" and p.profit < -5.0)
+        # v18.11.999: Si la IA falla, NO cerrar por pánico a los -$5.
+        # Solo purgar si el riesgo es real (>$30) para permitir ráfagas de 0.1.
+        purgar = "PURGA: SI" in res.upper() or (model == "FALLBACK_FAILED" and p.profit < -30.0)
         
         if purgar:
             log(f"💀 SENTENCIA IA ({model}): Purga ejecutada para #{p.ticket}. Profit: {p.profit:.2f}")
@@ -786,6 +787,19 @@ def close_ticket(pos, reason="UNK"):
     min_floor = 0.50 if is_gold else 0.01
     
     # Solo permitimos cierre en rojo si es una instrucción de pánico, purga crítica de la IA, martillo o cierre de mercado
+    # v19.0.1: [LEY DEL ESCUDO] 🛡️
+    # Si la posición ya tiene un SL en PROFIT (asegurado), PROHIBIMOS el cierre manual por pánico o IA.
+    # Preferimos dejar que toque el SL físico de MT5 para evitar el deslizamiento (slippage) del cierre a mercado.
+    is_secured = False
+    if pos.type == mt5.POSITION_TYPE_BUY and pos.sl > pos.price_open: is_secured = True
+    if pos.type == mt5.POSITION_TYPE_SELL and pos.sl > 0 and pos.sl < pos.price_open: is_secured = True
+    
+    # Si está asegurada y el profit actual es menor a $1.00, ABORTAMOS el cierre. 
+    # Dejamos que el SL físico haga su trabajo en el servidor o que la operación rebote.
+    if is_secured and profit < 1.00 and ("PURGE" in reason.upper() or "FLIP" in reason.upper()):
+        if now % 60 < 2: log(f"🛡️ LEY DEL ESCUDO #{pos.ticket}: Abortando cierre a mercado. SL físico está blindado.")
+        return None
+
     is_safe_close = profit >= min_floor or any(x in reason.upper() for x in ["HARD", "MERCADO", "PANIC", "PURGE", "WORST"])
     
     if not is_safe_close:
@@ -3041,9 +3055,8 @@ def metralleta_loop():
                                 continue 
 
                     # 1. Trailing Dinámico para mercados rápidos
-                    if is_fast and profit >= 1.05:
-                        # Si es rápido y tenemos >$1, NO CERRAR. Dejar que PACMAN o el Trailing del EA lo gestionen.
-                        # Solo cerramos si la señal de la IA cambia drásticamente.
+                    if is_fast and 1.05 <= profit < 3.50: # v18.11.998: Si ya ganó >$3.50, MANDATORIO usar Escalera SL, no cierre a mercado.
+                        # Evitamos cierres por señal IA en profit alto para evadir el slippage (deslizamiento).
                         adv = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
                         is_contrarian = (p.type == mt5.ORDER_TYPE_BUY and adv["sig"] == "SELL") or (p.type == mt5.ORDER_TYPE_SELL and adv["sig"] == "BUY")
                         if is_contrarian and adv["conf"] > 0.80:
