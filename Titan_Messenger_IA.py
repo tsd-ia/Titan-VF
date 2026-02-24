@@ -1,4 +1,14 @@
-import telebot
+import os
+import subprocess
+import sys
+
+try:
+    import telebot
+except ImportError:
+    print("📦 Instalando dependencias del Mensajero...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI"])
+    import telebot
+
 import MetaTrader5 as mt5
 import os
 import requests

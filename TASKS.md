@@ -1,8 +1,8 @@
 # 📋 TITAN vF - ROADMAP DE OPERACIONES (2026)
 
-## 🎯 OBJETIVO: AGRESIVIDAD Y LATENCIA CERO
-**Balance Actual:** ~$100 USD (Demo)
-**Modo:** COMANDANTE MODE (Aggressive Scalping)
+## 🎯 OBJETIVO: AGRESIVIDAD Y BLINDAJE TOTAL
+**Balance Actual:** ~$73 USD (Demo) - Recuperación en curso.
+**Modo:** SOBREVIVENCIA ACTIVA (v25.0)
 
 ---
 
@@ -19,24 +19,30 @@
 - [x] **Reliquia de Oro:** Copiado `Titan_Oracle_Gold.py` a `oro_ganador.py`.
 - [x] **Protocolo Oxígeno (Defensa):** Drawdown permitido hasta -$10 (Crypto) y -$12 (Oro).
 - [x] **Indulto de Tiempo:** Vida mínima de 20 min antes de auditoría de pánico.
+- [x] **Prioridad de Blindaje (v22.0):** Trailing Stop movido al tope del loop (Inmune a crashes).
+- [x] **Watchdog Atómico (v23.0):** Failsafe en gestión de posiciones y cierres.
+- [x] **Telegram de Mando (v24.0):** Reporte completo de Balance/Patrimonio/PnL.
+- [x] **Oficial de Puente (v24.5):** Asistente IA personal en Telegram para control remoto.
+- [x] **Liberación ETH (v25.5):** Eliminado bloqueo de prioridad imperial de Oro vs ETH.
 
 ---
 
 ### 🚀 TAREAS EN CURSO
-- [ ] **Monitoreo de Ráfagas:** Verificar en vivo que las 6 balas entren en < 2 segundos.
-- [ ] **Ajuste de Salida Trailing:** Optimizar el cierre para maximizar los recorridos de ballena.
+- [x] **Lote Dinámico de Emergencia:** Bajado ETH a 0.05 por balance crítico ($73).
+- [ ] **Sincronización Messenger:** Verificar comandos de voz/texto para cierre remoto.
+- [ ] **Auditoría de Latigazo:** Validar efectividad del Veto de Latigazo en ráfagas de BTC.
 
 ---
 
 ### 📡 ESTADO DE ORÁCULOS
-- **ORO:** Umbral $10k (Sensibilidad Máxima) | Lógica Taker: ✅ (Sincronizada)
-- **BTC:** Umbral $220k (Institucional) | Lógica Taker: 🔥 (VERIFICADA CON PROFIT +$13)
-- **MARGEN:** ⚠️ ALERTA CRÍTICA: Cuenta al límite por lote 0.1 en BTC.
-- **ETH/SOL/CRYPTO:** Umbral por volatilidad (Fast-Path Activo) | Lógica Taker: ✅
+- **ORO:** Umbral $10k (Sensibilidad Máxima) | Lógica Taker: ✅
+- **BTC:** Umbral $220k (Institucional) | Lógica Taker: 🔥
+- **ETH/CRYPTO:** Vía Libre (Prioridad Imperial OFF) | Smart Lot: 0.05 🐚
 
 ---
 ### 🧹 MANTENIMIENTO
-- [x] **Auditoría Regla 4:** Log `titan_vanguardia.log` rotado (Limpieza < 1MB).
+- [x] **Auditoría Regla 4:** Log `titan_vanguardia.log` limpio y rotado.
+- [x] **Auto-Instalación:** Dependencias de Telegram autogestionadas.
 
 ---
-*Ultima actualización: 2026-02-23 22:15 (Berserker Protocol Sync)*
+*Ultima actualización: 2026-02-24 12:15 (Antifraugile Survival Sync)*
