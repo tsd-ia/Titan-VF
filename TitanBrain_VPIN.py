@@ -3019,7 +3019,7 @@ def metralleta_loop():
                             elif profit >= 1.00: locked_p = 0.50
                             elif profit >= 0.50: 
                                 if "XAU" in sym or "Gold" in sym:
-                                    locked_p = 0.75 # v18.11.900: Suelo Comandante Elevado (Anti-Migaja)
+                                    locked_p = 0.25 # v18.11.901: Más aire para Oro (Bajado de 0.75)
                                 else:
                                     locked_p = 0.10
                             else: 
@@ -3079,8 +3079,8 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v18.9.900: PARACAÍDAS ORO AGRESIVO (SUELO 0.50) ===
-                    parachute_ratio = 0.40 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
+                    # === v18.11.901: PARACAÍDAS ORO RELAJADO (Respiración Profunda) ===
+                    parachute_ratio = 0.30 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
                     # El paracaídas solo actúa si ya aseguramos nuestro suelo de $0.50
                     if max_p > 1.05 and profit < (max_p * parachute_ratio) and profit >= 0.50:
                         log(f"🪂 PARACAÍDAS ORO $0.50: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")

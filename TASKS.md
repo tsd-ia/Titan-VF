@@ -15,6 +15,8 @@
 - [x] **Fix Error 'adx_val':** Estabilidad en el bypass de cálculos.
 - [x] **Modo Metralleta:** Cooldown reducido de 3.0s a 0.2s entre balas.
 - [x] **Fix Error 10016:** Buffer de seguridad en SL para evitar rechazos del broker.
+- [x] **Protocolo Aire Oro:** Bajado suelo de $0.75 a $0.25 para dejar correr beneficios.
+- [x] **Reliquia de Oro:** Copiado `Titan_Oracle_Gold.py` a `oro_ganador.py`.
 
 ---
 
