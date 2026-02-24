@@ -715,10 +715,15 @@ def perform_ai_health_audit():
         - Sé breve.
         """
         
-        res, model = call_ollama(prompt)
-        # v18.11.999: Si la IA falla, NO cerrar por pánico a los -$5.
-        # Solo purgar si el riesgo es real (>$30) para permitir ráfagas de 0.1.
-        purgar = "PURGA: SI" in res.upper() or (model == "FALLBACK_FAILED" and p.profit < -30.0)
+        # v20.0: LEY DEL CANDADO DE ACERO 🔒
+        # El bot tiene PROHIBIDO cerrar una posición por IA si no pierde al menos -$40.0.
+        # Esto mata de raíz las purgas de centavos (-$1.53, -$5.0).
+        sentencia_ia = "PURGA: SI" in res.upper()
+        if p.profit > -40.0:
+            if now % 60 < 1: log(f"🛡️ CANDADO v20: Ignorando sentencia IA para #{p.ticket} (Profit ${p.profit:.2f} es mayor a -$40).")
+            continue
+
+        purgar = sentencia_ia or (model == "FALLBACK_FAILED" and p.profit < -40.0)
         
         if purgar:
             log(f"💀 SENTENCIA IA ({model}): Purga ejecutada para #{p.ticket}. Profit: {p.profit:.2f}")
@@ -745,12 +750,17 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     # El Comandante pide 6 balas por instrumento.
     max_bullets = 6 if conf > 0.80 else 4
     
-    # 2. Definir Lotaje según Balance (v18.11.970: Comandante Mode $100+)
-    # ETH a 0.30, BTC/SOL a 0.10. Oro a 0.01 por seguridad de margen.
+    # 2. Definir Lotaje según Balance (v19.0.8: PROTECCIÓN DE CAPITAL)
+    # Si el balance cae de $100, bajamos el riesgo para evitar la quema de cuenta.
     if "ETH" in sym:
-        smart_lot = 0.3
+        smart_lot = 0.3 if balance >= 100 else 0.1
     elif "BTC" in sym or "SOL" in sym:
-        smart_lot = 0.1
+        if balance >= 110:
+            smart_lot = 0.1  # MODO BERSERKER (FUEGO TOTAL)
+        elif balance >= 90:
+            smart_lot = 0.05 # MODO CAUTELOSO (PROTECCIÓN DE $94)
+        else:
+            smart_lot = 0.02 # MODO BUNKER (SUPERVIVENCIA)
     else:
         smart_lot = 0.01
         
@@ -2977,13 +2987,8 @@ def metralleta_loop():
                     STATE["bullets"] = total_bullets
                     STATE["open_pnl"] = current_open_pnl
 
-                # === v18.9.362: PROTECCIÓN DE MARGEN AL 100% (ANTI-QUEMA) ===
-                acc = mt5.account_info()
-                if acc and acc.margin_level > 0 and acc.margin_level < 100.0:
-                    log(f"🚨 EMERGENCIA: Nivel de Margen Crítico ({acc.margin_level:.1f}%). Liquidando posición más costosa.")
-                    worst_p = min(open_positions, key=lambda x: x.profit)
-                    close_ticket(worst_p, "MARGIN_CALL_PROTECTION")
-                    continue
+                # v20.0: CIERRE POR MARGEN ELIMINADO A SOLICITUD DEL COMANDANTE.
+                # Dejamos que el broker gestione el Stop Out real.
 
                 # A. COSECHA DE RAÍZ DINÁMICA (v18.9.20)
                 # Cerrar al 95% de la meta para asegurar profit antes de retrocesos
