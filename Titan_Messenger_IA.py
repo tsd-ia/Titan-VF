@@ -12,8 +12,9 @@ try:
     from gtts import gTTS
     from pydub import AudioSegment
     import static_ffmpeg
-    # v27.0: Inicializar núcleo de audio
-    static_ffmpeg.add_paths() 
+    # v27.2: TRUCO MAESTRO - Extraer ruta real para pydub
+    static_ffmpeg.add_paths()
+    AudioSegment.converter = static_ffmpeg.get_ffmpeg_path()
 except ImportError:
     print("📦 Instalando dependencias de Evolución Sensorial...")
     subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI SpeechRecognition gTTS pydub static-ffmpeg"])
@@ -23,6 +24,7 @@ except ImportError:
     from pydub import AudioSegment
     import static_ffmpeg
     static_ffmpeg.add_paths()
+    AudioSegment.converter = static_ffmpeg.get_ffmpeg_path()
 
 import MetaTrader5 as mt5
 import os
