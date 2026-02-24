@@ -2053,12 +2053,12 @@ def process_symbol_task(sym, active, mission_state):
         margin_level = acc.margin_level if acc else 0.0
         
         # Regla del Comandante v18.9.37 (Margen) + v18.9.103 (Balance)
-        if margin_level >= 350:
-            user_max_bullets_margin = 5
-        elif margin_level >= 200:
-            user_max_bullets_margin = 3
+        if margin_level >= 200:
+            user_max_bullets_margin = 6 # v18.11.950: FUEGO TOTAL AUTORIZADO
+        elif margin_level >= 130:
+            user_max_bullets_margin = 4 # Margen de maniobra en batalla
         else:
-            user_max_bullets_margin = 1
+            user_max_bullets_margin = 2 # Defensa mínima
             
         # El balance define el límite maestro (Constitución v18.9.103)
         user_max_bullets = min(current_max_bullets, user_max_bullets_margin)
