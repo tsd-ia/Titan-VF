@@ -3010,17 +3010,19 @@ def metralleta_loop():
                             if is_rocket and profit >= 5.0:
                                 # Modo Rocket: Dejamos un buffer del 40% del profit (Más aire)
                                 locked_p = profit * 0.60
+                            elif profit >= 55.0: locked_p = 50.00 # v18.11.921: NIVEL BALLENA
+                            elif profit >= 45.0: locked_p = 40.00
+                            elif profit >= 35.0: locked_p = 30.00
+                            elif profit >= 25.0: locked_p = 20.00
+                            elif profit >= 15.0: locked_p = 12.00
                             elif profit >= 9.0: locked_p = 8.50
                             elif profit >= 8.0: locked_p = 7.50
                             elif profit >= 7.0: locked_p = 6.50
                             elif profit >= 6.0: locked_p = 5.50
                             elif profit >= 5.0: locked_p = 4.50
                             elif profit >= 4.0: locked_p = 3.50
-                            elif profit >= 3.50: locked_p = 3.00
-                            elif profit >= 3.00: locked_p = 2.50
-                            elif profit >= 2.50: locked_p = 2.00
-                            elif profit >= 2.00: locked_p = 1.50
-                            elif profit >= 1.50: locked_p = 1.00
+                            elif profit >= 2.00: locked_p = 1.20
+                            elif profit >= 1.50: locked_p = 0.80
                             elif profit >= 1.00: 
                                 if "XAU" in sym or "Gold" in sym:
                                     locked_p = 0.20 # v18.11.902: PULMÓN DE BALLENA (Suelo inicial muy bajo para dejar correr)
