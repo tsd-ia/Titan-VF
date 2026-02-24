@@ -221,9 +221,11 @@ def init_memories(s):
     if s not in LAST_CLOSE_TYPE: LAST_CLOSE_TYPE[s] = ""
     if s not in LAST_CLOSE_TIME: LAST_CLOSE_TIME[s] = 0
     if s not in PNL_MEMORIA: PNL_MEMORIA[s] = 0.0
+    if s not in LAST_IA_PRED: LAST_IA_PRED[s] = 0.0
     if f"price_history_{s}" not in STATE: STATE[f"price_history_{s}"] = []
 
 LAST_ENTRY_PRICE = {}
+LAST_IA_PRED = {}
 LAST_HEARTBEAT = {}
 LAST_SIGNALS = {}
 LAST_ENTRY = {}
@@ -251,6 +253,10 @@ LAST_CLOSE_TIME = {}
 PNL_MEMORIA = {}
 
 for sym_init in SYMBOLS: init_memories(sym_init)
+
+# v27.8.6: Pool dedicado para órdenes (Evita paros cardíacos del dashboard)
+executor_orders = ThreadPoolExecutor(max_workers=5)
+LAST_TICKET_UPDATE = {} # {ticket: timestamp}
 
 LAST_AI_PURGE_CHECK = 0    # v18.9.368: Auditoría de Salud IA cada 5 min
 COOLDOWN_AFTER_CLOSE = 15  # v15.30: Reducido para scalping rápido
@@ -984,45 +990,47 @@ def close_ticket(pos, reason="UNK"):
     return res
 
 def update_sl(ticket, new_sl, comment=""):
-    # v18.9.30: Seguridad total - Siempre blindamos si la posición existe.
+    """ v27.8.6: Wrapper Asíncrono para no bloquear el cerebro """
+    # v27.8.6: Throttling por ticket (3s) para no saturar al broker
+    now = time.time()
+    if ticket in LAST_TICKET_UPDATE and (now - LAST_TICKET_UPDATE[ticket]) < 3.0:
+        return True
+    
+    LAST_TICKET_UPDATE[ticket] = now
+    executor_orders.submit(_async_update_sl, ticket, new_sl, comment)
+    return True
+
+def _async_update_sl(ticket, new_sl, comment):
     try:
-        # Obtener datos frescos para PRESERVAR EL TP y evitar errores
-        pos_tuple = mt5.positions_get(ticket=ticket)
-        if not pos_tuple:
-            log(f"⚠️ Update SL fallido: Ticket {ticket} no encontrado")
-            return False
-        pos = pos_tuple[0]
+        positions = mt5.positions_get(ticket=ticket)
+        if not positions: return False
+        pos = positions[0]
         
         request = {
             "action": mt5.TRADE_ACTION_SLTP,
             "position": ticket,
             "symbol": pos.symbol,
             "sl": float(new_sl),
-            "tp": pos.tp, # CRÍTICO: Mantener el TP actual
+            "tp": pos.tp,
             "comment": comment
         }
         
-        # CRONOMETRAJE DE EJECUCIÓN (v15.42 REAL-MONEY READY)
         start_exec = time.perf_counter()
         res = mt5.order_send(request)
         end_exec = time.perf_counter()
-        latency = (end_exec - start_exec) * 1000 # ms
-        MISSION_LATENCIES.append(latency) # v15.43: Registro para reporte
+        latency = (end_exec - start_exec) * 1000
+        
+        MISSION_LATENCIES.append(latency)
         global LAST_LATENCY, LAST_LATENCY_UPDATE
-        LAST_LATENCY = latency # Actualizar memoria global
+        LAST_LATENCY = (LAST_LATENCY * 0.7) + (latency * 0.3) # Suavizado
         LAST_LATENCY_UPDATE = time.time()
         
-        if res.retcode == mt5.TRADE_RETCODE_DONE:
-            if latency > 150: log(f"⚠️ ALTA LATENCIA: {latency:.1f}ms en #{ticket}")
+        if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+            if latency > 300: log(f"🐌 BROKER LENTO: {latency:.1f}ms en #{ticket}")
         else:
-            log(f"❌ Error MT5 ({res.retcode}): {res.comment}")
-            log(f"⚠️ Error Blindaje #{ticket} a {new_sl}: {res.comment} (Ret: {res.retcode})")
-            return False
-        
-        log(f"🛡️ BLINDAJE EXITOSO: #{ticket} a {new_sl} ({comment})")
+            pass
         return True
     except Exception as e:
-        log(f"⚠️ Excepción Blindaje: {e}")
         return False
 
 def send_signal(symbol, mode, force=False, custom_tp=None):
@@ -1719,8 +1727,19 @@ def process_symbol_task(sym, active, mission_state):
                 STATE[f"last_fp_log_{sym}"] = now
             rsi_val = 50.0; raw_prob = 1.0; adx_val = 25.0 # Bypass de cálculos
         else:
-            # Solo si no hay oráculo, seguimos con la parsimonia técnica
-            sig_pred, conf_pred, rsi_val, raw_prob, adx_val = predecir(sym)
+            # v27.8.6: Throttling de IA (1.5s) para liberar CPU
+            last_pred_ts = LAST_IA_PRED.get(sym, 0)
+            if (now - last_pred_ts) < 1.5:
+                 # Reusar valores previos del dashboard si existen
+                 adv = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0, "rsi": 50, "prob": 0.5, "adx": 25})
+                 sig_pred = adv.get("sig", "HOLD")
+                 conf_pred = adv.get("conf", 0.0)
+                 rsi_val = adv.get("rsi", 50)
+                 raw_prob = adv.get("prob", 0.5)
+                 adx_val = adv.get("adx", 25)
+            else:
+                 sig_pred, conf_pred, rsi_val, raw_prob, adx_val = predecir(sym)
+                 LAST_IA_PRED[sym] = now
             
         tick = mt5.symbol_info_tick(sym)
         if not tick: return None
@@ -3241,10 +3260,11 @@ def metralleta_loop():
                             new_sl_trail = round(new_sl_trail, symbol_info.digits)
                             
                             is_better = False
+                            # v27.8.6: Subido umbral a 30 puntos (3 pips) para reducir latencia I/O
                             if p.type == mt5.ORDER_TYPE_BUY:
-                                if curr_sl == 0 or new_sl_trail > curr_sl + symbol_info.point * 10: is_better = True
+                                if curr_sl == 0 or new_sl_trail > curr_sl + symbol_info.point * 30: is_better = True
                             else:
-                                if curr_sl == 0 or (0 < new_sl_trail < curr_sl - symbol_info.point * 10): is_better = True
+                                if curr_sl == 0 or (0 < new_sl_trail < curr_sl - symbol_info.point * 30): is_better = True
                                 
                             if is_better:
                                 update_sl(p.ticket, new_sl_trail, f"TRL-SAFE (${profit:.2f})")
