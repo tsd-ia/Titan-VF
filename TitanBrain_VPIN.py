@@ -3016,13 +3016,13 @@ def metralleta_loop():
                     if p.magic == 0 and now_loop % 30 < 1:
                         log(f"🛡️ PROTEGIENDO POSICIÓN MANUAL: {sym} (${profit:.2f})")
                     
-                    # v21.0: CORTE QUIRÚRGICO (Proteger balance de $94)
-                    # No vale la pena aguantar -$60 si el 80% de las ganadoras nunca bajan de -$10.
+                    # v21.1: SALIDA POR AGOTAMIENTO (Análisis Madrugada 24/02)
+                    # Probabilidad de retorno < 20% después de -$13.5 en BTC (0.1 lot).
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
-                    limit_hs = -15.0 if is_gold_hs else -18.0 
+                    limit_hs = -6.5 if is_gold_hs else -13.5 
                     if profit <= limit_hs:
-                        log(f"🚨 CORTE RÁPIDO: {sym} alcanzó límite de ${limit_hs:.2f}. Protegiendo Balance.")
-                        close_ticket(p, "QUICK_CUT_v21"); continue
+                        log(f"🚨 CORTE POR AGOTAMIENTO: {sym} (${profit:.2f}). No vale la pena esperar retorno.")
+                        close_ticket(p, "EXHAUSTION_CUT_v21"); continue
 
                     # === PROTOCOLO DE TRIPLE TRAILING (Unificado v18.9.366) ===
                     # Trailing Permanente: Asegura desde los $0.30 y no tiene límite de tiempo (60s eliminado)
