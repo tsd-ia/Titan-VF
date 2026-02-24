@@ -1629,11 +1629,11 @@ def process_symbol_task(sym, active, mission_state):
     try:
         now = time.time()
         
-        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 3 BALAS
+        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 8 BALAS (MODO BERSERKER v28.1)
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
-        if len(pos_list) >= 3:
-            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} ya tiene {len(pos_list)}/3 balas. Deteniendo octopus.")
+        if len(pos_list) >= 8:
+            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} cargador lleno ({len(pos_list)}/8).")
             return None
             
         now_dt = datetime.fromtimestamp(now)
@@ -2084,17 +2084,21 @@ def process_symbol_task(sym, active, mission_state):
             
             # --- v18.0: BLOQUEO BINARIO DE TENDENCIA (EL GRILLETE) ---
             # EXCEPCIÓN: Si la IA tiene confianza sólida (80%+) permitimos ir contra corriente.
+            # --- v28.1: FILTRO DE TENDENCIA SUAVIZADO (IA > 80% BYPASS) ---
+            m5_locked = False
             if m5_trend_dir == "SELL" or precio_bajo_ema or ultima_vela_roja:
                 if sig == "BUY" and conf < 0.80: 
-                    sig = "HOLD"
-                    block_action = True
-                    block_reason = "CORRIENTE EN CONTRA (M5/EMA/VELA): Compra bloqueada."
+                    m5_locked = True
+                    block_reason = "VETO-M5 (Compra bloqueada)"
             
             if m5_trend_dir == "BUY" or precio_sobre_ema or ultima_vela_verde:
                 if sig == "SELL" and conf < 0.80:
-                    sig = "HOLD"
-                    block_action = True
-                    block_reason = "CORRIENTE EN CONTRA (M5/EMA/VELA): Venta bloqueada."
+                    m5_locked = True
+                    block_reason = "VETO-M5 (Venta bloqueada)"
+            
+            if m5_locked:
+                sig = "HOLD"
+                block_action = True
 
             # --- v18.9.660: BYPASS SUPREMO (MOVIDO AL FINAL PARA PODER TOTAL) ---
             # Se calculará al final de los filtros para sobreescribir cualquier bloqueo.
@@ -2709,11 +2713,10 @@ def process_symbol_task(sym, active, mission_state):
                         recovery_trigger = False
                         stacking_trigger = False # v10.1
                         
-                        # v18.10.600: MODO HEDGE/RESCATE - Permitir balas aunque la anterior pierda
-                        if (now - LAST_ENTRY.get(sym, 0)) > 15.0 or (is_oracle_signal and (now - LAST_ENTRY.get(sym, 0)) > 4.0):
+                        # v28.1: STACKING ULTRARRÁPIDO (1s)
+                        if (now - LAST_ENTRY.get(sym, 0)) > 1.0:
                             stacking_trigger = True
-                            r_text = 'ORÁCULO FORZA' if is_oracle_signal else 'Tiempo cumplido'
-                            log(f"🟢 BALA {n_balas+1}: {r_text}. RECUPERANDO POSICIÓN.")
+                            log(f"🟢 BALA {n_balas+1}: RÁFAGA ACTIVADA.")
 
                         # --- LÓGICA DE RE-ENTRADA INMEDIATA (ANTI-NOISE) v18.9.106 ---
                         # Si cerramos por Trailing (SUIZO) pero la señal sigue siendo BRUTAL (>88%), 
