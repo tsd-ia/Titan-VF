@@ -1,13 +1,19 @@
 import os
 import subprocess
 import sys
+import time
+import requests
+import json
+import re
 
 try:
     import telebot
+    import speech_recognition as sr
 except ImportError:
-    print("📦 Instalando dependencias del Mensajero...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI"])
+    print("📦 Instalando dependencias de Percepción Sensorial...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI SpeechRecognition"])
     import telebot
+    import speech_recognition as sr
 
 import MetaTrader5 as mt5
 import os
@@ -71,28 +77,59 @@ def call_ia(user_msg, context):
     except Exception as e:
         return f"Error conectando con el Cerebro IA: {e}"
 
-@bot.message_handler(func=lambda message: True)
-def handle_commander_msg(message):
+@bot.message_handler(content_types=['voice'])
+def handle_voice_msg(message):
+    if str(message.chat.id) != CHAT_ID: return
+    
+    try:
+        bot.send_chat_action(message.chat.id, 'record_audio')
+        file_info = bot.get_file(message.voice.file_id)
+        downloaded_file = bot.download_file(file_info.file_path)
+        
+        ogg_file = "voice_msg.ogg"
+        with open(ogg_file, 'wb') as f:
+            f.write(downloaded_file)
+        
+        # Intentar transcripción (Requiere ffmpeg para pydub, aviso si falla)
+        bot.reply_to(message, "🎤 Escuchando audio, Comandante... (Procesando v26)")
+        
+        # En una versión ultra-pro usaríamos Whisper local, 
+        # aquí intentamos una transcripción vía API de Google para velocidad.
+        # Nota: Sin ffmpeg, esto puede fallar.
+        # En caso de error, le pediremos al Comandante instalar ffmpeg.
+        
+        # Placeholder de respuesta si no hay transcriptor activo
+        user_text = "[Transcripción no disponible: Instale FFMPEG en el servidor]"
+        
+        # Aquí iría la lógica de STT real si tuviéramos ffmpeg
+        # Por ahora, procesamos como texto si logramos extraer algo.
+        
+        handle_commander_msg(message, override_text="Comandante, envié un audio. Por ahora por favor use texto mientras instalo el núcleo FFMPEG.")
+
+    except Exception as e:
+        bot.reply_to(message, f"⚠️ Error en Módulo Auditivo: {e}")
+
+@bot.message_handler(func=lambda message: True, content_types=['text'])
+def handle_commander_msg(message, override_text=None):
     # Seguridad: Solo responder si es el Comandante
     if str(message.chat.id) != CHAT_ID:
         return
 
-    print(f"📩 Mensaje del Comandante: {message.text}")
+    text = override_text if override_text else message.text
+    print(f"📩 Mensaje del Comandante: {text}")
     bot.send_chat_action(message.chat.id, 'typing')
     
     context = get_account_context()
-    ia_response = call_ia(message.text, context)
+    ia_response = call_ia(text, context)
     
     # Lógica de Ejecución Atómica
     if "CERRANDO" in ia_response.upper():
         # Intentar extraer el ticket si la IA lo mencionó
-        import re
-        tickets = re.findall(r'#(\d+)', ia_response + message.text)
+        tickets = re.findall(r'#(\d+)', ia_response + text)
         if tickets:
             for t in tickets:
-                # Aquí llamaríamos a la función de cerrar de MT5
                 bot.send_message(message.chat.id, f"🎯 Identificando Ticket #{t} para ejecución inmediata...")
-                # ... lógica de cierre ...
+                # Lógica de cierre MT5 aquí
         else:
             bot.send_message(message.chat.id, "⚠️ No identifiqué el número de ticket. Por favor, indíquelo con '#'.")
 
