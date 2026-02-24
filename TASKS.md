@@ -5,13 +5,14 @@
 - **Modo:** Bunker (1 Bala Máx / 0.01 Oro / 0.10 Eth)
 - **Oráculos:** BTC, Gold (XAUUSD), Crypto (Whales) - **ACTIVOS**
 
-- [x] **Blindaje de Entorno (v27.8.1):** Parche de supervivencia para Python 3.14+. TensorFlow es opcional.
-- [x] **Modo Lite Inteligente:** El bot conmuta automáticamente a señales técnicas si los modelos .h5 no cargan.
-- [x] **Reparación de Oráculo/Messenger:** Corregidos errores de importación y sintaxis en instaladores.
+- [x] **Blindaje de Entorno (v27.8.1):** Parche de supervivencia para Python 3.14+.
+- [x] **Especialización Oro (v27.8.2):** Foco 100% en XAUUSDm con lote 0.02 (Balance > $100).
+- [x] **Blindaje Anti-Hormiga:** Fix de Stop Loss dinámico para asegurar +$0.15 mínimos.
+- [x] **Auditoría BTC:** Umbral de Oráculo subido a $350k para filtrar ruido de absorción.
 
 ## 🛠️ TAREAS EN CURSO / PENDIENTES
+- [ ] **Validación de Lote 0.02:** Monitorear margen en Oro con el nuevo nivel de agresividad.
 - [ ] **Sincronización Messenger:** Verificar comandos de voz/texto para cierre remoto.
-- [ ] **Auditoría de Latigazo:** Validar efectividad del Veto de Latigazo en ráfagas de BTC.
 - [ ] **Auditoría de Latencia:** El puente muestra >250ms. Investigar saturación de red.
 
 ---

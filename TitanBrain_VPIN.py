@@ -136,8 +136,8 @@ print("✅ LIMPIEZA COMPLETA.")
 # ================= CONFIG =================
 PORT = 8000
 # LISTA DE ACTIVOS MONITORIZADOS (RADAR MÚLTIPLE v7.8)
-# CEREBRO TRIPLE: ORO, BTC y CRYPTO (SOL/ETH/MSTR/OPN)
-SYMBOLS = ["XAUUSDm", "BTCUSDm", "ETHUSDm"] 
+# CEREBRO DUAL: ORO (Prioridad) y BTC (Bala Especial)
+SYMBOLS = ["XAUUSDm", "BTCUSDm"] 
 
 # REPARACIÓN DE RUTA (Basada en LOGS del Robot)
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
@@ -411,7 +411,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 300, "tp": 2000, "max_bullets": 3},
+    "XAUUSDm": {"lot": 0.02, "sl": 300, "tp": 2000, "max_bullets": 4},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -2430,13 +2430,25 @@ def process_symbol_task(sym, active, mission_state):
                 try:
                     with open("titan_oracle_signal.json", "r") as f:
                         osig_data = json.load(f)
-                        oracle_power = 220000 # El oráculo de BTC solo escribe si superó WHALE_VOLUME_USD
-                except: pass
+                        oracle_power = osig_data.get("volume", 0)
+                        
+                        # v27.8.2: Si es una ballena institucional gigante (> $350k), Bypass absoluto.
+                        # Si es una ballena regular ($220k - $350k), permitimos Bypass pero lo advertimos.
+                        # El factor común de falla en BTC es la absorción, por eso exigimos más poder.
+                        if oracle_power < 350000:
+                            # v18.11.910: Requiere IA para confirmar ballenas pequeñas
+                            is_big_whale = False
+                        else:
+                            is_big_whale = True
+                except:
+                    oracle_power = 220000 
+                    is_big_whale = False
             
-            # v18.11.910: Si es ballena pequeña (<$80k), NO bypass parcial. Requiere IA Confirmación.
-            # v18.11.960: UMBRAL ORO BAJADO A $40k (A pedido del Comandante)
-            # v18.11.999: Sincronización Umbral Oro a $10k (Solicitud Comandante)
-            if sym == "XAUUSDm" and oracle_power < 10000:
+            # v18.11.910: Validación de Bypass IA por Poder
+            if sym == "BTCUSDm" and not is_big_whale:
+                # No bypass absoluto, dejar que el resto del código valide con IA
+                pass
+            elif sym == "XAUUSDm" and oracle_power < 10000:
                 is_oracle_signal = False 
                 log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Umbral mínimo es $10k.")
 
@@ -3183,7 +3195,10 @@ def metralleta_loop():
                             elif profit >= 2.0: locked_p = 1.50
                             elif profit >= 1.30: locked_p = 0.80 # v27.5: Ajuste Comandante
                             else: 
-                                locked_p = 0.0 # NADA DE CIERRES DE CENTAVOS
+                                # v27.8.2: Blindaje Anti-Hormiga. 
+                                # Si ya ganamos el umbral mínimo ($0.30), asegurar $0.15 positivos.
+                                # Esto evita que el spread convierta el Breakeven en pérdida.
+                                locked_p = 0.15 
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
