@@ -9,11 +9,20 @@ import re
 try:
     import telebot
     import speech_recognition as sr
+    from gtts import gTTS
+    from pydub import AudioSegment
+    import static_ffmpeg
+    # v27.0: Inicializar núcleo de audio
+    static_ffmpeg.add_paths() 
 except ImportError:
-    print("📦 Instalando dependencias de Percepción Sensorial...")
-    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI SpeechRecognition"])
+    print("📦 Instalando dependencias de Evolución Sensorial...")
+    subprocess.check_call([sys.executable, "-m", "pip", "install", "pyTelegramBotAPI SpeechRecognition gTTS pydub static-ffmpeg"])
     import telebot
     import speech_recognition as sr
+    from gtts import gTTS
+    from pydub import AudioSegment
+    import static_ffmpeg
+    static_ffmpeg.add_paths()
 
 import MetaTrader5 as mt5
 import os
@@ -77,6 +86,23 @@ def call_ia(user_msg, context):
     except Exception as e:
         return f"Error conectando con el Cerebro IA: {e}"
 
+def speak_to_commander(chat_id, text):
+    """ Convierte texto a voz y lo envía a Telegram """
+    try:
+        # Limpiar texto de caracteres raros o tags de IA
+        clean_text = re.sub(r'[#\*\_]', '', text)
+        tts = gTTS(text=clean_text, lang='es')
+        voice_file = f"response_{chat_id}.mp3"
+        tts.save(voice_file)
+        
+        with open(voice_file, 'rb') as voice:
+            bot.send_voice(chat_id, voice)
+        
+        # Opcional: Limpiar archivo después de enviar
+        if os.path.exists(voice_file): os.remove(voice_file)
+    except Exception as e:
+        print(f"⚠️ Error en TTS: {e}")
+
 @bot.message_handler(content_types=['voice'])
 def handle_voice_msg(message):
     if str(message.chat.id) != CHAT_ID: return
@@ -86,31 +112,38 @@ def handle_voice_msg(message):
         file_info = bot.get_file(message.voice.file_id)
         downloaded_file = bot.download_file(file_info.file_path)
         
-        ogg_file = "voice_msg.ogg"
+        ogg_file = f"voice_{message.chat.id}.ogg"
+        wav_file = f"voice_{message.chat.id}.wav"
+        
         with open(ogg_file, 'wb') as f:
             f.write(downloaded_file)
         
-        # Intentar transcripción (Requiere ffmpeg para pydub, aviso si falla)
-        bot.reply_to(message, "🎤 Escuchando audio, Comandante... (Procesando v26)")
+        # v27.0: Conversión y Transcripción Real
+        audio = AudioSegment.from_ogg(ogg_file)
+        audio.export(wav_file, format="wav")
         
-        # En una versión ultra-pro usaríamos Whisper local, 
-        # aquí intentamos una transcripción vía API de Google para velocidad.
-        # Nota: Sin ffmpeg, esto puede fallar.
-        # En caso de error, le pediremos al Comandante instalar ffmpeg.
+        recognizer = sr.Recognizer()
+        with sr.AudioFile(wav_file) as source:
+            audio_data = recognizer.record(source)
+            try:
+                user_text = recognizer.recognize_google(audio_data, language="es-ES")
+                bot.reply_to(message, f"🎯 Entendido: \"{user_text}\"")
+                # Procesar como mensaje de comando
+                handle_commander_msg(message, override_text=user_text, reply_audio=True)
+            except sr.UnknownValueError:
+                bot.reply_to(message, "⚠️ Comandante, no pude entender el audio. ¿Podría repetirlo o usar texto?")
+            except sr.RequestError as e:
+                bot.reply_to(message, f"⚠️ Error en servicio STT: {e}")
         
-        # Placeholder de respuesta si no hay transcriptor activo
-        user_text = "[Transcripción no disponible: Instale FFMPEG en el servidor]"
-        
-        # Aquí iría la lógica de STT real si tuviéramos ffmpeg
-        # Por ahora, procesamos como texto si logramos extraer algo.
-        
-        handle_commander_msg(message, override_text="Comandante, envié un audio. Por ahora por favor use texto mientras instalo el núcleo FFMPEG.")
+        # Limpieza de archivos temporales
+        if os.path.exists(ogg_file): os.remove(ogg_file)
+        if os.path.exists(wav_file): os.remove(wav_file)
 
     except Exception as e:
-        bot.reply_to(message, f"⚠️ Error en Módulo Auditivo: {e}")
+        bot.reply_to(message, f"⚠️ Error en Módulo Auditivo v27: {e}")
 
 @bot.message_handler(func=lambda message: True, content_types=['text'])
-def handle_commander_msg(message, override_text=None):
+def handle_commander_msg(message, override_text=None, reply_audio=False):
     # Seguridad: Solo responder si es el Comandante
     if str(message.chat.id) != CHAT_ID:
         return
@@ -124,16 +157,20 @@ def handle_commander_msg(message, override_text=None):
     
     # Lógica de Ejecución Atómica
     if "CERRANDO" in ia_response.upper():
-        # Intentar extraer el ticket si la IA lo mencionó
         tickets = re.findall(r'#(\d+)', ia_response + text)
         if tickets:
             for t in tickets:
                 bot.send_message(message.chat.id, f"🎯 Identificando Ticket #{t} para ejecución inmediata...")
-                # Lógica de cierre MT5 aquí
+                # Lógica cierre MT5...
         else:
-            bot.send_message(message.chat.id, "⚠️ No identifiqué el número de ticket. Por favor, indíquelo con '#'.")
+            bot.send_message(message.chat.id, "⚠️ No identifiqué el número de ticket.")
 
+    # Responder por texto
     bot.reply_to(message, ia_response)
+    
+    # v27.0: Responder por AUDIO si fue solicitado o si fue un audio de entrada
+    if reply_audio:
+        speak_to_commander(message.chat.id, ia_response)
 
 print("🦅 OFICIAL DE PUENTE TITAN ONLINE - Esperando al Comandante...")
 bot.infinity_polling()
