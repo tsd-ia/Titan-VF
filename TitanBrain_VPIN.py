@@ -3385,11 +3385,8 @@ def metralleta_loop():
                         log(f"🛑 MERCADO {sym} CERRADO - Durmiendo octopus...")
                     continue
                 
-                # v18.9.600: PRIORIDAD DE CAPITAL (ORO > MSTR > OPN > RESTO)
-                # Si detectamos señales en el "Trío Imperial", pausamos ETH para ahorrar margen.
-                if sym == "ETHUSDm":
-                    imperial_active = any(s in ACTIVE_TASKS_VPIN for s in ["XAUUSDm", "MSTRm", "OPNm"])
-                    if imperial_active: continue 
+                # v18.9.600: PRIORIDAD DE CAPITAL (DESACTIVADA v25.5 por solicitud Comandante)
+                # ETH ahora tiene vía libre total.
 
                 # v18.9.220: GUARDA DE TAREA ACTIVA (Evita que el mismo símbolo corra 2 veces si hay lag)
                 if sym in ACTIVE_TASKS_VPIN: continue
