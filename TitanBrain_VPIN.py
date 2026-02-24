@@ -715,15 +715,16 @@ def perform_ai_health_audit():
         - Sé breve.
         """
         
-        # v20.0: LEY DEL CANDADO DE ACERO 🔒
-        # El bot tiene PROHIBIDO cerrar una posición por IA si no pierde al menos -$40.0.
-        # Esto mata de raíz las purgas de centavos (-$1.53, -$5.0).
-        sentencia_ia = "PURGA: SI" in res.upper()
+        # v20.0.7: LEY DEL CANDADO DE ACERO 🔒 (REFACTORED)
+        # Primero verificamos el profit. Si no hay riesgo real (>-40), ni llamamos a la IA.
         if p.profit > -40.0:
-            if now % 60 < 1: log(f"🛡️ CANDADO v20: Ignorando sentencia IA para #{p.ticket} (Profit ${p.profit:.2f} es mayor a -$40).")
+            if now % 120 < 5: log(f"🛡️ CANDADO v20: #{p.ticket} protegido (${p.profit:.2f} > -$40).")
             continue
-
-        purgar = sentencia_ia or (model == "FALLBACK_FAILED" and p.profit < -40.0)
+            
+        # Solo si supera el umbral de dolor, llamamos al tribunal de la IA
+        res, model = call_ollama(prompt)
+        sentencia_ia = "PURGA: SI" in res.upper()
+        purgar = sentencia_ia or (model == "FALLBACK_FAILED")
         
         if purgar:
             log(f"💀 SENTENCIA IA ({model}): Purga ejecutada para #{p.ticket}. Profit: {p.profit:.2f}")
