@@ -1643,12 +1643,10 @@ def process_symbol_task(sym, active, mission_state):
     try:
         now = time.time()
         
-        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 4 BALAS (MODO BERSERKER v28.3)
-        # Reducido de 8 a 4 para proteger cuentas de $50 de pérdidas en ráfaga.
+        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 3 BALAS (LÍMITE REAL MARGEN 1:200)
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
-        if len(pos_list) >= 4:
-            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} cargador lleno ({len(pos_list)}/4).")
+        if len(pos_list) >= 3:
             return None
             
         now_dt = datetime.fromtimestamp(now)
@@ -2098,23 +2096,19 @@ def process_symbol_task(sym, active, mission_state):
             else: # Rango: Más rigor
                 margin = corridor * 0.22
             
-            # --- v18.0: BLOQUEO BINARIO DE TENDENCIA (EL GRILLETE) ---
-            # EXCEPCIÓN: Si la IA tiene confianza sólida (80%+) permitimos ir contra corriente.
-            # --- v28.1: FILTRO DE TENDENCIA SUAVIZADO (IA > 80% BYPASS) ---
+            # --- v28.4: BYPASS TOTAL ORO ---
             m5_locked = False
-            if m5_trend_dir == "SELL" or precio_bajo_ema or ultima_vela_roja:
-                if sig == "BUY" and conf < 0.80: 
-                    m5_locked = True
-                    block_reason = "VETO-M5 (Compra bloqueada)"
-            
-            if m5_trend_dir == "BUY" or precio_sobre_ema or ultima_vela_verde:
-                if sig == "SELL" and conf < 0.80:
-                    m5_locked = True
-                    block_reason = "VETO-M5 (Venta bloqueada)"
-            
-            if m5_locked:
-                sig = "HOLD"
-                block_action = True
+            if "XAU" not in sym: # Solo aplicar filtros de tendencia a otros activos
+                if m5_trend_dir == "SELL" or precio_bajo_ema or ultima_vela_roja:
+                    if sig == "BUY" and conf < 0.85: m5_locked = True
+                
+                if m5_trend_dir == "BUY" or precio_sobre_ema or ultima_vela_verde:
+                    if sig == "SELL" and conf < 0.85: m5_locked = True
+                
+                if m5_locked:
+                    sig = "HOLD"
+                    block_action = True
+                    block_reason = "VETO-M5"
 
             # --- v18.9.660: BYPASS SUPREMO (MOVIDO AL FINAL PARA PODER TOTAL) ---
             # Se calculará al final de los filtros para sobreescribir cualquier bloqueo.
@@ -3260,21 +3254,12 @@ def metralleta_loop():
                             elif profit >= 25.0: locked_p = 20.00
                             elif profit >= 15.0: locked_p = 12.00
                             elif profit >= 9.0: locked_p = 8.50
-                            elif profit >= 8.0: locked_p = 7.50
-                            elif profit >= 7.0: locked_p = 6.50
-                            elif profit >= 6.0: locked_p = 5.50
-                            elif profit >= 5.0: locked_p = 4.50
-                            elif profit >= 4.0: locked_p = 3.60 # v19.0.5: Ajuste agresivo BTC
-                            elif profit >= 3.5: locked_p = 3.10
+                            # v28.4: BREAKEVEN RELÁMPAGO
+                            if profit >= 0.50: locked_p = 0.10 # Asegurar Breakeven rápido
+                            elif profit >= 2.0: locked_p = 1.50
                             elif profit >= 3.0: locked_p = 2.60
-                            elif profit >= 2.5: locked_p = 2.00
-                            elif profit >= 2.0: locked_p = 1.50 # v27.8.3: Asegurar $1.50 solicitado por Comandante
-                            elif profit >= 1.30: locked_p = 0.85 # v27.8.3: Subido a 0.85 para evitar cierres hormiga
-                            else: 
-                                # v27.8.2: Blindaje Anti-Hormiga. 
-                                # Si ya ganamos el umbral mínimo ($0.30), asegurar $0.15 positivos.
-                                # Esto evita que el spread convierta el Breakeven en pérdida.
-                                locked_p = 0.15 
+                            elif profit >= 5.0: locked_p = 4.50
+                            else: locked_p = -2.0 # Seguir dejando aire si no llega al umbral
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
