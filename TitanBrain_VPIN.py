@@ -2987,10 +2987,12 @@ def metralleta_loop():
                     if p.magic == 0 and now_loop % 30 < 1:
                         log(f"🛡️ PROTEGIENDO POSICIÓN MANUAL: {sym} (${profit:.2f})")
                     
-                    # === PROTOCOLO DE $25 HARD STOP (v18.9.77) ===
-                    # El usuario indicó que prefiere arriesgar los $25 para aguantar la volatilidad extrema.
-                    if profit <= -25.0:
-                        log(f"🚨 HARD STOP ACTIVADO: {sym} alcanzó límite de -$25.00. Cerrando.")
+                    # === PROTOCOLO DE HARD STOP ADAPTATIVO (v18.11.920) ===
+                    # XAUUSDm: Aire controlado (-25) | BTC/Crypto: Respiración Profunda (-60)
+                    is_gold_hs = ("XAU" in sym or "Gold" in sym)
+                    limit_hs = -25.0 if is_gold_hs else -60.0 # Sugerencia Comandante para 0.1 lotes
+                    if profit <= limit_hs:
+                        log(f"🚨 HARD STOP ADAPTATIVO: {sym} alcanzó límite de ${limit_hs:.2f}. Cerrando.")
                         close_ticket(p, "HARD_STOP_USER"); continue
 
                     # === PROTOCOLO DE TRIPLE TRAILING (Unificado v18.9.366) ===

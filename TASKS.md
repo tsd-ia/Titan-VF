@@ -29,8 +29,8 @@
 ---
 
 ### 📡 ESTADO DE ORÁCULOS
-- **ORO:** Umbral $10k (Sensibilidad Máxima) | Lógica Taker: ✅
-- **BTC:** Umbral $220k (Institucional) | Lógica Taker: ✅
+- **ORO:** Umbral $10k (Sensibilidad Máxima) | Lógica Taker: ✅ (Sincronizada)
+- **BTC:** Umbral $220k (Institucional) | Lógica Taker: 🔥 (VERIFICADA CON PROFIT +$5)
 - **ETH/SOL/CRYPTO:** Umbral por volatilidad (Fast-Path Activo) | Lógica Taker: ✅
 
 ---
