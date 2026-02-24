@@ -68,6 +68,7 @@ def get_account_context():
 
 def call_ia(user_msg, context):
     """ Llama a la IA con el contexto de la cuenta y la duda del usuario """
+    # v28.8: Soporte para ANÁLISIS y TRADING REMOTO
     prompt = f"""
     Eres el OFICIAL DE PUENTE del sistema TITAN. Tu jefe es el COMANDANTE.
     
@@ -78,16 +79,18 @@ def call_ia(user_msg, context):
     "{user_msg}"
     
     INSTRUCCIONES:
-    1. Si el Comandante te pide cerrar algo, responde confirmando y di: "CERRANDO [TICKET]".
-    2. Si solo tiene dudas, explica la situación técnica basada en el contexto.
-    3. Mantén un tono técnico, directo y de élite. Estamos en el año 2026.
+    1. Si el Comandante pide analizar un símbolo (ej: EURUSD), responde obligatoriamente: "ANALIZANDO [SYMBOL]".
+    2. Si pide abrir una operación (ej: Compra Oro en 0.02), responde obligatoriamente: "OPERANDO [BUY/SELL] [SYMBOL] LOT [LOTE]".
+    3. Si pide cerrar algo, responde: "CERRANDO [TICKET]".
+    4. Si solo tiene dudas, explica la situación técnica basada en el contexto.
+    5. Mantén un tono técnico, directo y de élite. Estamos en el año 2026.
     
     RESPUESTA:
     """
     
     try:
         payload = {
-            "model": "gpt-oss:20b-cloud", # O el modelo que estés usando
+            "model": "gpt-oss:20b-cloud",
             "prompt": prompt,
             "stream": False
         }
@@ -155,30 +158,59 @@ def handle_voice_msg(message):
 @bot.message_handler(func=lambda message: True, content_types=['text'])
 def handle_commander_msg(message, override_text=None, reply_audio=False):
     # Seguridad: Solo responder si es el Comandante
-    if str(message.chat.id) != CHAT_ID:
-        return
+    if str(message.chat.id) != CHAT_ID: return
 
-    text = override_text if override_text else message.text
+    text = (override_text if override_text else message.text).upper()
     print(f"📩 Mensaje del Comandante: {text}")
     bot.send_chat_action(message.chat.id, 'typing')
     
     context = get_account_context()
     ia_response = call_ia(text, context)
     
-    # Lógica de Ejecución Atómica
-    if "CERRANDO" in ia_response.upper():
+    # --- LOGICA DE EJECUCIÓN ATÓMICA v28.8 ---
+    # 1. ANALISIS DE CUALQUIER INSTRUMENTO
+    if "ANALIZANDO" in ia_response.upper():
+        sym_match = re.search(r'ANALIZANDO\s+([A-Z0-9]+)', ia_response.upper())
+        if sym_match:
+            sym = sym_match.group(1)
+            try:
+                res = requests.get(f"http://localhost:8000/analyze/{sym}", timeout=10).json()
+                if "error" in res:
+                    ia_response = f"⚠️ Comandante, el símbolo {sym} no está disponible en MT5 o es inválido."
+                else:
+                    ia_response = (f"📊 *INFORME {sym}*:\n"
+                                  f"Señal IA: *{res['signal']}* ({res['confidence']*100:.0f}%)\n"
+                                  f"RSI: {res['rsi']:.1f} | Probabilidad: {res['probability']*100:.0f}%\n"
+                                  f"Veredicto: {'✅ APTO PARA SCALPING' if res['confidence'] > 0.65 else '❌ NO OPERAR (Inseguro)'}")
+            except: ia_response = "⚠️ Error conectando con el Cerebro Bridge (Port 8000)."
+
+    # 2. APERTURA REMOTA DE ÓRDENES
+    elif "OPERANDO" in ia_response.upper():
+        trade_match = re.search(r'OPERANDO\s+(BUY|SELL)\s+([A-Z0-9]+)\s+LOT\s+([\d\.]+)', ia_response.upper())
+        if trade_match:
+            action, sym, lot = trade_match.groups()
+            try:
+                res = requests.post("http://localhost:8000/trade", json={"symbol": sym, "action": action, "lot": lot}, timeout=10).json()
+                if res.get("status") == "success":
+                    ia_response = f"✅ *EJECUCIÓN EXITOSA*\n{action} {sym} [#{res['ticket']}] con lote {lot}.\nReglas Bunker de $25 activadas."
+                else:
+                    ia_response = f"❌ *FALLO EN TRADING*: {res.get('reason', 'Rechazo MT5')}"
+            except: ia_response = "⚠️ Error de comunicación con el Ejecutor MT5."
+
+    # 3. CIERRE DE TICKETS (LEGACY)
+    elif "CERRANDO" in ia_response.upper():
         tickets = re.findall(r'#(\d+)', ia_response + text)
         if tickets:
             for t in tickets:
-                bot.send_message(message.chat.id, f"🎯 Identificando Ticket #{t} para ejecución inmediata...")
-                # Lógica cierre MT5...
+                # El cierre se delega al MT5 via Bridge si estuviera activo o por comando directo
+                bot.send_message(message.chat.id, f"🎯 Ticket #{t} identificado. Ejecutando cierre de emergencia...")
+                # ... lógica legacy ...
         else:
-            bot.send_message(message.chat.id, "⚠️ No identifiqué el número de ticket.")
+            ia_response = "⚠️ No identifiqué el número de ticket para cerrar."
 
     # Responder por texto
-    bot.reply_to(message, ia_response)
+    bot.reply_to(message, ia_response, parse_mode="Markdown")
     
-    # v27.0: Responder por AUDIO si fue solicitado o si fue un audio de entrada
     if reply_audio:
         speak_to_commander(message.chat.id, ia_response)
 

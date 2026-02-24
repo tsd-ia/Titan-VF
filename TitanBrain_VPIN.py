@@ -606,6 +606,20 @@ def load_settings():
     except Exception as e:
         log(f"⚠️ Error cargando settings/misión: {e}")
 
+# --- v28.8: PUENTE TELEGRAM COMANDANTE ---
+TELEGRAM_TOKEN = '8217691336:AAFWduUGkO_f-QRF6MN338HY-MA46CjzHMg'
+TELEGRAM_CHAT_ID = '8339882349'
+
+def send_telegram(message):
+    def _send():
+        try:
+            url = f"https://api.telegram.org/bot{TELEGRAM_TOKEN}/sendMessage"
+            payload = {"chat_id": TELEGRAM_CHAT_ID, "text": f"🦅 TITAN: {message}", "parse_mode": "Markdown"}
+            requests.post(url, json=payload, timeout=8)
+        except Exception as e:
+            log(f"⚠️ Telegram Error: {e}")
+    threading.Thread(target=_send, daemon=True).start()
+
 def send_ntfy(message):
     def _send():
         try:
@@ -1006,6 +1020,21 @@ def close_ticket(pos, reason="UNK"):
 
 def update_sl(ticket, new_sl, comment=""):
     """ v27.8.6: Wrapper Asíncrono para no bloquear el cerebro """
+    # v28.8: Si el comentario indica protección de profit, avisar al Comandante
+    if "TRL-SAFE" in comment:
+        try:
+            p = mt5.positions_get(ticket=ticket)
+            if p:
+                sym = p[0].symbol
+                # Solo avisar si el profit es significativo (> $1.0) para no spamear
+                import re
+                profit_match = re.search(r'\(\$(.*?)\)', comment)
+                if profit_match:
+                    val = float(profit_match.group(1))
+                    if val >= 1.0:
+                        send_telegram(f"🛡️ *{sym} PROTEGIDO* \nProfit Asegurado: `${val:.2f}`\nTicket: `#{ticket}`")
+        except: pass
+
     # v27.8.6: Throttling por ticket (3s) para no saturar al broker
     now = time.time()
     if ticket in LAST_TICKET_UPDATE and (now - LAST_TICKET_UPDATE[ticket]) < 3.0:
@@ -3972,6 +4001,53 @@ async def toggle_brain(brain: str, status: bool):
 @app.get("/ping")
 async def ping():
     return {"status": "pong", "time": time.time(), "version": "18.9.100"}
+
+@app.get("/analyze/{symbol}")
+async def analyze_symbol(symbol: str):
+    """ Analiza cualquier símbolo bajo demanda """
+    try:
+        sig, conf, rsi, prob, adx = predecir(symbol.upper())
+        return {
+            "symbol": symbol.upper(),
+            "signal": sig,
+            "confidence": conf,
+            "rsi": rsi,
+            "probability": prob,
+            "adx": adx
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.post("/trade")
+async def execute_trade(request: Request):
+    """ Ejecución remota de órdenes via Telegram """
+    try:
+        d = await request.json()
+        symbol = d.get("symbol").upper()
+        action = d.get("action").upper() # BUY/SELL
+        lot = float(d.get("lot", 0.01))
+        
+        tick = mt5.symbol_info_tick(symbol)
+        if not tick: return {"error": f"Símbolo {symbol} no encontrado."}
+        
+        price = tick.ask if action == "BUY" else tick.bid
+        side = mt5.ORDER_TYPE_BUY if action == "BUY" else mt5.ORDER_TYPE_SELL
+        sl = get_bunker_sl_price(symbol, lot, side, price)
+        
+        req = {
+            "action": mt5.TRADE_ACTION_DEAL,
+            "symbol": symbol, "volume": lot,
+            "type": side, "price": price, "sl": sl, "magic": 999,
+            "comment": "TELEGRAM_REMOTE",
+            "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC,
+        }
+        res = mt5.order_send(req)
+        if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+            log(f"✅ ORDEN TELEGRAM EXITOSA: {action} {symbol} @ {price}")
+            return {"status": "success", "ticket": res.order}
+        return {"status": "failed", "reason": str(res.comment if res else "Unknown")}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.post("/command")
 async def post_command(request: Request):
