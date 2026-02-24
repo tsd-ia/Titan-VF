@@ -2884,8 +2884,7 @@ def process_symbol_task(sym, active, mission_state):
             elif minuto_chile >= 30: bloqueo_entrada = True # Soft Close (No abrir nuevas)
         elif hora_chile == 19:
             mercado_cerrado = True # Mercado oficialmente cerrado
-        elif hora_chile == 20:
-            if minuto_chile < 5: bloqueo_entrada = True # Bloqueo por Spread de Re-apertura (No entrar)
+        # A las 20:00 el mercado vuelve a la vida (Sin bloqueos de 5 min)
         
         if "XAU" in sym:
                 if mercado_cerrado:
@@ -4070,7 +4069,6 @@ async def post_command(request: Request):
             is_blocked = False
             if h == 18 and m >= 30: is_blocked = True
             elif h == 19: is_blocked = True
-            elif h == 20 and m < 5: is_blocked = True
             
             # BYPASS DE EMERGENCIA: Si el comando viene con 'force': True
             if is_blocked and not d.get("force", False):
