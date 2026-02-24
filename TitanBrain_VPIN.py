@@ -3016,13 +3016,13 @@ def metralleta_loop():
                     if p.magic == 0 and now_loop % 30 < 1:
                         log(f"🛡️ PROTEGIENDO POSICIÓN MANUAL: {sym} (${profit:.2f})")
                     
-                    # === PROTOCOLO DE HARD STOP ADAPTATIVO (v18.11.920) ===
-                    # XAUUSDm: Aire controlado (-25) | BTC/Crypto: Respiración Profunda (-60)
+                    # v21.0: CORTE QUIRÚRGICO (Proteger balance de $94)
+                    # No vale la pena aguantar -$60 si el 80% de las ganadoras nunca bajan de -$10.
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
-                    limit_hs = -25.0 if is_gold_hs else -60.0 # Sugerencia Comandante para 0.1 lotes
+                    limit_hs = -15.0 if is_gold_hs else -18.0 
                     if profit <= limit_hs:
-                        log(f"🚨 HARD STOP ADAPTATIVO: {sym} alcanzó límite de ${limit_hs:.2f}. Cerrando.")
-                        close_ticket(p, "HARD_STOP_USER"); continue
+                        log(f"🚨 CORTE RÁPIDO: {sym} alcanzó límite de ${limit_hs:.2f}. Protegiendo Balance.")
+                        close_ticket(p, "QUICK_CUT_v21"); continue
 
                     # === PROTOCOLO DE TRIPLE TRAILING (Unificado v18.9.366) ===
                     # Trailing Permanente: Asegura desde los $0.30 y no tiene límite de tiempo (60s eliminado)
@@ -3036,8 +3036,10 @@ def metralleta_loop():
                             is_gold = "XAU" in sym or "Gold" in sym
                             is_rocket = is_gold and is_fast
                             
-                            if is_rocket and profit >= 5.0:
-                                # Modo Rocket: Dejamos un buffer del 40% del profit (Más aire)
+                            if profit >= 0.50 and p.sl < p.price_open:
+                                # Trailing Sombra: Si ganamos >$0.50, el riesgo máximo baja a -$5.00
+                                new_sl_shadow = p.price_open - (5.0 / (lot * symbol_info.trade_contract_size)) if p.type == 0 else p.price_open + (5.0 / (lot * symbol_info.trade_contract_size))
+                                update_sl(p.ticket, new_sl_shadow, "SOMBRA_v21")
                                 locked_p = profit * 0.60
                             elif profit >= 55.0: locked_p = 50.00 # v18.11.921: NIVEL BALLENA
                             elif profit >= 45.0: locked_p = 40.00
