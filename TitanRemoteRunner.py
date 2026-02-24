@@ -9,12 +9,16 @@ import os
 FIREBASE_URL = "https://titan-sentinel-default-rtdb.firebaseio.com/live"
 
 def get_flag(name):
-    try:
-        res = requests.get(f"{FIREBASE_URL}/{name}.json", timeout=10)
-        if res.status_code == 200:
-            return bool(res.json())
-    except:
-        return False
+    """ v2.5: Consulta robusta con 3 reintentos antes de fallar """
+    for attempt in range(3):
+        try:
+            res = requests.get(f"{FIREBASE_URL}/{name}.json", timeout=5)
+            if res.status_code == 200:
+                val = res.json()
+                return bool(val) if val is not None else False
+        except Exception as e:
+            if attempt == 2: print(f"⚠️ Error crítico consultando {name}: {e}")
+            time.sleep(1)
     return False
 
 print("==================================================")
