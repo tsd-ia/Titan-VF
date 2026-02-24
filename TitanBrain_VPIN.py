@@ -19,6 +19,8 @@ from datetime import datetime, timedelta
 from collections import deque
 import requests # NEW FOR NTFY
 import subprocess # NEW FOR PORT CLEANUP
+from colorama import Fore, Style, init as colorama_init
+colorama_init(autoreset=True)
 
 # --- UPGRADE: FASTAPI (v7.58 DEEP SCALPER) ---
 import urllib3
@@ -189,7 +191,8 @@ STATE = {
     "price_history": [], "oro_brain_on": True, "btc_brain_on": True,
     "crypto_brain_on": True, "auto_mode": True, "start_mission": True,
     "auto_pilot": True,
-    "whale_memory": {"symbol": None, "signal": "HOLD", "power": 0, "timestamp": 0}
+    "whale_memory": {"symbol": None, "signal": "HOLD", "power": 0, "timestamp": 0},
+    "throttles": {"firebase": 0, "candles": 0, "ping": 0, "dashboard": 0, "telemetry": 0}
 }
 
 def init_memories(s):
@@ -1397,10 +1400,9 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
 
         try:
             line_f = f" {marker}{symbol:<9} | {display_sig:<4} | {confidence*100:>3.0f}% | {spread_val:>6.0f} | {rsi_val:>3.0f} | {lot:<5.2f} | "
-            from colorama import Fore, Style
             sig_col = Fore.GREEN if "BUY" in display_sig else (Fore.RED if "SELL" in display_sig else Fore.YELLOW)
             reset_style = Style.RESET_ALL
-        except ImportError:
+        except:
             sig_col = ""
             reset_style = ""
         
@@ -3068,6 +3070,9 @@ def metralleta_loop():
 
     # ============ 2. CONFIGURACIÓN DE AI & INDICADORES ============   
     pacman_timer = 0
+    LAST_DASH_PRINT = 0
+    LAST_ACC_INFO = 0
+    acc_check = mt5.account_info()
 
     while True:
         global VANGUARDIA_LOCK
@@ -3402,8 +3407,8 @@ def metralleta_loop():
 
 
             
-            # Solo actualizar si el dato de latencia es muy viejo (> 5s)
-            if time.time() - LAST_LATENCY_UPDATE > 5.0:
+            # Solo actualizar si el dato de latencia es muy viejo (> 8s)
+            if time.time() - LAST_LATENCY_UPDATE > 8.0:
                  lat_ping = (ping_end - ping_start) * 1000
                  with state_lock:
                      # El ping de info_tick es más rápido que trade, ajustamos factor x1.5 para realismo
@@ -3553,7 +3558,9 @@ def metralleta_loop():
                 STATE["human_advice"] = f"⌛ [{datetime.now().strftime('%H:%M:%S')}] SCANNING: {active_str}..."
 
             # --- v7.8: SINCRONIZACIÓN DASHBOARD FINAL (ALWAYS RUN) ---
-            if int(now_loop) % 2 == 0:
+            # --- v27.8.5: SINCRONIZACIÓN DASHBOARD THROTTLED (10s) ---
+            if now_loop - STATE["throttles"]["firebase"] > 10.0:
+                STATE["throttles"]["firebase"] = now_loop
                 try:
                     acc = mt5.account_info()
                     tick_oro = mt5.symbol_info_tick("XAUUSDm")
@@ -3639,63 +3646,53 @@ def metralleta_loop():
                     LAST_MISSION_TIME = time.time()
                     continue
 
-            # --- CAPTURA DE DATOS PARA GRÁFICO (VELAS) ---
-            try:
-                # Usar el simbolo configurado por defecto
-                target_sym = "XAUUSDm" # Default preference
-                
-                # Intentar encontrar el oro en la config actual
-                if "XAUUSDm" in ASSET_CONFIG: target_sym = "XAUUSDm"
-                elif "XAUUSD" in ASSET_CONFIG: target_sym = "XAUUSD"
-                elif "GOLD" in ASSET_CONFIG: target_sym = "GOLD"
-                elif len(ASSET_CONFIG) > 0: target_sym = list(ASSET_CONFIG.keys())[0] # Fallback al primero 
-                
-                # 1. M1 CANDLES
-                rates_m1 = mt5.copy_rates_from_pos(target_sym, mt5.TIMEFRAME_M1, 0, 30)
-                if rates_m1 is None: # Si falla, probar XAUUSD pelado
-                     rates_m1 = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M1, 0, 30)
-                
-                if rates_m1 is not None and len(rates_m1) > 20:
-                     # Calcular Bollinger Bands (20, 2)
-                     df_bb = pd.DataFrame(rates_m1)
-                     indicator_bb = ta.volatility.BollingerBands(close=df_bb['close'], window=20, window_dev=2)
-                     df_bb['bb_h'] = indicator_bb.bollinger_hband()
-                     df_bb['bb_m'] = indicator_bb.bollinger_mavg()
-                     df_bb['bb_l'] = indicator_bb.bollinger_lband()
-                     
-                     # Convertir numpy array a lista de dicts con BB
-                     data = []
-                     # v18.9.20: Limitar a 20 velas para la APK (Reducir peso JSON y evitar crasheos)
-                     for i, r in df_bb.tail(20).iterrows():
-                         data.append({
-                             "o": float(r['open']), 
-                             "h": float(r['high']), 
-                             "l": float(r['low']), 
-                             "c": float(r['close']),
-                             "bb_h": float(r['bb_h']) if not pd.isna(r['bb_h']) else None,
-                             "bb_m": float(r['bb_m']) if not pd.isna(r['bb_m']) else None,
-                             "bb_l": float(r['bb_l']) if not pd.isna(r['bb_l']) else None
-                         })
-                     STATE["candles_m1"] = data # Guardar en STATE con BB 🪐
-                
-                # 2. M5 CANDLES
-                rates_m5 = mt5.copy_rates_from_pos(target_sym, mt5.TIMEFRAME_M5, 0, 30)
-                if rates_m5 is None: 
-                     rates_m5 = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M5, 0, 30)
+            # --- v27.8.5: CAPTURA DE VELAS THROTTLED (15s) ---
+            if now_loop - STATE["throttles"]["candles"] > 15.0:
+                STATE["throttles"]["candles"] = now_loop
+                try:
+                    target_sym = "XAUUSDm"
+                    if "XAUUSDm" in ASSET_CONFIG: target_sym = "XAUUSDm"
+                    elif "XAUUSD" in ASSET_CONFIG: target_sym = "XAUUSD"
+                    elif "GOLD" in ASSET_CONFIG: target_sym = "GOLD"
+                    elif len(ASSET_CONFIG) > 0: target_sym = list(ASSET_CONFIG.keys())[0]
 
-                if rates_m5 is not None and len(rates_m5) > 0:
-                     data = []
-                     for r in rates_m5:
-                         data.append({
-                             "o": float(r['open']), 
-                             "h": float(r['high']), 
-                             "l": float(r['low']), 
-                             "c": float(r['close'])
-                         })
-                     STATE["candles_m5"] = data
+                    # 1. M1 CANDLES
+                    rates_m1 = mt5.copy_rates_from_pos(target_sym, mt5.TIMEFRAME_M1, 0, 30)
+                    if rates_m1 is None:
+                         rates_m1 = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M1, 0, 30)
+                    
+                    if rates_m1 is not None and len(rates_m1) > 20:
+                         df_bb = pd.DataFrame(rates_m1)
+                         indicator_bb = ta.volatility.BollingerBands(close=df_bb['close'], window=20, window_dev=2)
+                         df_bb['bb_h'] = indicator_bb.bollinger_hband()
+                         df_bb['bb_m'] = indicator_bb.bollinger_mavg()
+                         df_bb['bb_l'] = indicator_bb.bollinger_lband()
+                         
+                         data = []
+                         for i, r in df_bb.tail(20).iterrows():
+                             data.append({
+                                 "o": float(r['open']), 
+                                 "h": float(r['high']), 
+                                 "l": float(r['low']), 
+                                 "c": float(r['close']),
+                                 "bb_h": float(r['bb_h']) if not pd.isna(r['bb_h']) else None,
+                                 "bb_m": float(r['bb_m']) if not pd.isna(r['bb_m']) else None,
+                                 "bb_l": float(r['bb_l']) if not pd.isna(r['bb_l']) else None
+                             })
+                         STATE["candles_m1"] = data
+                    
+                    # 2. M5 CANDLES
+                    rates_m5 = mt5.copy_rates_from_pos(target_sym, mt5.TIMEFRAME_M5, 0, 30)
+                    if rates_m5 is None: 
+                         rates_m5 = mt5.copy_rates_from_pos("XAUUSD", mt5.TIMEFRAME_M5, 0, 30)
 
-            except Exception as e:
-                log(f"⚠️ Error fetching candles: {e}")
+                    if rates_m5 is not None and len(rates_m5) > 0:
+                         data = []
+                         for r in rates_m5:
+                             data.append({"o": float(r['open']), "h": float(r['high']), "l": float(r['low']), "c": float(r['close'])})
+                         STATE["candles_m5"] = data
+                except Exception as e:
+                    log(f"⚠️ Error fetching candles: {e}")
 
             # --- 4. AUTO-PILOT AI (GOD MODE) ---
             highest_conf = 0.0
@@ -3745,8 +3742,12 @@ def metralleta_loop():
             if start_t > 0:
                  elapsed = str(timedelta(seconds=int(end_t - start_t)))
             
-            print_dashboard(report, elapsed)
-            time.sleep(0.05)
+            # --- v27.8.5: THROTTLED DASHBOARD PRINT ---
+            if now_loop - LAST_DASH_PRINT > 0.8:
+                print_dashboard(report, elapsed)
+                LAST_DASH_PRINT = now_loop
+            
+            time.sleep(0.15) # v27.8.5: Respiro para el CPU
             
         except Exception as e:
             log(f"❌ CRITICAL LOOP CRASH: {e}")

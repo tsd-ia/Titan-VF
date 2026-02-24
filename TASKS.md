@@ -6,6 +6,7 @@
 - **Oráculos:** BTC, Gold (XAUUSD), Crypto (Whales) - **ACTIVOS**
 
 - [x] **Blindaje de Entorno (v27.8.1):** Parche de supervivencia para Python 3.14+.
+- [x] **Latencia Cero (v27.8.5):** Optimización masiva de hilos e I/O. Dashboard y gráficas con throttling para liberar CPU.
 - [x] **Inercia Institucional (v27.8.4):** Las ballenas Giga (>$1M) ahora "manchan" la tendencia por 5 min. Ballenas pequeñas no pueden borrar movimientos gigantes.
 - [x] **Fix Lote Oro 0.02:** Asegurado el lotaje dinámico para cuentas de $100+.
 
