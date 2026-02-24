@@ -251,9 +251,9 @@ def call_ollama(prompt):
             if res.status_code == 200:
                 response_text = res.json().get("response", "EMPTY")
                 if "ERROR" not in response_text.upper():
-                    if i > 0 and OLLAMA_FAIL_COUNT % 5 == 0:
-                        log(f"⚠️ IA NUBE AGOTADA: Usando {model}. (70% cuota estimada)")
-                        # Inyectar alerta en Telegram
+                    if i > 0 and OLLAMA_FAIL_COUNT % 15 == 0: # v27.6: Umbral subido a 15
+                        # log(f"⚠️ IA NUBE AGOTADA: Usando {model}. (70% cuota estimada)") # Silenciado
+                        pass
                         threading.Thread(target=requests.get, args=(f"https://api.telegram.org/bot{os.getenv('TELEGRAM_TOKEN')}/sendMessage?chat_id={os.getenv('TELEGRAM_CHAT_ID')}&text=🛡️ TITAN: IA PRINCIPAL AGOTADA. Iniciando Modo Supervivencia con {model}.",)).start()
                     OLLAMA_FAIL_COUNT = 0
                     return response_text, model
@@ -2410,7 +2410,11 @@ def process_symbol_task(sym, active, mission_state):
             with state_lock: STATE["last_ollama_res"] = f"[{model_used}] {ai_reply}"
             
             if "YES" in ai_reply.upper() or "SI" in ai_reply.upper():
-                log(f"🧠 IA CONFIRMA: {ai_reply[:50]}...")
+                with state_lock:
+                    last_conf_log = STATE.get(f"last_conf_log_{sym}", 0)
+                    if time.time() - last_conf_log > 60:
+                        log(f"🧠 IA CONFIRMA: {ai_reply[:50]}...")
+                        STATE[f"last_conf_log_{sym}"] = time.time()
             
             # v18.9.458: NO CACHEAR ERRORES (Solo cachear YES/NO reales)
             if "YES" in ai_reply.upper() or "NO" in ai_reply.upper() or "SI" in ai_reply.upper():
@@ -2441,10 +2445,11 @@ def process_symbol_task(sym, active, mission_state):
         elif use_cache:
             ai_reply = cache['res']
             model_used = cache['model']
-            last_cache_log = STATE.get(f"last_cache_log_{sym}", 0)
-            if now - last_cache_log > 60.0: # Reducir frecuencia de log de caché
-                log(f"🧠 IA CACHE ({sym}): Reutilizando decisión previa ({ai_reply[:30]}...)")
-                STATE[f"last_cache_log_{sym}"] = now
+            with state_lock:
+                last_cache_log = STATE.get(f"last_cache_log_{sym}", 0)
+                if time.time() - last_cache_log > 300: # v27.6: Caché subido a 5 min
+                    log(f"🧠 IA CACHE ({sym}): Reutilizando decisión previa ({ai_reply[:30]}...)")
+                    STATE[f"last_cache_log_{sym}"] = time.time()
             if "SI" not in ai_reply.upper(): conf *= 0.8
 
         if active and target_sig != "HOLD":

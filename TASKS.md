@@ -1,8 +1,8 @@
 # 🚀 TITAN vF - ROADMAP DE OPERACIONES (2026)
 
-## 📌 ESTADO ACTUAL: v27.4 (FUEGO TOTAL + BLINDAJE)
-- **Balance Actual:** ~$87.00 USD (Recuperando tras racha de BTC)
-- **Modo:** Supervivencia (0.01 Oro / 0.10 Eth)
+## 📌 ESTADO ACTUAL: v27.6 (SILENCIO DE ÉLITE + SUELO DE HIERRO)
+- **Balance Actual:** ~$33.00 USD (Sobrevivencia crítica)
+- **Modo:** Bunker (1 Bala Máx / 0.01 Oro / 0.10 Eth)
 - **Oráculos:** BTC, Gold (XAUUSD), Crypto (Whales) - **ACTIVOS**
 
 ## ✅ COMPLETADO ESTA SESIÓN
@@ -11,6 +11,9 @@
 - [x] **Escudo de Margen (v27.4):** Cierre automático de peor posición si el margen cae del 100%.
 - [x] **Auto-Reset de API (v27.4.2):** Re-conexión automática si MT5 devuelve errores fatales.
 - [x] **Sincronización de Escalera:** Ajuste de Trail a $1.30 -> $0.80 (Comandante).
+- [x] **Protocolo Inmediato (v27.5):** ETH liberado del delay de 1s para gatillo rápido.
+- [x] **Suelo de Hierro (v27.5):** Prohibición de cierres técnicos en negativo (+$0.10 min).
+- [x] **Bozal de Élite (v27.6):** Silenciado spam de IA y desconexiones de Binance (1008).
 
 ## 🛠️ TAREAS EN CURSO / PENDIENTES
 - [ ] **Auditoría de Latencia:** El puente muestra >250ms. Investigar saturación de red.
@@ -50,4 +53,4 @@
 - [x] **Auto-Instalación:** Dependencias de Telegram autogestionadas.
 
 ---
-*Ultima actualización: 2026-02-24 12:15 (Antifraugile Survival Sync)*
+*Ultima actualización: 2026-02-24 14:45 (Bunker Mode Sync)*

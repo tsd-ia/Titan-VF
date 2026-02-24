@@ -109,7 +109,9 @@ async def gold_oracle():
                             STATE["last_pulse_time"] = time.time()
                         continue 
         except Exception as e:
-            print(f"⚠️ Error Oro: {e}")
+            # v18.11.951: Silenciar spam de Binance (1008 Pong timeout)
+            if "1008" not in str(e) and "timeout" not in str(e).lower():
+                print(f"⚠️ Error Oro: {e}")
             await asyncio.sleep(5)
 
 if __name__ == "__main__":
