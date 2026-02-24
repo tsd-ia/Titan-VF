@@ -1567,6 +1567,15 @@ def process_symbol_task(sym, active, mission_state):
                     o_data = json.load(f)
                     if time.time() - o_data["timestamp"] < 10.0:
                         is_oracle_signal = True; sig_pred = o_data["signal"]; conf_pred = 1.0; oracle_volume = o_data.get("volume", 0)
+            # 3. Oráculo CRYPTO (ETH/SOL/MSTR/OPN) - v18.11.998: Radar de 45s
+            elif any(c in sym for c in ["ETH", "SOL", "MSTR", "OPN"]) and os.path.exists("titan_crypto_signals.json"):
+                with open("titan_crypto_signals.json", "r") as f:
+                    csigs = json.load(f)
+                    clean_sym = sym.lower().replace("usdm", "usdt").replace("usd", "usdt")
+                    if clean_sym in csigs:
+                        c_data = csigs[clean_sym]
+                        if time.time() - c_data["timestamp"] < 45.0:
+                            is_oracle_signal = True; sig_pred = c_data["signal"]; conf_pred = 1.0; oracle_volume = c_data.get("volume", 0)
         except: pass
 
         if is_oracle_signal:
