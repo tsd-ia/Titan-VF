@@ -3025,7 +3025,15 @@ def metralleta_loop():
                         close_ticket(p, "EXHAUSTION_CUT_v21"); continue
 
                     # === PROTOCOLO DE TRIPLE TRAILING (Unificado v18.9.366) ===
-                    # Trailing Permanente: Asegura desde los $0.30 y no tiene límite de tiempo (60s eliminado)
+                    # v21.5: SENSOR ANTI-LATIGAZO (Breakeven Dinámico)
+                    # Si ya ganamos >$2.5 y retrocede al 30% del pico, cerramos por seguridad.
+                    pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
+                    if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
+                    
+                    if pico_pnl >= 3.0 and profit <= (pico_pnl * 0.3):
+                        log(f"🪪 VETO DE LATIGAZO: {sym} protegiendo profit ganado (${profit:.2f} de pico ${pico_pnl:.2f})")
+                        close_ticket(p, "WHIPSAW_PROTECTION"); continue
+
                     if profit >= 0.30: 
                         symbol_info = mt5.symbol_info(sym)
                         if symbol_info:
