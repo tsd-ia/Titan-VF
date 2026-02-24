@@ -754,7 +754,9 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     # 2. Definir Lotaje según Balance (v19.0.8: PROTECCIÓN DE CAPITAL)
     # Si el balance cae de $100, bajamos el riesgo para evitar la quema de cuenta.
     if "ETH" in sym:
-        smart_lot = 0.3 if balance >= 100 else 0.1
+        if balance >= 100: smart_lot = 0.3
+        elif balance >= 90: smart_lot = 0.1
+        else: smart_lot = 0.05 # MODO BUNKER PARA $73
     elif "BTC" in sym or "SOL" in sym:
         if balance >= 110:
             smart_lot = 0.1  # MODO BERSERKER (FUEGO TOTAL)
