@@ -678,12 +678,15 @@ def perform_ai_health_audit():
         # Solo purgamos ETH/BTC si se quedan estancados. El Oro tiene aire total.
         is_stagnation_candidate = any(x in p.symbol for x in ["ETH", "BTC", "SOL"])
         # v18.11.955: PURGA RELAJADA PARA CUENTAS DE $100+ (Comandante Mode)
-        if is_stagnation_candidate and trade_life > 900 and p.profit < -3.50:
-             log(f"🧊 LENTITUD REAL: {p.symbol} agotó sus 15m en ${p.profit:.2f}. Purga ejecutada.")
+        # v18.11.903: DEFENSA RELAJADA (Respiro solicitado por Comandante)
+        # Subimos de -$3.50 a -$10.00 para permitir que el drawdown respire.
+        if is_stagnation_candidate and trade_life > 1200 and p.profit < -10.00:
+             log(f"🧊 DEFENSA CEDIDA: {p.symbol} agotó sus 20m y -$10. Purga ejecutada.")
              close_ticket(p, "SCALPING_PURGE"); continue
 
-        # v18.11.500: PULMÓN DE ACERO (600s de Vida)
-        if trade_life < 600 and p.profit > -4.0: continue
+        # v18.11.903: PULMÓN DE ACERO (1200s de Vida / -$12 de Umbral Pánico)
+        p_pánico = -12.0 if ("XAU" in p.symbol or "Gold" in p.symbol) else -8.0
+        if trade_life < 1200 and p.profit > p_pánico: continue
         
         # Preparar diagnóstico para la IA
         duration_min = int(trade_life / 60)
