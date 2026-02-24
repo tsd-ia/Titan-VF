@@ -3034,9 +3034,12 @@ def metralleta_loop():
                             elif profit >= 7.0: locked_p = 6.50
                             elif profit >= 6.0: locked_p = 5.50
                             elif profit >= 5.0: locked_p = 4.50
-                            elif profit >= 4.0: locked_p = 3.50
-                            elif profit >= 2.00: locked_p = 1.20
-                            elif profit >= 1.50: locked_p = 0.50 # v18.11.995: Mínimo para absorber spread
+                            elif profit >= 4.0: locked_p = 3.60 # v19.0.5: Ajuste agresivo BTC
+                            elif profit >= 3.5: locked_p = 3.10
+                            elif profit >= 3.0: locked_p = 2.60
+                            elif profit >= 2.5: locked_p = 2.00
+                            elif profit >= 2.0: locked_p = 1.50
+                            elif profit >= 1.50: locked_p = 0.50
                             else: 
                                 locked_p = 0.0 # NADA DE CIERRES DE CENTAVOS
                             
