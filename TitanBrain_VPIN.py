@@ -861,8 +861,18 @@ def close_ticket(pos, reason="UNK"):
             tg_token = os.getenv('TELEGRAM_TOKEN', '8217691336:AAFWduUGkO_f-QRF6MN338HY-MA46CjzHMg')
             tg_chat = os.getenv('TELEGRAM_CHAT_ID', '8339882349')
             if tg_token and tg_chat:
+                acc = mt5.account_info()
+                balance = acc.balance if acc else 0.0
+                equity = acc.equity if acc else 0.0
                 emo = "🟩 WIN" if profit > 0 else "🟥 LOSS"
-                msg = f"TITAN {emo}\nActivo: {pos.symbol}\nProfit: ${profit:.2f}\nRazón: {reason}\nEquidad: ${mt5.account_info().equity:.2f}"
+                msg = (f"TITAN {emo}\n"
+                       f"Activo: {pos.symbol}\n"
+                       f"Profit: ${profit:.2f}\n"
+                       f"Razón: {reason}\n"
+                       f"------------------\n"
+                       f"💰 Balance: ${balance:.2f}\n"
+                       f"📈 Patrimonio: ${equity:.2f}\n"
+                       f"📊 PnL Sesión: ${equity - balance:.2f}")
                 requests.get(f"https://api.telegram.org/bot{tg_token}/sendMessage?chat_id={tg_chat}&text={msg}", timeout=2)
         except: pass
         
@@ -2983,29 +2993,33 @@ def metralleta_loop():
                 
                 # B. PROTOCOLO DE BLINDAJE INDIVIDUAL (v22.0: Movido arriba para inmunidad a crashes)
                 for p in open_positions:
-                    # Lógica de protección aquí para que se ejecute SIEMPRE primero
-                    p_sym = p.symbol
-                    lot = p.volume
-                    profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
-                    
-                    # 1. HARD STOP / AGOTAMIENTO
-                    limit_hs = -6.5 if ("XAU" in p_sym or "Gold" in p_sym) else -13.5
-                    if profit <= limit_hs:
-                        close_ticket(p, "EXHAUSTION_CUT_v22"); continue
+                    try: # v23.0: WATCHDOG LOCAL - Si falla una, las demás siguen protegidas.
+                        p_sym = p.symbol
+                        lot = p.volume
+                        profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
                         
-                    # 2. VETO LATIGAZO
-                    pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
-                    if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
-                    if pico_pnl >= 3.0 and profit <= (pico_pnl * 0.3):
-                        close_ticket(p, "WHIPSAW_VETO_v22"); continue
+                        # 1. HARD STOP / AGOTAMIENTO
+                        limit_hs = -6.5 if ("XAU" in p_sym or "Gold" in p_sym) else -13.5
+                        if profit <= limit_hs:
+                            close_ticket(p, "EXHAUSTION_CUT_v22"); continue
+                            
+                        # 2. VETO LATIGAZO
+                        pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
+                        if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
+                        if pico_pnl >= 3.0 and profit <= (pico_pnl * 0.3):
+                            close_ticket(p, "WHIPSAW_VETO_v22"); continue
 
-                    # 3. ESCALERA TITÁN (Asegurar ganancias)
-                    if profit >= 0.30:
-                        # ... (lógica de escalera aquí) ...
-                        pass 
+                        # 3. ESCALERA TITÁN (Asegurar ganancias)
+                        if profit >= 0.30:
+                            # ... (resto de lógica de escalera que ya está abajo) ...
+                            pass
+                    except Exception as e_pos:
+                        log(f"⚠️ WATCHDOG POSICIÓN: Error en ticket #{p.ticket}: {e_pos}")
+                        continue
 
                 # Solo después de blindar, auditamos con IA
-                perform_ai_health_audit() 
+                try: perform_ai_health_audit() 
+                except Exception as e_ai: log(f"🆘 CRITICAL AI ERROR: {e_ai}. Ignorado para mantener blindaje.")
                 
                 # v18.11.900: FIX DASHBOARD CEGUERA (Sincronización de Balas)
                 total_bullets = len(open_positions)
