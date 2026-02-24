@@ -45,8 +45,8 @@ async def gold_oracle():
             continue
 
         try:
-            url = f"wss://stream.binance.com:9443/ws/{SYMBOL_BINANCE}@aggTrade"
-            async with websockets.connect(url, ping_interval=20, ping_timeout=20) as ws:
+            # v18.11.960: Blindaje anti-latencia (Ping/Pong extendido)
+            async with websockets.connect(url, ping_interval=30, ping_timeout=30, close_timeout=10) as ws:
                 print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] CONECTADO A BINANCE (ORO)")
                 while True:
                     if int(time.time()) % 30 == 0:
