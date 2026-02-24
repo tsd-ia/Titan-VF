@@ -68,10 +68,10 @@ while True:
             print("🦅 Lanzando OFICIAL DE PUENTE (Telegram IA)...")
             subprocess.Popen('start "TITAN_MESSENGER" cmd /k "python Titan_Messenger_IA.py"', shell=True)
             
-            print("✅ Despliegue completado. Pausando escucha 15s para estabilizar...")
-            time.sleep(15)
+            print("✅ Despliegue completado. Estabilizando sensores (5s)...")
+            time.sleep(5)
                 
-        time.sleep(5)
+        time.sleep(2)
     except Exception as e:
         print(f"⚠️ Error Runner: {e}")
         time.sleep(10)
