@@ -1643,10 +1643,12 @@ def process_symbol_task(sym, active, mission_state):
     try:
         now = time.time()
         
-        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 3 BALAS (LÍMITE REAL MARGEN 1:200)
+        # 🛡️ FRENO DE EMERGENCIA: CARGADOR DINÁMICO (v28.6)
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
-        if len(pos_list) >= 3:
+        balance = mt5.account_info().balance
+        limit = 5 if balance >= 100 else 3
+        if len(pos_list) >= limit:
             return None
             
         now_dt = datetime.fromtimestamp(now)
@@ -3248,16 +3250,13 @@ def metralleta_loop():
                                 new_sl_shadow = p.price_open - (5.0 / (lot * symbol_info.trade_contract_size)) if p.type == 0 else p.price_open + (5.0 / (lot * symbol_info.trade_contract_size))
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v21")
                                 locked_p = profit * 0.60
-                            # v28.5: ESCALERA DE PROTECCIÓN (MÍNIMO $1.00 NETO)
-                            if profit >= 55.0: locked_p = 50.00
-                            elif profit >= 35.0: locked_p = 30.00
-                            elif profit >= 15.0: locked_p = 12.00
-                            elif profit >= 9.0: locked_p = 8.50
-                            elif profit >= 5.0: locked_p = 4.20
-                            elif profit >= 3.0: locked_p = 2.50
-                            elif profit >= 2.0: locked_p = 1.60
-                            elif profit >= 1.30: locked_p = 1.00 # REGLA DE ORO: Mínimo $1 neto
-                            else: locked_p = -2.0 # Seguir dejando aire si no llega al umbral
+                            # v28.6: TRAILING EVOLUTIVO (DEJAR CORRER)
+                            if profit >= 10.0: locked_p = profit - 2.50 # Buffer de $2.50 para mega-tendencias
+                            elif profit >= 5.0: locked_p = profit - 1.50
+                            elif profit >= 3.0: locked_p = 2.40
+                            elif profit >= 2.0: locked_p = 1.40
+                            elif profit >= 1.30: locked_p = 1.00 # Suelo de Hierro
+                            else: locked_p = -2.0
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
