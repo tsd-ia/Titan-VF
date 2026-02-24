@@ -3106,7 +3106,7 @@ def metralleta_loop():
                             elif profit >= 3.0: locked_p = 2.60
                             elif profit >= 2.5: locked_p = 2.00
                             elif profit >= 2.0: locked_p = 1.50
-                            elif profit >= 1.50: locked_p = 0.50
+                            elif profit >= 1.30: locked_p = 0.80 # v27.5: Ajuste Comandante
                             else: 
                                 locked_p = 0.0 # NADA DE CIERRES DE CENTAVOS
                             
