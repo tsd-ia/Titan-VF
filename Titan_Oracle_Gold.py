@@ -12,7 +12,7 @@ except ImportError:
 
 # CONFIGURACIÓN DEL ORÁCULO ORO (PAXG/USDT)
 SYMBOL_BINANCE = "paxgusdt"
-WHALE_THRESHOLD = 18000    
+WHALE_THRESHOLD = 10000    
 GOD_MODE_THRESHOLD = 80000 
 FILE_SIGNAL = "titan_gold_signals.json"
 FILE_PULSE = "titan_gold_pulse.json"
@@ -58,9 +58,10 @@ async def gold_oracle():
                         
                         price = float(data['p'])
                         col = float(data['q']) * price
-                        # INVERSIÓN COMANDANTE: Seguir a la Institución (Maker), no al Pececillo Atrapado (Taker)
-                        # data['m'] = True significa que el TAKER vendió (Maker compró).
-                        side = "BUY" if data['m'] else "SELL"
+                        # CORRECCIÓN COMANDANTE: Seguir al Agresor (Taker), no al Maker (Atrapado)
+                        # m = True -> El Comprador es Maker -> El VENDEDOR es Taker (Agresor) -> SELL
+                        # m = False -> El Vendedor es Maker -> El COMPRADOR es Taker (Agresor) -> BUY
+                        side = "SELL" if data['m'] else "BUY"
                         ts = data['T'] / 1000.0
                         
                         STATE["window"]["price"] = price

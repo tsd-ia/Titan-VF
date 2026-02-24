@@ -25,9 +25,13 @@
 ---
 
 ### 📡 ESTADO DE ORÁCULOS
-- **ORO:** Umbral $10k (Sensibilidad Máxima).
-- **BTC:** Umbral $220k (Institucional).
-- **ETH/SOL/CRYPTO:** Umbral por volatilidad (Fast-Path Activo).
+- **ORO:** Umbral $10k (Sensibilidad Máxima) | Lógica Taker: ✅
+- **BTC:** Umbral $220k (Institucional) | Lógica Taker: ✅
+- **ETH/SOL/CRYPTO:** Umbral por volatilidad (Fast-Path Activo) | Lógica Taker: ✅
 
 ---
-*Ultima actualización: 2026-02-23 21:15 (Latencia Purificada)*
+### 🧹 MANTENIMIENTO
+- [x] **Auditoría Regla 4:** Log `titan_vanguardia.log` rotado (Limpieza < 1MB).
+
+---
+*Ultima actualización: 2026-02-23 22:15 (Berserker Protocol Sync)*
