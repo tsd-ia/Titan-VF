@@ -3017,9 +3017,9 @@ def metralleta_loop():
                         log(f"⚠️ WATCHDOG POSICIÓN: Error en ticket #{p.ticket}: {e_pos}")
                         continue
 
-                # Solo después de blindar, auditamos con IA
-                try: perform_ai_health_audit() 
-                except Exception as e_ai: log(f"🆘 CRITICAL AI ERROR: {e_ai}. Ignorado para mantener blindaje.")
+                # Solo después de blindar, auditamos con IA (INACTIVO v24: Reservado para Asistente Telegram)
+                # try: perform_ai_health_audit() 
+                # except Exception as e_ai: log(f"🆘 CRITICAL AI ERROR: {e_ai}. Ignorado para mantener blindaje.")
                 
                 # v18.11.900: FIX DASHBOARD CEGUERA (Sincronización de Balas)
                 total_bullets = len(open_positions)
