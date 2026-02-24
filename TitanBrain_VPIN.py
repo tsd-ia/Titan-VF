@@ -2880,29 +2880,30 @@ def process_symbol_task(sym, active, mission_state):
         bloqueo_entrada = False
 
         if hora_chile == 18:
-            if minuto_chile >= 45: mercado_cerrado = True # Hard Close: 18:45
-            elif minuto_chile >= 30: bloqueo_entrada = True # Soft Close: 18:30
+            if minuto_chile >= 45: mercado_cerrado = True # Hard Close (Liquidar antes del Gap)
+            elif minuto_chile >= 30: bloqueo_entrada = True # Soft Close (No abrir nuevas)
         elif hora_chile == 19:
-            mercado_cerrado = True
-        elif hora_chile == 20 and minuto_chile < 5:
-            mercado_cerrado = True
+            mercado_cerrado = True # Mercado oficialmente cerrado
+        elif hora_chile == 20:
+            if minuto_chile < 5: bloqueo_entrada = True # Bloqueo por Spread de Re-apertura (No entrar)
         
         if "XAU" in sym:
                 if mercado_cerrado:
                     block_action = True
-                    block_reason = "MERCADO CERRADO (18:45)"
-                    if len(pos_list) > 0:
+                    block_reason = "MERCADO CERRADO (19h-20h)"
+                    # Solo liquidamos si estamos en la ventana de pre-cierre (18:45-19:00)
+                    if hora_chile == 18 and minuto_chile >= 45 and len(pos_list) > 0:
                         log(f"🔒 CIERRE MERCADO (HARD): Cerrando {sym} antes del gap! (18:45)")
                         for p in pos_list:
                              close_ticket(p, "MERCADO_CERRADO")
                         log(f"🏁 MISIÓN FINALIZADA POR HORARIO. Retirada estratégica.")
                         stop_mission()
-                elif is_market_closed(sym):
+                elif is_market_closed(sym) or (hora_chile == 19):
                     block_action = True
                     block_reason = "CIERRE DIARIO (19:00 - 20:00)"
                 elif bloqueo_entrada:
                     block_action = True
-                    block_reason = "RESTRICCIÓN PRE-CIERRE (18:30)"
+                    block_reason = "RESTRICCIÓN RE-APERTURA/PRE-CIERRE"
 
         # --- BOTÓN DE PÁNICO (Última defensa - SUBIDO A $150) ---
         if sym_pnl <= -150.0 and len(pos_list) > 0:
