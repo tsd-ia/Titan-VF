@@ -3016,12 +3016,14 @@ def metralleta_loop():
                             elif profit >= 2.50: locked_p = 2.00
                             elif profit >= 2.00: locked_p = 1.50
                             elif profit >= 1.50: locked_p = 1.00
-                            elif profit >= 1.00: locked_p = 0.50
-                            elif profit >= 0.50: 
+                            elif profit >= 1.00: 
                                 if "XAU" in sym or "Gold" in sym:
-                                    locked_p = 0.25 # v18.11.901: Más aire para Oro (Bajado de 0.75)
+                                    locked_p = 0.20 # v18.11.902: PULMÓN DE BALLENA (Suelo inicial muy bajo para dejar correr)
                                 else:
-                                    locked_p = 0.10
+                                    locked_p = 0.50
+                            elif profit >= 0.50: 
+                                if "XAU" in sym or "Gold" in sym: continue # v18.11.902: Oro NO bloquea nada por debajo de $1.00
+                                locked_p = 0.10
                             else: 
                                 if "XAU" in sym or "Gold" in sym: continue
                                 locked_p = profit - 0.20
@@ -3079,8 +3081,8 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v18.11.901: PARACAÍDAS ORO RELAJADO (Respiración Profunda) ===
-                    parachute_ratio = 0.30 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
+                    # === v18.11.902: PARACAÍDAS ORO "DEEP BREATH" (Ratio 20%) ===
+                    parachute_ratio = 0.20 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
                     # El paracaídas solo actúa si ya aseguramos nuestro suelo de $0.50
                     if max_p > 1.05 and profit < (max_p * parachute_ratio) and profit >= 0.50:
                         log(f"🪂 PARACAÍDAS ORO $0.50: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
