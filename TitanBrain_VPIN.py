@@ -1490,11 +1490,11 @@ def process_symbol_task(sym, active, mission_state):
     try:
         now = time.time()
         
-        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 3 BALAS
+        # 🛡️ FRENO DE EMERGENCIA: MÁXIMO 6 BALAS (v18.11.970)
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
-        if len(pos_list) >= 3:
-            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} ya tiene {len(pos_list)}/3 balas. Deteniendo octopus.")
+        if len(pos_list) >= 6:
+            if now % 60 < 2: log(f"🛡️ BLOQUEO ATÓMICO: {sym} ya tiene {len(pos_list)}/6 balas. Deteniendo octopus.")
             return None
             
         now_dt = datetime.fromtimestamp(now)
