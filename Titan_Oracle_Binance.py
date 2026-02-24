@@ -63,12 +63,14 @@ def on_message(ws, message):
         STATE["buys_window"] = [(ts, vol) for ts, vol in STATE["buys_window"] if now - ts <= window_size]
         STATE["sells_window"] = [(ts, vol) for ts, vol in STATE["sells_window"] if now - ts <= window_size]
         
-        # INVERSIÓN COMANDANTE: Seguir a la Institución (Maker), no al Pececillo
-        # is_buyer_maker = True -> Maker compró / Taker vendió -> Seguir compra
+        # CORRECCIÓN COMANDANTE: Seguir al Agresor (Taker), no al Maker (Atrapado)
+        # m = True -> El Comprador es Maker -> El VENDEDOR es Taker (Agresor) -> SELL
+        # m = False -> El Vendedor es Maker -> El COMPRADOR es Taker (Agresor) -> BUY
         if is_buyer_maker: 
-            STATE["buys_window"].append((now, volume_usd))
-        else: 
             STATE["sells_window"].append((now, volume_usd))
+        else: 
+            STATE["buys_window"].append((now, volume_usd))
+
             
         total_sells = sum(vol for ts, vol in STATE["sells_window"])
         total_buys = sum(vol for ts, vol in STATE["buys_window"])

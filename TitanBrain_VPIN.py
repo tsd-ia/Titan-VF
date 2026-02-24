@@ -1561,12 +1561,13 @@ def process_symbol_task(sym, active, mission_state):
                     o_data = json.load(f)
                     if time.time() - o_data["timestamp"] < 10.0:
                         sig_pred = o_data["signal"]; conf_pred = 1.0; is_oracle_signal = True; oracle_volume = o_data.get("volume", 0)
-            # 2. Oráculo ORO (Umbral $10k)
+            # 2. Oráculo ORO (v18.11.999: Radar 60s / Umbral $10k)
             elif "XAU" in sym and os.path.exists("titan_gold_signals.json"):
                 with open("titan_gold_signals.json", "r") as f:
                     o_data = json.load(f)
-                    if time.time() - o_data["timestamp"] < 10.0:
+                    if time.time() - o_data["timestamp"] < 60.0:
                         is_oracle_signal = True; sig_pred = o_data["signal"]; conf_pred = 1.0; oracle_volume = o_data.get("volume", 0)
+
             # 3. Oráculo CRYPTO (ETH/SOL/MSTR/OPN) - v18.11.998: Radar de 45s
             elif any(c in sym for c in ["ETH", "SOL", "MSTR", "OPN"]) and os.path.exists("titan_crypto_signals.json"):
                 with open("titan_crypto_signals.json", "r") as f:
@@ -2314,9 +2315,11 @@ def process_symbol_task(sym, active, mission_state):
             
             # v18.11.910: Si es ballena pequeña (<$80k), NO bypass parcial. Requiere IA Confirmación.
             # v18.11.960: UMBRAL ORO BAJADO A $40k (A pedido del Comandante)
-            if sym == "XAUUSDm" and oracle_power < 40000:
-                is_oracle_signal = False # Relegar a señal técnica normal
-                log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Umbral mínimo es $40k.")
+            # v18.11.999: Sincronización Umbral Oro a $10k (Solicitud Comandante)
+            if sym == "XAUUSDm" and oracle_power < 10000:
+                is_oracle_signal = False 
+                log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Umbral mínimo es $10k.")
+
             else:
                 ai_reply = "YES" # Bypass absoluto para Ballenas Giga
                 model_used = "ORACLE_MODE"

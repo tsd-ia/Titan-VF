@@ -60,8 +60,9 @@ async def crypto_oracle():
                         sym = data['s'].lower()
                         price = float(data['p'])
                         col = float(data['q']) * price
-                        # INVERSIÓN COMANDANTE: Seguir a la Institución (Maker), no al Taker (Atrapado)
-                        side = "BUY" if data['m'] else "SELL"
+                        # CORRECCIÓN COMANDANTE: Seguir al Agresor (Taker)
+                        # data['m'] (True) -> Buyer is Maker -> Aggressor is SELLER
+                        side = "SELL" if data['m'] else "BUY"
                         ts = data['T'] / 1000.0
                         
                         STATE["windows"][sym]["price"] = price
