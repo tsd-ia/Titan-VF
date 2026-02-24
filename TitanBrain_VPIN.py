@@ -3248,17 +3248,15 @@ def metralleta_loop():
                                 new_sl_shadow = p.price_open - (5.0 / (lot * symbol_info.trade_contract_size)) if p.type == 0 else p.price_open + (5.0 / (lot * symbol_info.trade_contract_size))
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v21")
                                 locked_p = profit * 0.60
-                            elif profit >= 55.0: locked_p = 50.00 # v18.11.921: NIVEL BALLENA
-                            elif profit >= 45.0: locked_p = 40.00
+                            # v28.5: ESCALERA DE PROTECCIÓN (MÍNIMO $1.00 NETO)
+                            if profit >= 55.0: locked_p = 50.00
                             elif profit >= 35.0: locked_p = 30.00
-                            elif profit >= 25.0: locked_p = 20.00
                             elif profit >= 15.0: locked_p = 12.00
                             elif profit >= 9.0: locked_p = 8.50
-                            # v28.4: BREAKEVEN RELÁMPAGO
-                            if profit >= 0.50: locked_p = 0.10 # Asegurar Breakeven rápido
-                            elif profit >= 2.0: locked_p = 1.50
-                            elif profit >= 3.0: locked_p = 2.60
-                            elif profit >= 5.0: locked_p = 4.50
+                            elif profit >= 5.0: locked_p = 4.20
+                            elif profit >= 3.0: locked_p = 2.50
+                            elif profit >= 2.0: locked_p = 1.60
+                            elif profit >= 1.30: locked_p = 1.00 # REGLA DE ORO: Mínimo $1 neto
                             else: locked_p = -2.0 # Seguir dejando aire si no llega al umbral
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)

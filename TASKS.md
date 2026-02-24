@@ -5,7 +5,9 @@
 - **Modo:** Bunker (1 Bala Máx / 0.01 Oro / 0.10 Eth)
 - **Oráculos:** BTC, Gold (XAUUSD), Crypto (Whales) - **ACTIVOS**
 
+- [x] **Garantía de Cierre (v28.5):** Umbral mínimo de profit de $1.00 para cualquier cierre en verde. Eliminados los cierres "hormiga".
 - [x] **Protocolo Berserker (v28.1):** Cargador de 8 balas, bypass de M5 y ráfaga de 1 segundo para inundar el mercado.
+
 - [x] **Modo Metralleta (v28.0):** Stacking agresivo (0.10 dist), Cooldown relámpago (5s) y SL Scalper ($5) para maximizar volumen en cuentas pequeñas.
 - [x] **Blindaje de Entorno (v27.8.1):** Parche de supervivencia para Python 3.14+.
 - [x] **Turbo Reactor (v27.8.6):** Auditoría de latencia aplicada. SL asíncrono, IA throttled y umbrales de precisión mejorados. El dashboard ya no debe congelarse.
