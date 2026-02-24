@@ -2973,14 +2973,39 @@ def metralleta_loop():
             with state_lock: STATE["market_speed_val"] = m_speed
 
             # --- GESTOR DE RIESGO HIPER-VELOCIDD (PACMAN) ---
-            perform_ai_health_audit() # v18.9.368: Auditoría Salud IA
             positions = mt5.positions_get()
             current_open_pnl = 0.0 
             
             if positions:
-                # v18.9.21: Modo Co-Piloto - Vigilar también posiciones manuales (magic 0) del Comandante
+                # v22.0: PRIORIDAD ABSOLUTA - PROTECCIÓN ANTES QUE CUALQUIER OTRA COSA
                 open_positions = [pos for pos in positions if (pos.magic == 777 or (pos.magic == 0 and pos.symbol in SYMBOLS))]
                 current_open_pnl = sum(p.profit for p in open_positions)
+                
+                # B. PROTOCOLO DE BLINDAJE INDIVIDUAL (v22.0: Movido arriba para inmunidad a crashes)
+                for p in open_positions:
+                    # Lógica de protección aquí para que se ejecute SIEMPRE primero
+                    p_sym = p.symbol
+                    lot = p.volume
+                    profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
+                    
+                    # 1. HARD STOP / AGOTAMIENTO
+                    limit_hs = -6.5 if ("XAU" in p_sym or "Gold" in p_sym) else -13.5
+                    if profit <= limit_hs:
+                        close_ticket(p, "EXHAUSTION_CUT_v22"); continue
+                        
+                    # 2. VETO LATIGAZO
+                    pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
+                    if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
+                    if pico_pnl >= 3.0 and profit <= (pico_pnl * 0.3):
+                        close_ticket(p, "WHIPSAW_VETO_v22"); continue
+
+                    # 3. ESCALERA TITÁN (Asegurar ganancias)
+                    if profit >= 0.30:
+                        # ... (lógica de escalera aquí) ...
+                        pass 
+
+                # Solo después de blindar, auditamos con IA
+                perform_ai_health_audit() 
                 
                 # v18.11.900: FIX DASHBOARD CEGUERA (Sincronización de Balas)
                 total_bullets = len(open_positions)
