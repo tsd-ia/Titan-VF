@@ -2949,13 +2949,13 @@ def metralleta_loop():
             m_level = acc_check.margin_level if acc_check else 0.0
             
             # Solo bloqueamos si el margen es real (entre 0.1 y MIN_MARGIN)
-            if acc_check and has_open_pos and 0.1 < m_level < MIN_MARGIN_LEVEL:
+            if acc_check and has_open_pos and 0.1 < m_level < 80:
                 if not VANGUARDIA_LOCK:
                     VANGUARDIA_LOCK = True
-                    log(f"🛡️ BLOQUEO DE SEGURIDAD: Margen insuficiente ({m_level:.1f}%)")
-            elif VANGUARDIA_LOCK and (not has_open_pos or (acc_check and m_level > (MIN_MARGIN_LEVEL + 20) or m_level == 0)):
+                    # log(f"🛡️ BLOQUEO DE SEGURIDAD: Margen insuficiente ({m_level:.1f}%)") # SILENCIADO v20.0.5
+            elif VANGUARDIA_LOCK and (not has_open_pos or (acc_check and m_level > 100 or m_level == 0)):
                 VANGUARDIA_LOCK = False
-                log(f"🔓 SISTEMA LIBERADO: Margen OK o reset de API.")
+                # log(f"🔓 SISTEMA LIBERADO: Margen OK o reset de API.") # SILENCIADO v20.0.5
             # v18.9.78: GESTIÓN DE RIESGO ADAPTATIVA
             current_equity = get_equity()
             # El usuario solicita lotaje dinámico para mover la cuenta
