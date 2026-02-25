@@ -2864,8 +2864,10 @@ def process_symbol_task(sym, active, mission_state):
                                     should_fire = False
                                     # Log de espera detallado
                                     if now % 20 < 1:
+                                        # v31.17: Stacking Dinámico (Mitad de distancia si hay Ballena)
+                                        smart_min_dist = 0.25 if not is_oracle_signal else 0.12
                                         razon_espera = "Distancia" if dist_val < smart_min_dist else "Color de Vela"
-                                        log(f"🧘 AFILANDO PUNTERÍA: Esperando {razon_espera} para B{n_balas+1} (D:{dist_val:.2f}/0.25)")
+                                        log(f"🧘 AFILANDO PUNTERÍA: Esperando {razon_espera} para B{n_balas+1} (D:{dist_val:.2f}/{smart_min_dist})")
                         
                         # --- FILTRO DE VIDA MÍNIMA v11.6 (ANTI-WHIPSAW) ---
                         # v12.1: Ignorar delay si es un HEDGE (Rescate urgente)
@@ -3224,10 +3226,17 @@ def metralleta_loop():
                         # v31.10: Micro-Veto (Blindaje desde $1.10)
                         pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
                         if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
+                        # v31.17: DOMA DE BALLENAS (Profit sin asfixia)
+                        target_pico = 1.10
+                        is_whale = False
+                        if STATE.get(f"oracle_{p_sym}", False):
+                            ov = STATE.get(f"oracle_vol_{p_sym}", 0)
+                            if ov > 15000: 
+                                is_whale = True
+                                target_pico = 5.00 # Dejamos correr hasta los $5 si hay volumen real
                         
-                        # Si ya ganamos > $1.10, no permitimos que se devuelva más del 25%
-                        if pico_pnl >= 1.10 and profit <= (pico_pnl * 0.75):
-                            log(f"🪪 MICRO-VETO: {p_sym} asegurando {profit:.2f} (75% de pico {pico_pnl:.2f})")
+                        if pico_pnl >= target_pico and profit <= (pico_pnl * 0.75):
+                            log(f"🪪 VETO RECUPERADOR: {p_sym} asegurando {profit:.2f} (Pico: {pico_pnl:.2f})")
                             close_ticket(p, "WHIPSAW_VETO_v31"); continue
 
                         # 3. ESCALERA TITÁN (Asegurar ganancias)
