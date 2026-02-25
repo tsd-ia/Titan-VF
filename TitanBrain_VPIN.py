@@ -1067,8 +1067,8 @@ def _async_update_sl(ticket, new_sl, comment):
             err_msg = res.comment if res else "No Response"
             retcode = res.retcode if res else 10001
             
-            # v31.9.2: EMERGENCIA - Si el SL falla por proximidad (10011) en Oro con profit, cerramos a mercado.
-            if retcode == 10011 and pos.profit >= 0.50:
+            # v31.14.2: EMERGENCIA - Si el SL falla por proximidad (10011 o 10016) en Oro con profit, cerramos a mercado.
+            if retcode in [10011, 10016] and pos.profit >= 0.50:
                 log(f"🆘 ERROR 10011 (Stops Inválidos) en {pos.symbol}: ¡CERRANDO A MERCADO PARA ASEGURAR ${pos.profit:.2f}!")
                 close_ticket(pos, "EMERGENCY_STOP_GUARD")
             elif retcode != 10025:
@@ -2933,13 +2933,8 @@ def process_symbol_task(sym, active, mission_state):
             time_since_last = now - LAST_HEARTBEAT.get(sym, 0)
             is_heartbeat = time_since_last > 5.0
             
-            # v31.12: BLOQUEO POR FLOTANTE NEGATIVO (Recuperación)
-            # Si perdemos más de $3.00 en total, frenamos nuevas balas salvo Oráculo.
-            o_pnl = STATE.get("open_pnl", 0.0)
-            if o_pnl < -3.0 and not is_oracle_signal and should_fire:
-                should_send = False
-                if now % 10 < 1: log(f"⚠️ BLOQUEO RECUPERACION: Canasta en {o_pnl:.2f}. Solo Oráculo tiene permiso.")
-            elif is_vigilancia_blocked and not is_oracle_signal:
+            # v18.9.245: Si está en vigilancia por pérdida, NO DISPARAR nuevas balas.
+            if is_vigilancia_blocked and not is_oracle_signal:
                 should_send = False
             elif target_sig in ["BUY", "SELL"]: 
                 # v18.9.245: Si es Oráculo, ignorar bloqueos suaves (Veto M1, etc)
@@ -3195,6 +3190,8 @@ def metralleta_loop():
             # logic handled inside process_symbol_task if needed
             
             # --- SENSOR DE VELOCIDAD DEL MERCADO (v18.9.20) ---
+            now_loop = time.time() # v31.14.1: Definición global de tiempo
+            now = now_loop
             ph_v = STATE.get("price_history", [])
             m_speed = 20.0 # Default
             if len(ph_v) > 10:
@@ -3216,10 +3213,7 @@ def metralleta_loop():
                 for p in open_positions:
                     try: # v23.0: WATCHDOG LOCAL - Si falla una, las demás siguen protegidas.
                         p_sym = p.symbol
-                        sym = p.symbol # v31.13: Alias para compatibilidad
-                        now = time.time() 
                         lot = p.volume
-                        entry = p.price_open # v31.13: Restauración Crítica
                         profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
                         
                         # 1. HARD STOP / AGOTAMIENTO
@@ -3227,15 +3221,13 @@ def metralleta_loop():
                         if profit <= limit_hs:
                             close_ticket(p, "EXHAUSTION_CUT_v22"); continue
                             
-                        # v31.12: MICRO-VETO DINÁMICO (Más aire al Oráculo)
+                        # v31.10: Micro-Veto (Blindaje desde $1.10)
                         pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
                         if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
                         
-                        # Si es Oráculo, dejamos que respire hasta los $3.50
-                        target_pico = 3.50 if STATE.get(f"oracle_{p_sym}", False) else 1.10
-                        
-                        if pico_pnl >= target_pico and profit <= (pico_pnl * 0.75):
-                            log(f"🪪 VETO RECUPERADOR: {p_sym} asegurando {profit:.2f} (Pico: {pico_pnl:.2f})")
+                        # Si ya ganamos > $1.10, no permitimos que se devuelva más del 25%
+                        if pico_pnl >= 1.10 and profit <= (pico_pnl * 0.75):
+                            log(f"🪪 MICRO-VETO: {p_sym} asegurando {profit:.2f} (75% de pico {pico_pnl:.2f})")
                             close_ticket(p, "WHIPSAW_VETO_v31"); continue
 
                         # 3. ESCALERA TITÁN (Asegurar ganancias)
@@ -3269,6 +3261,21 @@ def metralleta_loop():
 
                 # B. PROTOCOLO DE BLINDAJE INDIVIDUAL (v7.71)
                 for p in open_positions:
+                    # v11.5: Sincronización de Tiempos (Last Entry Fix)
+                    # Si reiniciamos, el bot no sabe cuándo abrió. Lo leemos de MT5.
+                    p_sym = p.symbol
+                    if p_sym not in LAST_ENTRY or LAST_ENTRY[p_sym] == 0:
+                        LAST_ENTRY[p_sym] = float(p.time)
+                        # log(f"⏱️ SINCRONIZADO: {p_sym} abierto hace {int(now_loop - p.time)}s")
+                    
+                    sym = p.symbol
+                    lot = p.volume
+                    entry = p.price_open
+                    profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
+                    
+                    if p.magic == 0 and now_loop % 30 < 1:
+                        log(f"🛡️ PROTEGIENDO POSICIÓN MANUAL: {sym} (${profit:.2f})")
+                    
                     # v21.1: SALIDA POR AGOTAMIENTO (Análisis Madrugada 24/02)
                     # Probabilidad de retorno < 20% después de -$13.5 en BTC (0.1 lot).
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
@@ -3421,24 +3428,24 @@ def metralleta_loop():
                         with state_lock: STATE["basket_pico"] = current_open_pnl
                         curr_pk = current_open_pnl
 
-                    # v31.12: GLOBAL GUARD TRAILING (Modo Caza)
+                    # v31.10: Persecución Estrecha y Stop de Pánico
                     g_floor = -999.0
-                    if curr_pk >= 15.0: g_floor = curr_pk - 1.50 # Pegadísimo en ganancias altas
-                    elif curr_pk >= 8.0: g_floor = curr_pk - 1.00
-                    elif curr_pk >= 5.0: g_floor = 4.00 
-                    elif curr_pk >= 3.0: g_floor = 2.10
-                    elif curr_pk >= 1.80: g_floor = 1.00
+                    if curr_pk >= 15.0: g_floor = curr_pk - 2.50
+                    elif curr_pk >= 8.0: g_floor = curr_pk - 1.50
+                    elif curr_pk >= 5.0: g_floor = 3.50
+                    elif curr_pk >= 3.0: g_floor = 1.90
+                    elif curr_pk >= 1.80: g_floor = 0.80
 
-                    # STOP DE EMERGENCIA: Canasta a -$20 (Un poco más de aire)
-                    if current_open_pnl < -20.0:
-                        log(f"🚨 HARD BASKET STOP: Canasta en ${current_open_pnl:.2f}. Protegiendo balance.")
+                    # STOP DE EMERGENCIA: Si la canasta cae a -$15, matamos todo por seguridad.
+                    if current_open_pnl < -15.0:
+                        log(f"🚨 LIMITADOR DE PÉRDIDAS GLOBAL: Canasta en ${current_open_pnl:.2f}. Cierre total de seguridad.")
                         for p in open_positions: close_ticket(p, "HARD_BASKET_STOP")
                         with state_lock: STATE["basket_pico"] = 0.0
                         continue
 
                     if current_open_pnl < g_floor:
-                        log(f"🧺 GLOBAL GUARD v31.12: Cobrando ${current_open_pnl:.2f} (Pico: ${curr_pk:.2f}).")
-                        for p in open_positions: close_ticket(p, "RECUPERACION_GLOBAL")
+                        log(f"🧺 GLOBAL GUARD v31.10: PnL ${current_open_pnl:.2f} < Piso ${g_floor:.2f} (Pico: ${curr_pk:.2f}).")
+                        for p in open_positions: close_ticket(p, "GLOBAL_GUARD_v3110")
                         with state_lock: STATE["basket_pico"] = 0.0
                         continue
                 else:
