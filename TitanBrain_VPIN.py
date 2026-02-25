@@ -2948,13 +2948,16 @@ def process_symbol_task(sym, active, mission_state):
                             if tick:
                                 cp = tick.ask if target_sig == "BUY" else tick.bid
                                 s_info = mt5.symbol_info(sym)
-                                # Para Oro: $8 de distancia. Para el resto: 1000 puntos.
-                                min_dist_h = 8.0 if ("XAU" in sym or "Gold" in sym) else (s_info.point * 1000)
+                                # v31.7: Distancia reducida a $2 para Oro y bypass total de Oráculo
+                                min_dist_h = 2.0 if ("XAU" in sym or "Gold" in sym) else (s_info.point * 500)
                                 too_close = any(abs(cp - p.price_open) < min_dist_h for p in opp_positions)
                                 
-                                if too_close:
-                                    if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE CERCANO: {sym} ya tiene opuestas muy cerca. No abriendo {target_sig}.")
+                                # Si es Oráculo, ignoramos la proximidad (Caza agresiva)
+                                if too_close and not is_oracle_signal:
+                                    if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE CERCANO: {sym} opuestas muy cerca. No abriendo {target_sig}.")
                                     return
+                                elif too_close and is_oracle_signal:
+                                    log(f"🔱 ORÁCULO HEDGE: Saltando proximidad por volumen institucional.")
                                 else:
                                     log(f"⚖️ SOPESANDO: Abriendo cobertura inteligente en {sym} (Distancia > ${min_dist_h})")
                         # v18.9.600: OPTIMIZACIÓN DE LATENCIA (Cache Tick)
@@ -3300,15 +3303,13 @@ def metralleta_loop():
                                 new_sl_shadow = entry - shadow_dist if p.type == 0 else entry + shadow_dist
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
-                            # v31.6: ESCUDO BERSERKER (Aseguramiento ultra-agresivo)
+                            # v31.7: ESCUDO FLEXIBLE (Dejar correr el profit)
                             locked_steps = -2.0
                             if profit >= 10.0: locked_steps = profit - 2.00
-                            elif profit >= 5.0: locked_steps = 4.40
-                            elif profit >= 3.0: locked_steps = 2.60
-                            elif profit >= 2.0: locked_steps = 1.70
-                            elif profit >= 1.40: locked_steps = 1.05 # v31.6: MINIMO 1 USD ASEGURADO
-                            elif profit >= 1.20: locked_steps = 0.90 
-                            elif profit >= 0.50: locked_steps = 0.25
+                            elif profit >= 5.0: locked_steps = 4.00
+                            elif profit >= 3.0: locked_steps = 2.00
+                            elif profit >= 2.0: locked_steps = 1.00 
+                            elif profit >= 0.80: locked_steps = 0.10
                             
                             # v28.13: Tomar el mayor entre pasos fijos y porcentaje dinámico (0.50%)
                             locked_p = max(locked_steps, profit * 0.50) if profit >= 1.0 else locked_steps
