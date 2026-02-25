@@ -3219,13 +3219,13 @@ def metralleta_loop():
                         if profit <= limit_hs:
                             close_ticket(p, "EXHAUSTION_CUT_v22"); continue
                             
-                        # 2. VETO LATIGAZO (v31.5: Blindaje 75% del pico)
+                        # v31.10: Micro-Veto (Blindaje desde $1.10)
                         pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
                         if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
                         
-                        # Si ya ganamos > $2.00, no permitimos que se devuelva más del 25% (Protección 75%)
-                        if pico_pnl >= 2.0 and profit <= (pico_pnl * 0.75):
-                            log(f"🪪 VETO DE LATIGAZO: {p_sym} asegurando {profit:.2f} (75% de pico {pico_pnl:.2f})")
+                        # Si ya ganamos > $1.10, no permitimos que se devuelva más del 25%
+                        if pico_pnl >= 1.10 and profit <= (pico_pnl * 0.75):
+                            log(f"🪪 MICRO-VETO: {p_sym} asegurando {profit:.2f} (75% de pico {pico_pnl:.2f})")
                             close_ticket(p, "WHIPSAW_VETO_v31"); continue
 
                         # 3. ESCALERA TITÁN (Asegurar ganancias)
@@ -3310,13 +3310,15 @@ def metralleta_loop():
                                 new_sl_shadow = entry - shadow_dist if p.type == 0 else entry + shadow_dist
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
-                            # v31.7: ESCUDO FLEXIBLE (Dejar correr el profit)
+                            # v31.10: ESCUDO MICRO (Asegurar desde centavos)
                             locked_steps = -2.0
                             if profit >= 10.0: locked_steps = profit - 2.00
-                            elif profit >= 5.0: locked_steps = 4.00
-                            elif profit >= 3.0: locked_steps = 2.00
-                            elif profit >= 2.0: locked_steps = 1.00 
-                            elif profit >= 0.80: locked_steps = 0.10
+                            elif profit >= 5.0: locked_steps = 3.90
+                            elif profit >= 3.0: locked_steps = 2.10
+                            elif profit >= 2.0: locked_steps = 1.30 
+                            elif profit >= 1.20: locked_steps = 0.65
+                            elif profit >= 0.80: locked_steps = 0.35
+                            elif profit >= 0.45: locked_steps = 0.15
                             
                             # v28.13: Tomar el mayor entre pasos fijos y porcentaje dinámico (0.50%)
                             locked_p = max(locked_steps, profit * 0.50) if profit >= 1.0 else locked_steps
@@ -3424,16 +3426,24 @@ def metralleta_loop():
                         with state_lock: STATE["basket_pico"] = current_open_pnl
                         curr_pk = current_open_pnl
 
-                    # Lógica de "Persecución Estrecha": No permitimos caídas de más de $1.50
+                    # v31.10: Persecución Estrecha y Stop de Pánico
                     g_floor = -999.0
                     if curr_pk >= 15.0: g_floor = curr_pk - 2.50
                     elif curr_pk >= 8.0: g_floor = curr_pk - 1.50
                     elif curr_pk >= 5.0: g_floor = 3.50
-                    elif curr_pk >= 3.0: g_floor = 1.60
+                    elif curr_pk >= 3.0: g_floor = 1.90
+                    elif curr_pk >= 1.80: g_floor = 0.80
+
+                    # STOP DE EMERGENCIA: Si la canasta cae a -$15, matamos todo por seguridad.
+                    if current_open_pnl < -15.0:
+                        log(f"🚨 LIMITADOR DE PÉRDIDAS GLOBAL: Canasta en ${current_open_pnl:.2f}. Cierre total de seguridad.")
+                        for p in open_positions: close_ticket(p, "HARD_BASKET_STOP")
+                        with state_lock: STATE["basket_pico"] = 0.0
+                        continue
 
                     if current_open_pnl < g_floor:
-                        log(f"🧺 GLOBAL GUARD v31.9: PnL ${current_open_pnl:.2f} < Piso ${g_floor:.2f} (Pico: ${curr_pk:.2f}). ¡CIERRE TOTAL!")
-                        for p in open_positions: close_ticket(p, "GLOBAL_GUARD_v319")
+                        log(f"🧺 GLOBAL GUARD v31.10: PnL ${current_open_pnl:.2f} < Piso ${g_floor:.2f} (Pico: ${curr_pk:.2f}).")
+                        for p in open_positions: close_ticket(p, "GLOBAL_GUARD_v3110")
                         with state_lock: STATE["basket_pico"] = 0.0
                         continue
                 else:
