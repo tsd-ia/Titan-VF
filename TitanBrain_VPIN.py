@@ -1027,9 +1027,9 @@ def close_ticket(pos, reason="UNK"):
 
 def update_sl(ticket, new_sl, comment=""):
     """ v27.8.6: Wrapper Asíncrono para no bloquear el cerebro """
-    # v27.8.6: Throttling por ticket (3s) para no saturar al broker
+    # v31.8: Throttling reducido a 0.5s para Oro de Alta Velocidad (vanguardia)
     now = time.time()
-    if ticket in LAST_TICKET_UPDATE and (now - LAST_TICKET_UPDATE[ticket]) < 3.0:
+    if ticket in LAST_TICKET_UPDATE and (now - LAST_TICKET_UPDATE[ticket]) < 0.5:
         return True
     
     LAST_TICKET_UPDATE[ticket] = now
@@ -1065,7 +1065,15 @@ def _async_update_sl(ticket, new_sl, comment):
             if latency > 300: log(f"🐌 BROKER LENTO: {latency:.1f}ms en #{ticket}")
         else:
             err_msg = res.comment if res else "No Response"
-            log(f"⚠️ FALLO SL #{ticket}: {err_msg} (Retcode: {res.retcode if res else '???'}) SL: {new_sl}")
+            retcode = res.retcode if res else 10001
+            
+            # v31.9.2: EMERGENCIA - Si el SL falla por proximidad (10011) en Oro con profit, cerramos a mercado.
+            if retcode == 10011 and pos.profit >= 0.50:
+                log(f"🆘 ERROR 10011 (Stops Inválidos) en {pos.symbol}: ¡CERRANDO A MERCADO PARA ASEGURAR ${pos.profit:.2f}!")
+                close_ticket(pos, "EMERGENCY_STOP_GUARD")
+            elif retcode != 10025:
+                log(f"⚠️ FALLO SL #{ticket}: {err_msg} (Retcode: {retcode}) SL: {new_sl}")
+            # El 10025 lo ignoramos salvo monitoreo interno
         return True
     except Exception as e:
         log(f"💥 EXCEPCIÓN SL #{ticket}: {e}")
@@ -2939,27 +2947,24 @@ def process_symbol_task(sym, active, mission_state):
                     elif is_heartbeat and target_sig == LAST_SIGNALS.get(sym): should_send = True # Heartbeat normal
                     
                     if should_send:
-                        # v31.3: SOPESAR INTELIGENTE (Hedge Distante)
-                        # Permitimos abrir en contra si la distancia es suficiente para no anularse.
+                        # v31.9: SOPESAR LIBERADO (Bypass Oráculo)
                         opp_type = 1 if target_sig == "BUY" else 0
                         opp_positions = [p for p in pos_list if p.type == opp_type]
+                        
                         if opp_positions:
-                            tick = mt5.symbol_info_tick(sym)
-                            if tick:
-                                cp = tick.ask if target_sig == "BUY" else tick.bid
-                                s_info = mt5.symbol_info(sym)
-                                # v31.7: Distancia reducida a $2 para Oro y bypass total de Oráculo
-                                min_dist_h = 2.0 if ("XAU" in sym or "Gold" in sym) else (s_info.point * 500)
-                                too_close = any(abs(cp - p.price_open) < min_dist_h for p in opp_positions)
-                                
-                                # Si es Oráculo, ignoramos la proximidad (Caza agresiva)
-                                if too_close and not is_oracle_signal:
-                                    if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE CERCANO: {sym} opuestas muy cerca. No abriendo {target_sig}.")
-                                    return
-                                elif too_close and is_oracle_signal:
-                                    log(f"🔱 ORÁCULO HEDGE: Saltando proximidad por volumen institucional.")
-                                else:
-                                    log(f"⚖️ SOPESANDO: Abriendo cobertura inteligente en {sym} (Distancia > ${min_dist_h})")
+                            # Si es Oráculo, ignoramos cualquier bloqueo de proximidad.
+                            if is_oracle_signal:
+                                log(f"🔱 ORÁCULO HEDGE: Cobertura agresiva por volumen institucional.")
+                            else:
+                                tick = mt5.symbol_info_tick(sym)
+                                if tick:
+                                    cp = tick.ask if target_sig == "BUY" else tick.bid
+                                    s_info = mt5.symbol_info(sym)
+                                    # Para manual/IA normal, mantenemos $1.5 de distancia.
+                                    min_dist_h = 1.5 if ("XAU" in sym or "Gold" in sym) else (s_info.point * 100)
+                                    if any(abs(cp - p.price_open) < min_dist_h for p in opp_positions):
+                                        if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE: {sym} muy cerca. No abriendo (Manual/IA).")
+                                        return
                         # v18.9.600: OPTIMIZACIÓN DE LATENCIA (Cache Tick)
                         tick = mt5.symbol_info_tick(sym)
                         if not tick: return
@@ -3042,6 +3047,8 @@ def process_symbol_task(sym, active, mission_state):
                         }
                         
                         res = mt5.order_send(request)
+
+                        
                         if res and res.retcode == mt5.TRADE_RETCODE_DONE:
                             log(f"✅ ORDEN EXITOSA ({target_sig}) en {sym} @ {price}")
                             with state_lock: STATE[f"firing_{sym}"] = now
@@ -3319,11 +3326,11 @@ def metralleta_loop():
                             new_sl_trail = round(new_sl_trail, symbol_info.digits)
                             
                             is_better = False
-                            # v31.5: Umbral de 50 puntos para reducir spam 10025 y latencia
+                            # v31.8: Umbral de 20 puntos para máxima precisión en Oro
                             if p.type == mt5.ORDER_TYPE_BUY:
-                                if curr_sl == 0 or new_sl_trail > curr_sl + symbol_info.point * 50: is_better = True
+                                if curr_sl == 0 or new_sl_trail > curr_sl + symbol_info.point * 20: is_better = True
                             else:
-                                if curr_sl == 0 or (0 < new_sl_trail < curr_sl - symbol_info.point * 50): is_better = True
+                                if curr_sl == 0 or (0 < new_sl_trail < curr_sl - symbol_info.point * 20): is_better = True
                                 
                             if is_better:
                                 update_sl(p.ticket, new_sl_trail, f"TRL-SAFE (${profit:.2f})")
@@ -3410,25 +3417,23 @@ def metralleta_loop():
                         close_ticket(worst_pos, "MARGIN_EMERGENCY_CUT")
                         continue 
 
-                # v31.6: COSECHA GLOBAL DINÁMICA (Seguro de Canasta)
+                # v31.9: COSECHA GLOBAL DE PRECISIÓN (Basket Trailing)
                 if has_open_pos:
-                    # Rastreo de pico de la canasta actual
-                    current_basket_pico = STATE.get("basket_pico", 0.0)
-                    if current_open_pnl > current_basket_pico:
+                    curr_pk = STATE.get("basket_pico", 0.0)
+                    if current_open_pnl > curr_pk:
                         with state_lock: STATE["basket_pico"] = current_open_pnl
-                        current_basket_pico = current_open_pnl
+                        curr_pk = current_open_pnl
 
-                    # Lógica de Escalinata Global: 10->7, 15->11, 20->16
-                    global_floor = -999.0
-                    if current_basket_pico >= 20.0: global_floor = 16.0
-                    elif current_basket_pico >= 15.0: global_floor = 11.0
-                    elif current_basket_pico >= 10.0: global_floor = 7.0
-                    elif current_basket_pico >= 5.0: global_floor = 2.0 # Piso inicial preventivo
+                    # Lógica de "Persecución Estrecha": No permitimos caídas de más de $1.50
+                    g_floor = -999.0
+                    if curr_pk >= 15.0: g_floor = curr_pk - 2.50
+                    elif curr_pk >= 8.0: g_floor = curr_pk - 1.50
+                    elif curr_pk >= 5.0: g_floor = 3.50
+                    elif curr_pk >= 3.0: g_floor = 1.60
 
-                    if current_open_pnl < global_floor:
-                        log(f"🧺 COSECHA GLOBAL ACTIVADA: PnL Total ${current_open_pnl:.2f} cayó de piso ${global_floor:.2f} (Pico: ${current_basket_pico:.2f}).")
-                        for p in open_positions: 
-                            close_ticket(p, "GLOBAL_BASKET_GUARD")
+                    if current_open_pnl < g_floor:
+                        log(f"🧺 GLOBAL GUARD v31.9: PnL ${current_open_pnl:.2f} < Piso ${g_floor:.2f} (Pico: ${curr_pk:.2f}). ¡CIERRE TOTAL!")
+                        for p in open_positions: close_ticket(p, "GLOBAL_GUARD_v319")
                         with state_lock: STATE["basket_pico"] = 0.0
                         continue
                 else:
