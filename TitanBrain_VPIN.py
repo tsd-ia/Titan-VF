@@ -3216,8 +3216,10 @@ def metralleta_loop():
                 for p in open_positions:
                     try: # v23.0: WATCHDOG LOCAL - Si falla una, las demás siguen protegidas.
                         p_sym = p.symbol
-                        now = time.time() # v31.11: Definición crítica para protecciones
+                        sym = p.symbol # v31.13: Alias para compatibilidad
+                        now = time.time() 
                         lot = p.volume
+                        entry = p.price_open # v31.13: Restauración Crítica
                         profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
                         
                         # 1. HARD STOP / AGOTAMIENTO
