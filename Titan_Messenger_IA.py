@@ -214,5 +214,57 @@ def handle_commander_msg(message, override_text=None, reply_audio=False):
     if reply_audio:
         speak_to_commander(message.chat.id, ia_response)
 
-print("🦅 OFICIAL DE PUENTE TITAN ONLINE - Esperando al Comandante...")
-bot.infinity_polling()
+def radar_officer_loop():
+    """ Hilo secundario para vigilancia de mercado v29.3 """
+    print("📡 OFICIAL DE RADAR INICIANDO VIGILANCIA...")
+    last_hunt_alert = 0
+    last_retreat_alert = 0
+    
+    while True:
+        try:
+            res = requests.get("http://localhost:8000/radar", timeout=5).json()
+            if "error" in res:
+                time.sleep(10)
+                continue
+            
+            adx = res.get("adx", 0)
+            spread = res.get("spread", 0)
+            latency = res.get("latency", 0)
+            oracle_sig = res.get("oracle_signal", "HOLD")
+            oracle_vol = res.get("oracle_volume", 0)
+            brain_on = res.get("brain_on", True)
+            
+            now = time.time()
+            
+            # --- LÓGICA DE ALERTA: CAZA (Hunting) ---
+            if brain_on and adx > 25 and oracle_sig != "HOLD" and oracle_vol > 15000:
+                if now - last_hunt_alert > 600: # Solo una alerta cada 10 min
+                    msg = (f"🎯 *OFICIAL DE RADAR:* \n"
+                           f"Comandante, el Oro está DULCE para cazar.\n"
+                           f"Volatilidad (ADX): `{adx:.1f}`\n"
+                           f"Oráculo: *{oracle_sig}* (${oracle_vol/1000:.1f}k)\n"
+                           f"¡Prepárese para el profit!")
+                    bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
+                    last_hunt_alert = now
+            
+            # --- LÓGICA DE ALERTA: RETIRADA (Retreat) ---
+            if brain_on and (spread > 450 or latency > 600):
+                if now - last_retreat_alert > 300: # Una alerta cada 5 min
+                    msg = (f"⚠️ *ALERTA DE SEGURIDAD:* \n"
+                           f"Mercado turbio o Broker lento.\n"
+                           f"Spread: `{spread:.0f}` | Latencia: `{latency:.0f}ms`\n"
+                           f"Recomiendo supervisión o APAGAR temporalmente.")
+                    bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
+                    last_retreat_alert = now
+        except:
+            pass
+        time.sleep(20) # Revisar cada 20 segundos
+
+if __name__ == "__main__":
+    import threading
+    t = threading.Thread(target=radar_officer_loop, daemon=True)
+    t.start()
+    
+    print("🦅 OFICIAL DE PUENTE TITAN ONLINE - Esperando al Comandante...")
+    bot.infinity_polling()
+

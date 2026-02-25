@@ -1266,7 +1266,7 @@ def predecir(symbol):
         
         if conf > 0.88: conf = min(0.99, conf * 1.05)
         
-        return sig, conf, df['rsi'].iloc[-1], prob, 0.0
+        return sig, conf, df['rsi'].iloc[-1], prob, float(df['adx'].iloc[-1])
 
     except Exception as e:
         log(f"🧠 Predict Err {symbol}: {e}")
@@ -1306,7 +1306,7 @@ def _technical_fallback(symbol, df):
         sig = "BUY" if score > 0.20 else ("SELL" if score < -0.20 else "HOLD")
         prob = 0.5 + (score * 0.4)  # Mapear a probabilidad
         
-        return sig, conf, rsi, prob, 0.0
+        return sig, conf, rsi, prob, float(df['adx'].iloc[-1])
     except:
         return "NONE", 0.0, 50, 0.5, 0.0
 
@@ -4006,6 +4006,49 @@ async def analyze_symbol(symbol: str):
             "rsi": rsi,
             "probability": prob,
             "adx": adx
+        }
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/radar")
+async def get_radar():
+    """ v29.3: Endpoint para el Oficial de Radar de Telegram """
+    try:
+        symbol = "XAUUSDm"
+        tick = mt5.symbol_info_tick(symbol)
+        spread = 0
+        if tick:
+            spread = (tick.ask - tick.bid) / mt5.symbol_info(symbol).point
+        
+        # Obtener métricas actuales (ADX, RSI, etc)
+        sig, conf, rsi, prob, adx = predecir(symbol)
+        
+        # Oracle Info
+        oracle_sig = "HOLD"
+        oracle_vol = 0
+        oracle_file = "titan_gold_signals.json"
+        if os.path.exists(oracle_file):
+            try:
+                with open(oracle_file, "r") as f:
+                    d = json.load(f)
+                    if time.time() - d.get("timestamp", 0) < 60:
+                        oracle_sig = d.get("signal", "HOLD")
+                        oracle_vol = d.get("volume", 0)
+            except: pass
+            
+        avg_latency = sum(MISSION_LATENCIES) / len(MISSION_LATENCIES) if MISSION_LATENCIES else 0
+        
+        return {
+            "status": "OK",
+            "symbol": symbol,
+            "adx": float(adx),
+            "rsi": float(rsi),
+            "spread": float(spread),
+            "latency": float(avg_latency),
+            "oracle_signal": oracle_sig,
+            "oracle_volume": float(oracle_vol),
+            "brain_on": STATE.get("oro_brain_on", True),
+            "server_time": datetime.now().strftime('%H:%M:%S')
         }
     except Exception as e:
         return {"error": str(e)}
