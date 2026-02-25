@@ -3430,35 +3430,9 @@ def metralleta_loop():
                         close_ticket(worst_pos, "MARGIN_EMERGENCY_CUT")
                         continue 
 
-                # v31.9: COSECHA GLOBAL DE PRECISIÓN (Basket Trailing)
-                if has_open_pos:
-                    curr_pk = STATE.get("basket_pico", 0.0)
-                    if current_open_pnl > curr_pk:
-                        with state_lock: STATE["basket_pico"] = current_open_pnl
-                        curr_pk = current_open_pnl
-
-                    # v31.10: Persecución Estrecha y Stop de Pánico
-                    g_floor = -999.0
-                    if curr_pk >= 15.0: g_floor = curr_pk - 2.50
-                    elif curr_pk >= 8.0: g_floor = curr_pk - 1.50
-                    elif curr_pk >= 5.0: g_floor = 3.50
-                    elif curr_pk >= 3.0: g_floor = 1.90
-                    elif curr_pk >= 1.80: g_floor = 0.80
-
-                    # STOP DE EMERGENCIA: Si la canasta cae a -$15, matamos todo por seguridad.
-                    if current_open_pnl < -15.0:
-                        log(f"🚨 LIMITADOR DE PÉRDIDAS GLOBAL: Canasta en ${current_open_pnl:.2f}. Cierre total de seguridad.")
-                        for p in open_positions: close_ticket(p, "HARD_BASKET_STOP")
-                        with state_lock: STATE["basket_pico"] = 0.0
-                        continue
-
-                    if current_open_pnl < g_floor:
-                        log(f"🧺 GLOBAL GUARD v31.10: PnL ${current_open_pnl:.2f} < Piso ${g_floor:.2f} (Pico: ${curr_pk:.2f}).")
-                        for p in open_positions: close_ticket(p, "GLOBAL_GUARD_v3110")
-                        with state_lock: STATE["basket_pico"] = 0.0
-                        continue
-                else:
-                    with state_lock: STATE["basket_pico"] = 0.0
+                # v31.18.2: GESTIÓN POR POSICIÓN INDIVIDUAL (Sin Basket Trailing)
+                # Se elimina el bloque de Cosecha Global por orden del Comandante.
+                with state_lock: STATE["basket_pico"] = 0.0
 
                 # v18.9.175: VIGILANCIA GLOBAL DESHABILITADA (Movida a nivel de símbolo)
                 # if current_open_pnl <= MAX_SESSION_LOSS:
