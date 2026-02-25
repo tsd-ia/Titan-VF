@@ -1057,9 +1057,11 @@ def _async_update_sl(ticket, new_sl, comment):
         if res and res.retcode == mt5.TRADE_RETCODE_DONE:
             if latency > 300: log(f"🐌 BROKER LENTO: {latency:.1f}ms en #{ticket}")
         else:
-            pass
+            err_msg = res.comment if res else "No Response"
+            log(f"⚠️ FALLO SL #{ticket}: {err_msg} (Retcode: {res.retcode if res else '???'}) SL: {new_sl}")
         return True
     except Exception as e:
+        log(f"💥 EXCEPCIÓN SL #{ticket}: {e}")
         return False
 
 def send_signal(symbol, mode, force=False, custom_tp=None):
@@ -3256,18 +3258,24 @@ def metralleta_loop():
                             is_gold = "XAU" in sym or "Gold" in sym
                             is_rocket = is_gold and is_fast
                             
-                            if profit >= 0.50 and p.sl < p.price_open:
-                                # Trailing Sombra: Si ganamos >$0.50, el riesgo máximo baja a -$5.00
-                                new_sl_shadow = p.price_open - (5.0 / (lot * symbol_info.trade_contract_size)) if p.type == 0 else p.price_open + (5.0 / (lot * symbol_info.trade_contract_size))
-                                update_sl(p.ticket, new_sl_shadow, "SOMBRA_v21")
+                            # v28.13: Blindaje Sombra mejorado (Unificado BUY/SELL)
+                            is_in_risk_zone = (p.type == 0 and p.sl < entry) or (p.type == 1 and p.sl > entry)
+                            if profit >= 0.50 and is_in_risk_zone:
+                                # Trailing Sombra: Bajamos el riesgo de -$25 canónico a -$5 inicial
+                                shadow_dist = 5.0 / (lot * symbol_info.trade_contract_size)
+                                new_sl_shadow = entry - shadow_dist if p.type == 0 else entry + shadow_dist
+                                update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
-                            # v28.6: TRAILING EVOLUTIVO (DEJAR CORRER)
-                            if profit >= 10.0: locked_p = profit - 2.50 # Buffer de $2.50 para mega-tendencias
-                            elif profit >= 5.0: locked_p = profit - 1.50
-                            elif profit >= 3.0: locked_p = 2.40
-                            elif profit >= 2.0: locked_p = 1.40
-                            elif profit >= 1.30: locked_p = 1.00 # Suelo de Hierro
-                            else: locked_p = -2.0
+                            # v28.13: SUELO DE HIERRO (ASEGURAMIENTO REDUNDANTE)
+                            locked_steps = -2.0
+                            if profit >= 10.0: locked_steps = profit - 2.50
+                            elif profit >= 5.0: locked_steps = profit - 1.50
+                            elif profit >= 3.0: locked_steps = 2.40
+                            elif profit >= 2.0: locked_steps = 1.40
+                            elif profit >= 1.20: locked_steps = 1.00 
+                            
+                            # v28.13: Tomar el mayor entre pasos fijos y porcentaje dinámico (0.50%)
+                            locked_p = max(locked_steps, profit * 0.50) if profit >= 1.0 else locked_steps
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
@@ -3322,11 +3330,10 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v18.11.902: PARACAÍDAS ORO "DEEP BREATH" (Ratio 20%) ===
-                    parachute_ratio = 0.20 if (("XAU" in sym or "Gold" in sym) and is_fast) else 0.75
-                    # El paracaídas solo actúa si ya aseguramos nuestro suelo de $0.50
-                    if max_p > 1.05 and profit < (max_p * parachute_ratio) and profit >= 0.50:
-                        log(f"🪂 PARACAÍDAS ORO $0.50: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
+                    # === v28.13: PARACAÍDAS ORO "DEEP BREATH" (Buffer de Seguridad) ===
+                    parachute_ratio = 0.60 if (("XAU" in sym or "Gold" in sym)) else 0.75
+                    if max_p > 1.20 and profit < (max_p * parachute_ratio) and profit >= 0.50:
+                        log(f"🪂 PARACAÍDAS v28: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
                         close_ticket(p, "PROFIT_PARACHUTE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
