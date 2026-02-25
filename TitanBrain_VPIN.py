@@ -2939,12 +2939,24 @@ def process_symbol_task(sym, active, mission_state):
                     elif is_heartbeat and target_sig == LAST_SIGNALS.get(sym): should_send = True # Heartbeat normal
                     
                     if should_send:
-                        # v18.9.510: FILTRO ANTI-HEDGE (No comprar y vender simultáneamente)
-                        opp_type = mt5.ORDER_TYPE_SELL if target_sig == "BUY" else mt5.ORDER_TYPE_BUY
-                        has_hedging = any(p.type == opp_type for p in pos_list)
-                        if has_hedging:
-                            if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE: {sym} ya tiene posiciones en contra. No abriendo {target_sig}.")
-                            return
+                        # v31.3: SOPESAR INTELIGENTE (Hedge Distante)
+                        # Permitimos abrir en contra si la distancia es suficiente para no anularse.
+                        opp_type = 1 if target_sig == "BUY" else 0
+                        opp_positions = [p for p in pos_list if p.type == opp_type]
+                        if opp_positions:
+                            tick = mt5.symbol_info_tick(sym)
+                            if tick:
+                                cp = tick.ask if target_sig == "BUY" else tick.bid
+                                s_info = mt5.symbol_info(sym)
+                                # Para Oro: $8 de distancia. Para el resto: 1000 puntos.
+                                min_dist_h = 8.0 if ("XAU" in sym or "Gold" in sym) else (s_info.point * 1000)
+                                too_close = any(abs(cp - p.price_open) < min_dist_h for p in opp_positions)
+                                
+                                if too_close:
+                                    if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE CERCANO: {sym} ya tiene opuestas muy cerca. No abriendo {target_sig}.")
+                                    return
+                                else:
+                                    log(f"⚖️ SOPESANDO: Abriendo cobertura inteligente en {sym} (Distancia > ${min_dist_h})")
                         # v18.9.600: OPTIMIZACIÓN DE LATENCIA (Cache Tick)
                         tick = mt5.symbol_info_tick(sym)
                         if not tick: return
