@@ -3211,6 +3211,7 @@ def metralleta_loop():
                 for p in open_positions:
                     try: # v23.0: WATCHDOG LOCAL - Si falla una, las demás siguen protegidas.
                         p_sym = p.symbol
+                        now = time.time() # v31.11: Definición crítica para protecciones
                         lot = p.volume
                         profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
                         
@@ -3259,21 +3260,6 @@ def metralleta_loop():
 
                 # B. PROTOCOLO DE BLINDAJE INDIVIDUAL (v7.71)
                 for p in open_positions:
-                    # v11.5: Sincronización de Tiempos (Last Entry Fix)
-                    # Si reiniciamos, el bot no sabe cuándo abrió. Lo leemos de MT5.
-                    p_sym = p.symbol
-                    if p_sym not in LAST_ENTRY or LAST_ENTRY[p_sym] == 0:
-                        LAST_ENTRY[p_sym] = float(p.time)
-                        # log(f"⏱️ SINCRONIZADO: {p_sym} abierto hace {int(now_loop - p.time)}s")
-                    
-                    sym = p.symbol
-                    lot = p.volume
-                    entry = p.price_open
-                    profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
-                    
-                    if p.magic == 0 and now_loop % 30 < 1:
-                        log(f"🛡️ PROTEGIENDO POSICIÓN MANUAL: {sym} (${profit:.2f})")
-                    
                     # v21.1: SALIDA POR AGOTAMIENTO (Análisis Madrugada 24/02)
                     # Probabilidad de retorno < 20% después de -$13.5 en BTC (0.1 lot).
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
