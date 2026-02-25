@@ -2038,13 +2038,13 @@ def process_symbol_task(sym, active, mission_state):
             
             # v31.0: LEY DEL RETROCESO (Anti-FOMO)
             # Si el precio está en el techo y hay mucha furia (ATR > 1.5), prohibido comprar.
-            if sig == "BUY" and bb_pct > 0.88 and atr > 1.5:
+            if sig == "BUY" and bb_pos > 0.88 and atr > 1.5:
                 block_council = True
-                block_council_reason = f"ESPERANDO RETROCESO: Techo BB ({bb_pct:.2f}) con ATR alto ({atr:.1f})"
+                block_council_reason = f"ESPERANDO RETROCESO: Techo BB ({bb_pos:.2f}) con ATR alto ({atr:.1f})"
             
-            if sig == "SELL" and bb_pct < 0.12 and atr > 1.5:
+            if sig == "SELL" and bb_pos < 0.12 and atr > 1.5:
                 block_council = True
-                block_council_reason = f"ESPERANDO RETROCESO: Suelo BB ({bb_pct:.2f}) con ATR alto ({atr:.1f})"
+                block_council_reason = f"ESPERANDO RETROCESO: Suelo BB ({bb_pos:.2f}) con ATR alto ({atr:.1f})"
 
             if votos_buy > votos_sell:
                 # Veto BUY: Si estamos debajo de la EMA y la vela aún es roja
