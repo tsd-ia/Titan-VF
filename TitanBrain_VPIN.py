@@ -3209,11 +3209,14 @@ def metralleta_loop():
                         if profit <= limit_hs:
                             close_ticket(p, "EXHAUSTION_CUT_v22"); continue
                             
-                        # 2. VETO LATIGAZO
+                        # 2. VETO LATIGAZO (v31.5: Blindaje 75% del pico)
                         pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
                         if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
-                        if pico_pnl >= 3.0 and profit <= (pico_pnl * 0.3):
-                            close_ticket(p, "WHIPSAW_VETO_v22"); continue
+                        
+                        # Si ya ganamos > $2.00, no permitimos que se devuelva más del 25% (Protección 75%)
+                        if pico_pnl >= 2.0 and profit <= (pico_pnl * 0.75):
+                            log(f"🪪 VETO DE LATIGAZO: {p_sym} asegurando {profit:.2f} (75% de pico {pico_pnl:.2f})")
+                            close_ticket(p, "WHIPSAW_VETO_v31"); continue
 
                         # 3. ESCALERA TITÁN (Asegurar ganancias)
                         if profit >= 0.30:
@@ -3297,13 +3300,15 @@ def metralleta_loop():
                                 new_sl_shadow = entry - shadow_dist if p.type == 0 else entry + shadow_dist
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
-                            # v28.13: SUELO DE HIERRO (ASEGURAMIENTO REDUNDANTE)
+                            # v31.6: ESCUDO BERSERKER (Aseguramiento ultra-agresivo)
                             locked_steps = -2.0
-                            if profit >= 10.0: locked_steps = profit - 2.50
-                            elif profit >= 5.0: locked_steps = profit - 1.50
-                            elif profit >= 3.0: locked_steps = 2.40
-                            elif profit >= 2.0: locked_steps = 1.40
-                            elif profit >= 1.20: locked_steps = 1.00 
+                            if profit >= 10.0: locked_steps = profit - 2.00
+                            elif profit >= 5.0: locked_steps = 4.40
+                            elif profit >= 3.0: locked_steps = 2.60
+                            elif profit >= 2.0: locked_steps = 1.70
+                            elif profit >= 1.40: locked_steps = 1.05 # v31.6: MINIMO 1 USD ASEGURADO
+                            elif profit >= 1.20: locked_steps = 0.90 
+                            elif profit >= 0.50: locked_steps = 0.25
                             
                             # v28.13: Tomar el mayor entre pasos fijos y porcentaje dinámico (0.50%)
                             locked_p = max(locked_steps, profit * 0.50) if profit >= 1.0 else locked_steps
@@ -3313,11 +3318,11 @@ def metralleta_loop():
                             new_sl_trail = round(new_sl_trail, symbol_info.digits)
                             
                             is_better = False
-                            # v27.8.6: Subido umbral a 30 puntos (3 pips) para reducir latencia I/O
+                            # v31.5: Umbral de 50 puntos para reducir spam 10025 y latencia
                             if p.type == mt5.ORDER_TYPE_BUY:
-                                if curr_sl == 0 or new_sl_trail > curr_sl + symbol_info.point * 30: is_better = True
+                                if curr_sl == 0 or new_sl_trail > curr_sl + symbol_info.point * 50: is_better = True
                             else:
-                                if curr_sl == 0 or (0 < new_sl_trail < curr_sl - symbol_info.point * 30): is_better = True
+                                if curr_sl == 0 or (0 < new_sl_trail < curr_sl - symbol_info.point * 50): is_better = True
                                 
                             if is_better:
                                 update_sl(p.ticket, new_sl_trail, f"TRL-SAFE (${profit:.2f})")
@@ -3395,23 +3400,38 @@ def metralleta_loop():
                         if is_better:
                             update_sl(p.ticket, new_sl, comment)
 
-                # v27.4: ESCUDO DE MARGEN (EMERGENCIA)
-                # Si el margen cae del 100%, matamos la peor posición para salvar la cuenta.
-                if acc_check and has_open_pos and 0.1 < m_level < 100:
+                # v31.6: ESCUDO DE MARGEN (RELAJADO A 75%)
+                # Si el margen cae del 75%, matamos la peor posición para salvar la cuenta.
+                if acc_check and has_open_pos and 0.1 < m_level < 75:
                     worst_pos = min(open_positions, key=lambda x: x.profit)
-                    if worst_pos.profit < -2.0: # Solo si realmente está restando
-                        log(f"🚨 ESCUDO DE MARGEN ACTIVADO ({m_level:.1f}%): Liquidando peor posición #{worst_pos.ticket} ({worst_pos.symbol}) para liberar margen.")
+                    if worst_pos.profit < -3.0: # Solo si realmente está restando fuerte
+                        log(f"🚨 ESCUDO DE MARGEN ACTIVADO ({m_level:.1f}%): Liquidando peor posición #{worst_pos.ticket} para salvar cuenta.")
                         close_ticket(worst_pos, "MARGIN_EMERGENCY_CUT")
                         continue 
 
-                # C. COSECHA TACTICA (DESHABILITADA v15.25)
-                # El Ratchet Suizo individual maneja cada posición. 
-                # La cosecha cerraba prematuramente posiciones que seguían subiendo.
-                # if current_open_pnl >= 12.0: 
-                #     log(f"🧺 COSECHA TACTICA: +${current_open_pnl:.2f}. ¡ASEGURANDO META CORTA!")
-                #     for p in open_positions: 
-                #         if p.profit >= 1.20: close_ticket(p, "COSECHA_TACTICA")
-                #     continue
+                # v31.6: COSECHA GLOBAL DINÁMICA (Seguro de Canasta)
+                if has_open_pos:
+                    # Rastreo de pico de la canasta actual
+                    current_basket_pico = STATE.get("basket_pico", 0.0)
+                    if current_open_pnl > current_basket_pico:
+                        with state_lock: STATE["basket_pico"] = current_open_pnl
+                        current_basket_pico = current_open_pnl
+
+                    # Lógica de Escalinata Global: 10->7, 15->11, 20->16
+                    global_floor = -999.0
+                    if current_basket_pico >= 20.0: global_floor = 16.0
+                    elif current_basket_pico >= 15.0: global_floor = 11.0
+                    elif current_basket_pico >= 10.0: global_floor = 7.0
+                    elif current_basket_pico >= 5.0: global_floor = 2.0 # Piso inicial preventivo
+
+                    if current_open_pnl < global_floor:
+                        log(f"🧺 COSECHA GLOBAL ACTIVADA: PnL Total ${current_open_pnl:.2f} cayó de piso ${global_floor:.2f} (Pico: ${current_basket_pico:.2f}).")
+                        for p in open_positions: 
+                            close_ticket(p, "GLOBAL_BASKET_GUARD")
+                        with state_lock: STATE["basket_pico"] = 0.0
+                        continue
+                else:
+                    with state_lock: STATE["basket_pico"] = 0.0
 
                 # v18.9.175: VIGILANCIA GLOBAL DESHABILITADA (Movida a nivel de símbolo)
                 # if current_open_pnl <= MAX_SESSION_LOSS:
