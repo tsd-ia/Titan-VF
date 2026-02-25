@@ -848,11 +848,12 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
         else:
             smart_lot = 0.01 # v27.8.7: Reducido a 0.01 solicitado
     elif is_gold:
-        # v28.2: Lote 0.01 obligatorio por bajo apalancamiento (1:200) y balance < $100.
-        # Esto permite al menos 2 balas simultáneas.
-        smart_lot = 0.01 
-    else:
-        smart_lot = 0.01
+        # v32.4: LOTE ESTRATÉGICO ($50-$100) - Regla Maestra v18.9.103
+        actual_bal = mt5.account_info().balance
+        if 50 <= actual_bal < 100:
+            smart_lot = 0.02 # Subimos de 0.01 a 0.02 para ganar con ritmo
+        else:
+            smart_lot = 0.01 
         
     return max_bullets, smart_lot
 
@@ -2800,16 +2801,15 @@ def process_symbol_task(sym, active, mission_state):
                             # Limpiamos la razón para no loopear infinitamente
                             LAST_CLOSE_REASON[sym] = "RE-ENTERED"
 
-                        # v32.2: BLINDAJE DE SEGURIDAD EXTREMA
+                        # v32.4.1: CARGADOR ESTRATÉGICO (2 Base + 1 Salvación)
                         actual_equity = get_equity()
-                        # Si perdemos, limitamos drásticamente el apalancamiento
-                        if actual_equity < 75: dynamic_max_bullets = 1 
-                        elif actual_equity < 120: dynamic_max_bullets = 2
+                        if actual_equity < 50: dynamic_max_bullets = 1 
+                        elif actual_equity < 120: dynamic_max_bullets = 3 # 2 Base + 1 Salvación
                         else: dynamic_max_bullets = MAX_BULLETS
                         
                         if n_balas >= dynamic_max_bullets:
                             should_fire = False
-                            if now % 30 < 1: log(f"🛡️ ESCUDO EQUIDAD: Solo {dynamic_max_bullets} bala permitida por balance crítico (${actual_equity:.2f})")
+                            if now % 30 < 1: log(f"🛡️ CARGADOR LIMITADO: {n_balas}/{dynamic_max_bullets} balas (Balance: ${actual_equity:.2f})")
                         elif n_balas == 0 and not is_urgent_continuation:
                             # v32.0: Filtro de Sesión Limbo (Alta peligrosidad)
                             ahora_cl = datetime.fromtimestamp(now)
