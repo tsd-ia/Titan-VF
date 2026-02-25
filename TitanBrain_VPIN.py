@@ -179,10 +179,14 @@ def global_health_check():
         print(f"⚠️ Error en Health Check: {e}")
 
 # --- CONFIGURACIÓN DE GESTIÓN ---
-MAX_BULLETS = 20 # v18.9.260: Límite extendido para GIGA-FIRE Domingo
-MAX_DAILY_LOSS = 0.85 # -85% equidad = Stop loss global (Sobrevivencia = Mínimo $15.0)9
-MAX_SESSION_LOSS = -200.0  # v18.9.510: Aire total para recuperación desde $51
-MIN_EQUITY_TO_TRADE = 10.0  # v18.9.93: GUARDIA MÍNIMA - Si equity < $10, bot se congela
+MAX_BULLETS = 20
+MAX_DAILY_LOSS = 0.85 
+MAX_SESSION_LOSS = -200.0  
+MIN_EQUITY_TO_TRADE = 10.0  
+
+# v32.0: CONSTANTES DE ADAPTACIÓN DINÁMICA
+LIMBO_HOURS = [(17, 0), (18, 45)] # Horario de alta volatilidad/bajo volumen (Chile)
+MIN_BALLENA_VOL = 18000 # Volumen para ignorar vetos en crisis
 # === v18.9.995: MOTOR DE INICIALIZACIÓN UNIVERSAL (CERO KEY-ERRORS) ===
 # --- GLOBALES DE CONTROL (Sincronización v18.9.999) ---
 STATE = {
@@ -993,9 +997,12 @@ def close_ticket(pos, reason="UNK"):
             # Guardar el tipo de operación que falló (SELL/BUY)
             LAST_CLOSE_TYPE[pos.symbol] = "BUY" if pos.type == mt5.POSITION_TYPE_BUY else "SELL"
             CONSECUTIVE_LOSSES[pos.symbol] = CONSECUTIVE_LOSSES.get(pos.symbol, 0) + 1
-            # v18.9.78: Aumentado a 3 minutos para evitar racha destructiva
-            if CONSECUTIVE_LOSSES[pos.symbol] >= 2:
-                COOL_DOWN_UNTIL[pos.symbol] = time.time() + 180 
+            # v32.3.1: BLOQUEO POR RACHA MORTAL (30 MINUTOS)
+            if CONSECUTIVE_LOSSES[pos.symbol] >= 3:
+                COOL_DOWN_UNTIL[pos.symbol] = time.time() + 1800 # 30 minutos
+                log(f"🕯️ RACHA MORTAL EN {pos.symbol}: 3 pérdidas seguidas. Pausa táctica de 30 minutos.")
+            else:
+                COOL_DOWN_UNTIL[pos.symbol] = time.time() + 180 # 3 minutos normales
         
         
         # Guardar razón para re-entrada inmediata v18.9.106
@@ -2316,6 +2323,12 @@ def process_symbol_task(sym, active, mission_state):
         else:
             STATE[f"oracle_active_{sym}"] = False
 
+        # v32.2: BLINDAJE DE LATENCIA (Anti-Broker Lento)
+        actual_latency = LAST_LATENCY
+        if actual_latency > 400:
+            block_action = True
+            block_reason = f"LATENCIA CRÍTICA ({actual_latency:.0f}ms)"
+
         # 3. FILTRO DE VOLATILIDAD (ATR DYNAMICS)
         # Si el mercado está loco (ATR alto), aumentamos la distancia de las balas
         atr_factor = 1.0
@@ -2704,14 +2717,14 @@ def process_symbol_task(sym, active, mission_state):
                         block_reason = "TENDENCIA BAJISTA CRÍTICA"
                         
                     # --- BLOQUEO POR RACHA DE PÉRDIDAS v15.6 (Más agresivo) ---
-                    if CONSECUTIVE_LOSSES.get(sym, 0) >= 2:
+                    if CONSECUTIVE_LOSSES.get(sym, 0) >= 3:
                         now_c = time.time()
                         if now_c < COOL_DOWN_UNTIL.get(sym, 0):
                             block_action = True
-                            block_reason = f"RACHA DE PÉRDIDAS ({CONSECUTIVE_LOSSES[sym]}) - PAUSA 10M"
+                            block_reason = f"RACHA MORTAL ({CONSECUTIVE_LOSSES[sym]}) - PAUSA 30M"
                         else:
-                             # Solo resetar si ya pasó el tiempo
-                             pass 
+                             # Resetar si ya pasó el tiempo
+                             CONSECUTIVE_LOSSES[sym] = 0 
 
                     # Verificar si posiciones actuales van ganando
                     pos_ganando = sym_pnl > 0 if n_balas > 0 else True
@@ -2787,17 +2800,29 @@ def process_symbol_task(sym, active, mission_state):
                             # Limpiamos la razón para no loopear infinitamente
                             LAST_CLOSE_REASON[sym] = "RE-ENTERED"
 
-                        if n_balas == 0 and not is_urgent_continuation:
-                            # v16.7: Solo entrar si NO hay bloqueos de Bollinger/Spread
-                            # v18.9.120: ORACLE BYPASS total de bloqueos tácticos
-                            if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= 0.60:  
+                        # v32.2: BLINDAJE DE SEGURIDAD EXTREMA
+                        actual_equity = get_equity()
+                        # Si perdemos, limitamos drásticamente el apalancamiento
+                        if actual_equity < 75: dynamic_max_bullets = 1 
+                        elif actual_equity < 120: dynamic_max_bullets = 2
+                        else: dynamic_max_bullets = MAX_BULLETS
+                        
+                        if n_balas >= dynamic_max_bullets:
+                            should_fire = False
+                            if now % 30 < 1: log(f"🛡️ ESCUDO EQUIDAD: Solo {dynamic_max_bullets} bala permitida por balance crítico (${actual_equity:.2f})")
+                        elif n_balas == 0 and not is_urgent_continuation:
+                            # v32.0: Filtro de Sesión Limbo (Alta peligrosidad)
+                            ahora_cl = datetime.fromtimestamp(now)
+                            is_limbo = any(h_start <= ahora_cl.hour <= h_end for (h_start, m_start), (h_end, m_end) in [LIMBO_HOURS])
+                            req_conf = 0.85 if is_limbo else 0.65
+                            
+                            if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= req_conf:  
                                 should_fire = True
                             else:
                                 should_fire = False
-                                if now % 20 < 1 and not block_action: 
-                                    log(f"⏳ BAJA CONFIANZA: {conf*100:.1f}% < 70%")
-                                elif now % 20 < 1:
-                                    log(f"🧘 BLOQUEO VANGUARDIA: {block_reason}")
+                                if now % 20 < 1:
+                                    reason = block_reason if block_action else f"Confianza {conf*100:.1f}% < {req_conf*100:.0f}%"
+                                    log(f"🧘 FILTRO INTELIGENTE: {reason}")
 
                             if should_fire:
                                 trigger_type = "EXPLORACIÓN-0.01" if is_exploring else "SOLO"
@@ -3218,26 +3243,38 @@ def metralleta_loop():
                         lot = p.volume
                         profit = p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0)
                         
-                        # 1. HARD STOP / AGOTAMIENTO
-                        limit_hs = -6.5 if ("XAU" in p_sym or "Gold" in p_sym) else -13.5
+                        # 1. HARD STOP ADAPTATIVO (v32.0: Basado en ATR)
+                        # El stop ya no es un número frío, se adapta al ruido del mercado.
+                        current_atr = STATE.get(f"atr_{p_sym}", 1.5)
+                        limit_hs = -max(3.5, current_atr * 3.8) # Mínimo $3.5 de stop, máximo según volatilidad
+                        
                         if profit <= limit_hs:
-                            close_ticket(p, "EXHAUSTION_CUT_v22"); continue
+                            log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
+                            close_ticket(p, "ADAPTIVE_EXIT_v32"); continue
                             
                         # v31.10: Micro-Veto (Blindaje desde $1.10)
                         pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
                         if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
-                        # v31.17: DOMA DE BALLENAS (Profit sin asfixia)
-                        target_pico = 1.10
+                        # v31.17: DOMA DE BALLENAS (v32.0: Umbral dinámico por ATR)
+                        # Si el mercado está muy loco, pedimos más profit antes del veto.
+                        base_veto = max(1.10, current_atr * 0.8) 
+                        target_pico = base_veto
+                        
                         is_whale = False
                         if STATE.get(f"oracle_{p_sym}", False):
                             ov = STATE.get(f"oracle_vol_{p_sym}", 0)
                             if ov > 15000: 
                                 is_whale = True
-                                target_pico = 5.00 # Dejamos correr hasta los $5 si hay volumen real
+                                target_pico = max(5.00, current_atr * 3.5)
                         
+                        # v32.3: Veto por Latencia (Asegurar si el broker falla)
+                        if LAST_LATENCY > 350 and profit > 0.50:
+                            log(f"🐌 VETO LATENCIA: Asegurando {profit:.2f} por broker lento ({LAST_LATENCY:.0f}ms)")
+                            close_ticket(p, "LATENCY_VETO_v32"); continue
+
                         if pico_pnl >= target_pico and profit <= (pico_pnl * 0.75):
-                            log(f"🪪 VETO RECUPERADOR: {p_sym} asegurando {profit:.2f} (Pico: {pico_pnl:.2f})")
-                            close_ticket(p, "WHIPSAW_VETO_v31"); continue
+                            log(f"🪪 VETO ADAPTATIVO: {p_sym} asegurando {profit:.2f} (Target: {target_pico:.2f})")
+                            close_ticket(p, "ADAPTIVE_VETO_v32"); continue
 
                         # 3. ESCALERA TITÁN (Asegurar ganancias)
                         if profit >= 0.30:
