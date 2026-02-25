@@ -859,17 +859,24 @@ def get_bunker_sl_price(sym, lot, side, price):
         s_info = mt5.symbol_info(sym)
         if not s_info: return 0.0
         
-        # REGLA MAESTRA: Riesgo calibrado por balance
-        # v28.0: Si el balance es bajo, no podemos arriesgar $25 por bala.
-        target_loss = 25.0
-        if mt5.account_info().balance < 100:
-            target_loss = 5.0 # RIESGO SCALPER: $5 USD por bala.
+        # v31.0: SL ADAPTATIVO POR VOLATILIDAD (ATR)
+        # Recuperamos el ATR guardado en el estado para ajustar el 'target_loss'
+        atr_val = STATE.get(f"atr_{sym}", 0.8) # Default 0.8 si no hay dato
         
+        # REGLA MAESTRA: Riesgo calibrado por balance y volatilidad
+        # Si el ATR supera 2.0 (Oro saltando fuerte), multiplicamos el aire por 2.5x
+        vol_multiplier = 1.0
+        if atr_val > 2.0: vol_multiplier = 2.5
+        elif atr_val > 1.2: vol_multiplier = 1.5
+
+        target_loss = 5.0 * vol_multiplier # Riesgo dinámico entre $5 y $12.50 por bala
+        if mt5.account_info().balance >= 500: # Solo si la cuenta crece aumentamos el riesgo base
+             target_loss = 25.0 * vol_multiplier
+
         # Formula: PriceDelta = Loss / (Lot * ContractSize)
         cs = s_info.trade_contract_size
-        if cs <= 0: cs = 1.0 # Seguridad para no dividir por cero
+        if cs <= 0: cs = 1.0 
         
-        # Delta es el cambio en el precio que produce la pérdida deseada
         delta = target_loss / (lot * cs)
         
         # v18.11.996: BUFFER ANTI-RECHAZO (Evitar Error 10016)
@@ -2022,10 +2029,22 @@ def process_symbol_task(sym, active, mission_state):
                         "state": "🟢", "profit": sym_pnl
                     }
 
-            # --- FILTRO VOLATILIDAD RELAJADO v7.88 ---
+            # --- FILTRO VOLATILIDAD ADAPTATIVA v31.0 ---
             atr = df_ta['atr'].iloc[-1] if 'atr' in df_ta.columns else 0
-            if atr > 2.8: # Oro saltando más de $2.8 es el nuevo límite
+            with state_lock: STATE[f"atr_{sym}"] = atr # Guardar para el bunker SL
+            
+            if atr > 3.5: # v31.0: Límite de caos absoluto
                 block_council = True; block_council_reason = f"VETO: Caos Total (ATR:{atr:.2f})"
+            
+            # v31.0: LEY DEL RETROCESO (Anti-FOMO)
+            # Si el precio está en el techo y hay mucha furia (ATR > 1.5), prohibido comprar.
+            if sig == "BUY" and bb_pct > 0.88 and atr > 1.5:
+                block_council = True
+                block_council_reason = f"ESPERANDO RETROCESO: Techo BB ({bb_pct:.2f}) con ATR alto ({atr:.1f})"
+            
+            if sig == "SELL" and bb_pct < 0.12 and atr > 1.5:
+                block_council = True
+                block_council_reason = f"ESPERANDO RETROCESO: Suelo BB ({bb_pct:.2f}) con ATR alto ({atr:.1f})"
 
             if votos_buy > votos_sell:
                 # Veto BUY: Si estamos debajo de la EMA y la vela aún es roja
