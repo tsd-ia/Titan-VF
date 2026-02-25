@@ -797,7 +797,7 @@ def perform_ai_health_audit():
         # v20.0.7: LEY DEL CANDADO DE ACERO 🔒 (REFACTORED)
         # Primero verificamos el profit. Si no hay riesgo real (>-40), ni llamamos a la IA.
         if p.profit > -40.0:
-            if now % 120 < 5: log(f"🛡️ CANDADO v20: #{p.ticket} protegido (${p.profit:.2f} > -$40).")
+            # if now % 120 < 5: log(f"🛡️ CANDADO v20: #{p.ticket} protegido (${p.profit:.2f} > -$40).") # v30.1: Silenciado por spam
             continue
             
         # Solo si supera el umbral de dolor, llamamos al tribunal de la IA
@@ -3552,7 +3552,11 @@ def metralleta_loop():
                 
                 if not brain_on:
                     if time.time() % 30 < 1: 
-                        log(f"💤 CEREBRO {sym} APAGADO. (Revisa Dashboard o Firebase)")
+                        # v30.2: Throttling de log para evitar spam de cerebros apagados
+                        last_off_log = STATE.get(f"last_off_log_{sym}", 0)
+                        if (time.time() - last_off_log) > 300: # Solo una vez cada 5 minutos
+                            log(f"💤 CEREBRO {sym} APAGADO. (Revisa Dashboard o Firebase)")
+                            STATE[f"last_off_log_{sym}"] = time.time()
                     continue
                     
                 # 2. Verificar si el mercado está abierto
