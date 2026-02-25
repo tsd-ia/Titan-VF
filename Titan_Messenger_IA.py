@@ -66,24 +66,26 @@ def get_account_context():
     
     return context
 
-def call_ia(user_msg, context):
+def call_ia(user_msg, context, is_audit=False):
     """ Llama a la IA con el contexto de la cuenta y la duda del usuario """
-    # v28.8: Soporte para ANÁLISIS y TRADING REMOTO
-    prompt = f"""
-    Eres el OFICIAL DE PUENTE del sistema TITAN. Tu jefe es el COMANDANTE.
+    tipo_mision = "AUDITORÍA DE MERCADO" if is_audit else "COMUNICACIÓN DE PUENTE"
     
-    CONTEXTO DE LA CUENTA:
+    prompt = f"""
+    Eres el OFICIAL DE INTELIGENCIA del sistema TITAN (Año 2026).
+    Tu misión es: {tipo_mision}.
+    
+    CONTEXTO OPERATIVO:
     {context}
     
-    MENSAJE DEL COMANDANTE:
+    MENSAJE DEL COMANDANTE/EVENTO:
     "{user_msg}"
     
-    INSTRUCCIONES:
-    1. Si el Comandante pide analizar un símbolo (ej: EURUSD), responde obligatoriamente: "ANALIZANDO [SYMBOL]".
-    2. Si pide abrir una operación (ej: Compra Oro en 0.02), responde obligatoriamente: "OPERANDO [BUY/SELL] [SYMBOL] LOT [LOTE]".
-    3. Si pide cerrar algo, responde: "CERRANDO [TICKET]".
-    4. Si solo tiene dudas, explica la situación técnica basada en el contexto.
-    5. Mantén un tono técnico, directo y de élite. Estamos en el año 2026.
+    INSTRUCCIONES PARA TU RESPUESTA:
+    1. No seas una máquina fría. Sé un analista de élite, técnico y directo.
+    2. Si es una AUDITORÍA, analiza si el mercado está lateral, tendencial o caótico basándote en los datos.
+    3. Si el Comandante está molesto, mantén la calma profesional pero reconoce los fallos técnicos si los hay.
+    4. Usa términos como 'Flotante', 'Spread', 'Liquidez' y 'Volatilidad'.
+    5. Máximo 3-4 líneas. Directo al grano.
     
     RESPUESTA:
     """
@@ -94,7 +96,7 @@ def call_ia(user_msg, context):
             "prompt": prompt,
             "stream": False
         }
-        res = requests.post(OLLAMA_URL, json=payload, timeout=15)
+        res = requests.post(OLLAMA_URL, json=payload, timeout=20)
         return res.json().get('response', 'Error de respuesta IA')
     except Exception as e:
         return f"Error conectando con el Cerebro IA: {e}"
@@ -208,6 +210,15 @@ def handle_commander_msg(message, override_text=None, reply_audio=False):
         else:
             ia_response = "⚠️ No identifiqué el número de ticket para cerrar."
 
+    # 4. AUDITORÍA PROFUNDA IA (v31.15)
+    elif "AUDIT" in text or "COMO VAS" in text or "COMO VES" in text:
+        bot.send_message(message.chat.id, "🧠 *INICIANDO AUDITORÍA COGNITIVA...*")
+        try:
+            radar_data = requests.get("http://localhost:8000/radar", timeout=5).json()
+            audit_msg = f"DATOS RADAR: {json.dumps(radar_data)}. ¿Es seguro operar o hay peligro oculto?"
+            ia_response = call_ia(audit_msg, context, is_audit=True)
+        except: ia_response = "⚠️ No pude conectar con los sensores del radar para la auditoría."
+
     # Responder por texto
     bot.reply_to(message, ia_response, parse_mode="Markdown")
     
@@ -215,50 +226,56 @@ def handle_commander_msg(message, override_text=None, reply_audio=False):
         speak_to_commander(message.chat.id, ia_response)
 
 def radar_officer_loop():
-    """ Hilo secundario para vigilancia de mercado v29.3 """
-    print("📡 OFICIAL DE RADAR INICIANDO VIGILANCIA...")
+    # v31.15: Variables de Vigilancia Cognitiva
     last_hunt_alert = 0
     last_retreat_alert = 0
+    market_is_abnormal = False
+    stability_start_time = 0 
     
     while True:
         try:
             res = requests.get("http://localhost:8000/radar", timeout=5).json()
             if "error" in res:
-                time.sleep(10)
-                continue
+                time.sleep(10); continue
             
-            adx = res.get("adx", 0)
-            spread = res.get("spread", 0)
-            latency = res.get("latency", 0)
-            oracle_sig = res.get("oracle_signal", "HOLD")
-            oracle_vol = res.get("oracle_volume", 0)
-            brain_on = res.get("brain_on", True)
-            
+            adx, spread, latency = res.get("adx", 0), res.get("spread", 0), res.get("latency", 0)
             now = time.time()
             
-            # --- LÓGICA DE ALERTA: CAZA (Hunting) ---
-            if brain_on and adx > 25 and oracle_sig != "HOLD" and oracle_vol > 15000:
-                if now - last_hunt_alert > 600: # Solo una alerta cada 10 min
-                    msg = (f"🎯 *OFICIAL DE RADAR:* \n"
-                           f"Comandante, el Oro está DULCE para cazar.\n"
-                           f"Volatilidad (ADX): `{adx:.1f}`\n"
-                           f"Oráculo: *{oracle_sig}* (${oracle_vol/1000:.1f}k)\n"
-                           f"¡Prepárese para el profit!")
-                    bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
-                    last_hunt_alert = now
+            # --- DETECCIÓN DE ANORMALIDAD ---
+            currently_abnormal = (spread > 450 or latency > 600 or adx < 10) # adx < 10 es lateralidad pura
             
-            # --- LÓGICA DE ALERTA: RETIRADA (Retreat) ---
-            if brain_on and (spread > 450 or latency > 600):
-                if now - last_retreat_alert > 300: # Una alerta cada 5 min
-                    msg = (f"⚠️ *ALERTA DE SEGURIDAD:* \n"
-                           f"Mercado turbio o Broker lento.\n"
-                           f"Spread: `{spread:.0f}` | Latencia: `{latency:.0f}ms`\n"
-                           f"Recomiendo supervisión o APAGAR temporalmente.")
+            if currently_abnormal and not market_is_abnormal:
+                market_is_abnormal = True
+                stability_start_time = 0
+                msg = (f"⚠️ *OFICIAL DE RADAR:* Mercado ANORMAL detectado.\n"
+                       f"Spread: `{spread:.0f}` | ADX: `{adx:.1f}` (Choppiness).\n"
+                       f"Sugiero retirada inmediata.")
+                bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
+            
+            # --- PROTOCOLO DE RETORNO (HISTÉRESIS 5 MINUTOS) ---
+            if not currently_abnormal and market_is_abnormal:
+                if stability_start_time == 0:
+                    stability_start_time = now
+                    bot.send_message(CHAT_ID, "🕒 *ESTABILIDAD:* Sensores en verde. Iniciando periodo de prueba de 5 min...")
+                
+                elif (now - stability_start_time) > 300: # 5 minutos
+                    # VALIDACIÓN IA ANTES DE CONFIRMAR
+                    context = get_account_context()
+                    audit_res = call_ia(f"Radar dice OK. Datos: {json.dumps(res)}. ¿Confirmas retorno?", context, is_audit=True)
+                    
+                    msg = (f"✅ *RETORNO A LA NORMALIDAD:* Confirmado por IA.\n"
+                           f"Veredicto del Cerebro:\n_{audit_res}_")
                     bot.send_message(CHAT_ID, msg, parse_mode="Markdown")
-                    last_retreat_alert = now
-        except:
-            pass
-        time.sleep(20) # Revisar cada 20 segundos
+                    market_is_abnormal = False
+                    stability_start_time = 0
+            
+            # Reset si vuelve la tormenta en el minuto de prueba
+            if currently_abnormal and stability_start_time > 0:
+                stability_start_time = 0
+                bot.send_message(CHAT_ID, "❌ *REBOTE:* Tormenta detectada nuevamente. Reiniciando vigilancia.")
+
+        except Exception as e: print(f"Error Radar: {e}")
+        time.sleep(30) # Vigilancia cada 30 segundos
 
 if __name__ == "__main__":
     import threading
