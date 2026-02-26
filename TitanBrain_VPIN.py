@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v38.3 | ESCUDO DE MARGEN (RESCATE ACTIVO) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v38.4 | MARGEN INTELIGENTE (SCALPING SNIPER) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1689,7 +1689,16 @@ def process_symbol_task(sym, active, mission_state):
                 close_ticket(peor_p, "MARGIN_RESCUE")
                 return None # Re-evaluar en el siguiente ciclo
         
-        limit = 10 if balance >= 100 else 5
+        # v38.4: FRENO PROACTIVO POR MARGEN
+        if acc and hasattr(acc, 'margin_level') and acc.margin_level < 180.0:
+             if now % 60 < 1: log(f"🧘 FILTRO MARGEN: Nivel {acc.margin_level:.1f}% insuficiente para nueva bala.")
+             return None # No abrir nada nuevo si no hay aire real
+        
+        # Cargador Dinámico Realista según Balance
+        if balance < 150: limit = 3
+        elif balance < 300: limit = 6
+        else: limit = 10
+        
         if len(pos_list) >= limit:
             return None
             
@@ -2812,7 +2821,10 @@ def process_symbol_task(sym, active, mission_state):
                             LAST_CLOSE_REASON[sym] = "RE-ENTERED"
 
                         # v32.5.1: POTENCIA DE RECUPERACIÓN (3 Balas @ 0.02)
-                        dynamic_max_bullets = 10 # v38.0: Modo Metralleta
+                        # v38.4: Metralleta Escalable por Balance
+                        if balance < 150: dynamic_max_bullets = 3
+                        elif balance < 300: dynamic_max_bullets = 6
+                        else: dynamic_max_bullets = 10
                         
                         if n_balas >= dynamic_max_bullets:
                             should_fire = False
