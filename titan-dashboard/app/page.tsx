@@ -255,7 +255,7 @@ export default function TitanDashboard() {
                             </span>
                           </td>
                           <td className="p-6 font-black text-cyan-400">{(r.confidence * 100).toFixed(0)}%</td>
-                          <td className="p-6 font-bold text-gray-400">{r.rsi.toFixed(0)}</td>
+                          <td className="p-6 font-bold text-gray-400">{(r.rsi || 0).toFixed(0)}</td>
                           <td className="p-6 text-right font-mono text-gray-500">{r.lot}</td>
                         </tr>
                       )) : (
@@ -534,7 +534,7 @@ export default function TitanDashboard() {
               </div>
 
               {simResult && simResult.recommendation && (
-                <div className="mt-8 p-6 bg-cyan-500/10 border border-cyan-500/30 rounded-[2rem] animate-bounce-subtle">
+                <div className="mt-8 p-6 bg-cyan-500/10 border border-cyan-500/30 rounded-[2rem]">
                   <div className="flex items-center gap-4 text-cyan-400">
                     <BrainCircuit size={32} />
                     <div>
@@ -548,17 +548,17 @@ export default function TitanDashboard() {
               {simResult && !simResult.error && (
                 <div className="mt-12 space-y-12 animate-in zoom-in-95 duration-500">
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                    <StatBox label="PROFIT NETO" value={`$${simResult.net_profit.toFixed(2)}`} color={simResult.net_profit > 0 ? "emerald" : "red"} icon={<TrendingUp size={14} />} />
-                    <StatBox label="WIN RATE" value={simResult.win_rate} color="cyan" icon={<Target size={14} />} />
-                    <StatBox label="TRADES TOTALES" value={simResult.total_trades} color="white" icon={<Activity size={14} />} />
-                    <StatBox label="BALANCE FINAL" value={`$${simResult.final_balance.toFixed(2)}`} color="emerald" icon={<DollarSign size={14} />} />
+                    <StatBox label="PROFIT NETO" value={`$${(simResult.net_profit || 0).toFixed(2)}`} color={(simResult.net_profit || 0) > 0 ? "emerald" : "red"} icon={<TrendingUp size={14} />} />
+                    <StatBox label="WIN RATE" value={simResult.win_rate || "0%"} color="cyan" icon={<Target size={14} />} />
+                    <StatBox label="TRADES TOTALES" value={simResult.total_trades || 0} color="white" icon={<Activity size={14} />} />
+                    <StatBox label="BALANCE FINAL" value={`$${(simResult.final_balance || 0).toFixed(2)}`} color="emerald" icon={<DollarSign size={14} />} />
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div className="bg-black/50 border border-white/5 p-8 rounded-[2rem]">
                       <h3 className="text-xs font-black text-cyan-500 uppercase tracking-widest mb-6 italic">Rendimiento por Hora (Smart Analysis)</h3>
                       <div className="space-y-3">
-                        {Object.entries(simResult.hourly_performance).sort((a: any, b: any) => b[1] - a[1]).map(([h, pnl]: any) => (
+                        {Object.entries(simResult.hourly_performance || {}).sort((a: any, b: any) => (b[1] as number) - (a[1] as number)).map(([h, pnl]: any) => (
                           <div key={h} className="flex items-center justify-between text-[11px] font-bold">
                             <span className="text-gray-500">Hora {h.padStart(2, '0')}:00</span>
                             <div className="flex-1 mx-4 h-1 bg-gray-800 rounded-full overflow-hidden">
@@ -571,13 +571,13 @@ export default function TitanDashboard() {
                     </div>
                     <div className="bg-black/50 border border-white/5 p-8 rounded-[2rem]">
                       <h3 className="text-xs font-black text-cyan-500 uppercase tracking-widest mb-6 italic">Rendimiento por Día</h3>
-                      <div className="space-y-4">
-                        {Object.entries(simResult.daily_performance).map(([day, pnl]: any) => (
+                      <div className="space-y-4 text-[10px] text-gray-500 italic">
+                        {simResult.daily_performance ? Object.entries(simResult.daily_performance).map(([day, pnl]: any) => (
                           <div key={day} className="flex justify-between items-center text-sm font-black italic">
                             <span className="text-gray-400 uppercase tracking-tighter">{day}</span>
                             <span className={pnl > 0 ? 'text-emerald-400' : 'text-red-400'}>${pnl.toFixed(2)}</span>
                           </div>
-                        ))}
+                        )) : "Análisis de ráfaga diaria activo. Ejecute nueva simulación."}
                       </div>
                     </div>
                   </div>
