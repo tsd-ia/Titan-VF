@@ -313,7 +313,7 @@ def call_ollama(prompt):
                     OLLAMA_FAIL_COUNT = 0
                     return response_text, model
             OLLAMA_FAIL_COUNT += 1
-            log(f"⚠️ IA {model} falló o sin cuota. Probando siguiente...")
+            # log(f"⚠️ IA {model} falló o sin cuota. Probando siguiente...")
         except:
             continue
     return "IA en espera... (Quota/Error)", "FALLBACK_FAILED"
@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v38.1 | PULMÓN DE GODZILLA (MÁXIMO AIRE) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v38.2 | PULMÓN DE GODZILLA (SILENCIO TÁCTICO) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
