@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v38.5 | MARGEN INTELIGENTE (FIX ARRANQUE) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v38.7 | BLINDAJE ANTI-GAP (RETIRO SEGURO) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1679,6 +1679,23 @@ def process_symbol_task(sym, active, mission_state):
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
         balance = acc.balance if acc else 0.0
+        
+        # v38.7: CONTROL PREVENTIVO DE HORARIO (Ubicación Proactiva)
+        now_chile = datetime.now() # O usar horario del broker si es más preciso
+        hora_chile = now_chile.hour
+        minuto_chile = now_chile.minute
+        
+        # Bloqueos para Oro (XAU) en el Gap Diario (19:00 - 20:00 Chile)
+        if "XAU" in sym:
+            if hora_chile == 18 and minuto_chile >= 45:
+                if len(pos_list) > 0:
+                    log(f"🔒 VENTANA DE CIERRE (18:45-19:00): Liquidando {sym} para evitar Gap.")
+                    for p in pos_list: close_ticket(p, "MERCADO_CERRADO")
+                    stop_mission()
+                return None # Bloqueo total de nuevas entradas hasta las 20:00
+            elif hora_chile == 19:
+                if now % 60 < 1: log(f"🧘 FILTRO HORARIO: Mercado {sym} en GAP diario (19h-20h).")
+                return None
         
         # v38.3: PROTOCOLO DE RESCATE POR MARGEN (Solicitud Comandante)
         # Si el margen es crítico (< 125%), liquidamos la peor posición para dar "aire".
@@ -2952,23 +2969,7 @@ def process_symbol_task(sym, active, mission_state):
             mercado_cerrado = True # Mercado oficialmente cerrado
         # A las 20:00 el mercado vuelve a la vida (Sin bloqueos de 5 min)
         
-        if "XAU" in sym:
-                if mercado_cerrado:
-                    block_action = True
-                    block_reason = "MERCADO CERRADO (19h-20h)"
-                    # Solo liquidamos si estamos en la ventana de pre-cierre (18:45-19:00)
-                    if hora_chile == 18 and minuto_chile >= 45 and len(pos_list) > 0:
-                        log(f"🔒 CIERRE MERCADO (HARD): Cerrando {sym} antes del gap! (18:45)")
-                        for p in pos_list:
-                             close_ticket(p, "MERCADO_CERRADO")
-                        log(f"🏁 MISIÓN FINALIZADA POR HORARIO. Retirada estratégica.")
-                        stop_mission()
-                elif is_market_closed(sym) or (hora_chile == 19):
-                    block_action = True
-                    block_reason = "CIERRE DIARIO (19:00 - 20:00)"
-                elif bloqueo_entrada:
-                    block_action = True
-                    block_reason = "RESTRICCIÓN RE-APERTURA/PRE-CIERRE"
+        # v38.7: Bloques de horario movidos al inicio de process_symbol_task
 
         # --- BOTÓN DE PÁNICO (Última defensa - SUBIDO A $150) ---
         if sym_pnl <= -150.0 and len(pos_list) > 0:
