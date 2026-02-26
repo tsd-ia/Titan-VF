@@ -22,7 +22,7 @@ def get_flag(name):
     return False
 
 print("==================================================")
-print("  🚀 TITAN REMOTE RUNNER v2.0 (SELECTIVE)")
+print("  🚀 TITAN REMOTE RUNNER v38.8 (RESILIENTE)")
 print("  Esperando señal del Dashboard para TRABAJAR...")
 print("==================================================")
 
@@ -36,14 +36,15 @@ while True:
         cmds = res.json()
         if not cmds:
             time.sleep(5); continue
-
-        # v18.11.970: Manejo ultra-robusto de booleanos (acepta True, 1 o "true")
+        
+        # v38.8: Manejo ultra-robusto de booleanos
         launch_val = cmds.get("remote_launch", False)
         if launch_val in [True, 1, "true", "True"]:
-            # 1.5. LIMPIEZA PREVENTIVA (Anti-Multi-Ventana)
+            # 1.5. LIMPIEZA PREVENTIVA
             print("🧹 Limpiando instancias antiguas...")
             os.system('taskkill /F /FI "WINDOWTITLE eq TITAN_BRAIN*" /T >nul 2>&1')
             os.system('taskkill /F /FI "WINDOWTITLE eq TITAN_ORACLE*" /T >nul 2>&1')
+            os.system('taskkill /F /FI "WINDOWTITLE eq TITAN_MESSENGER*" /T >nul 2>&1')
             time.sleep(1)
 
             # 2. Resetear la señal en Firebase ANTES de lanzar (Evita bucles)
@@ -76,6 +77,9 @@ while True:
             time.sleep(5)
                 
         time.sleep(2)
-    except Exception:
-        # v2.5: Silencio Total ante caídas de Firebase/Red (Evita spam SSLError)
+    except KeyboardInterrupt:
+        print("🛑 Detención manual detectada.")
+        break
+    except Exception as e:
+        print(f"⚠️ Error en Runner: {e}. Reiniciando bucle en 10s...")
         time.sleep(10)

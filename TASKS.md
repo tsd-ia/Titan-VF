@@ -1,15 +1,15 @@
-# 🗺️ TITAN ROADMAP - MODO VERDAD (v38.7)
-**Estado:** BLINDAJE ANTI-GAP ACTIVADO (ESPERA TÁCTICA) 🛡️🕒
-**Balance Actual:** $91.59 USD (Tras retirada estratégica del Oro)
-**Misión:** Proteger el capital durante el gap diario y re-iniciar cacería a las 20:00 Chile.
+# 🗺️ TITAN ROADMAP - MODO VERDAD (v38.8)
+**Estado:** BLINDAJE DE PROCESOS ACTIVADO (RESILIENTE) 🛡️🚀
+**Balance Actual:** $91.59 USD
+**Misión:** Estabilizar la ejecución remota y evitar cierres accidentales al prompt.
 
 ## 🎯 Tareas Críticas
-- [x] **v38.7:** Blindaje Anti-Gap: Se eliminó el bucle de "abrir y cerrar" moviendo el bloqueo al inicio del ciclo.
+- [x] **v38.8:** Blindaje de TitanRemoteRunner: Manejo de excepciones robusto para evitar caídas al prompt.
+- [x] **v38.7:** Blindaje Anti-Gap (Cierre proactivo 18:45-20:00).
 - [x] **v38.6:** Bot Telegram Inmortal (Multimodelo + Auto-reconexión).
-- [x] **v38.5:** Fix de arranque (Margen 0% ya no bloquea).
-- [ ] **Próximo:** Re-evaluar agresividad en la reapertura (20:00).
+- [ ] **Próximo:** Monitorear estabilidad del Oro tras la reapertura.
 
 ## ✅ Logros Recientes
-- [x] Recuperación del balance de $80 a $118 (antes del retroceso del Oro).
-- [x] Limpieza de conflictos de procesos de Telegram.
-- [x] Gestión atómica de horario de cierre de mercado.
+- [x] Resuelto conflicto de procesos duplicados en Telegram.
+- [x] Eliminado el "fuego amigo" que cerraba ventanas del Oráculo.
+- [x] Implementado sistema de auto-recuperación de bucles.
