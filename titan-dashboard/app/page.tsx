@@ -72,9 +72,17 @@ interface SentinelData {
 
 export default function TitanDashboard() {
   const [data, setData] = useState<SentinelData | null>(null);
-  const [activeTab, setActiveTab] = useState<"radar" | "audit" | "history" | "system">("radar");
+  const [activeTab, setActiveTab] = useState<"radar" | "audit" | "history" | "system" | "simulator">("radar");
   const [connecting, setConnecting] = useState(true);
   const [overrides, setOverrides] = useState<Record<string, any>>({});
+  const [simResult, setSimResult] = useState<any>(null);
+  const [simLoading, setSimLoading] = useState(false);
+  const [simParams, setSimParams] = useState({
+    balance: 300,
+    days: 7,
+    start_hour: 8,
+    end_hour: 23
+  });
 
   useEffect(() => {
     const liveRef = ref(db, "live");
@@ -130,6 +138,7 @@ export default function TitanDashboard() {
 
           <div className="flex bg-black/40 rounded-xl p-1 border border-gray-800 backdrop-blur-md">
             <TabBtn id="radar" active={activeTab} icon={<LayoutDashboard size={14} />} label="RADAR" onClick={setActiveTab} />
+            <TabBtn id="simulator" active={activeTab} icon={<Zap size={14} />} label="SIMULATOR" onClick={setActiveTab} />
             <TabBtn id="audit" active={activeTab} icon={<RotateCcw size={14} />} label="AUDIT" onClick={setActiveTab} />
             <TabBtn id="history" active={activeTab} icon={<History size={14} />} label="ENGAGEMENTS" onClick={setActiveTab} />
             <TabBtn id="system" active={activeTab} icon={<Settings2 size={14} />} label="CORE CONFIG" onClick={setActiveTab} />
@@ -414,6 +423,169 @@ export default function TitanDashboard() {
           </div>
         )}
 
+        {activeTab === "simulator" && (
+          <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="bg-gray-900 border border-white/5 rounded-[2.5rem] p-8 lg:p-12 shadow-3xl">
+              <h2 className="text-3xl font-black text-white mb-8 tracking-tighter italic uppercase flex items-center gap-4">
+                <BrainCircuit className="text-cyan-500" /> Centro de <span className="text-cyan-500">Simulación Estratégica</span>
+              </h2>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-12">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Balance Inicial ($)</label>
+                  <input
+                    type="number"
+                    value={simParams.balance}
+                    onChange={(e) => setSimParams({ ...simParams, balance: Number(e.target.value) })}
+                    className="w-full bg-black border border-gray-800 p-4 rounded-2xl text-white font-black"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Días a Analizar</label>
+                  <select
+                    value={simParams.days}
+                    onChange={(e) => setSimParams({ ...simParams, days: Number(e.target.value) })}
+                    className="w-full bg-black border border-gray-800 p-4 rounded-2xl text-white font-black"
+                  >
+                    <option value={1}>1 Día</option>
+                    <option value={7}>1 Semana</option>
+                    <option value={30}>1 Mes</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Desde Hora</label>
+                  <input
+                    type="number"
+                    min={0} max={23}
+                    value={simParams.start_hour}
+                    onChange={(e) => setSimParams({ ...simParams, start_hour: Number(e.target.value) })}
+                    className="w-full bg-black border border-gray-800 p-4 rounded-2xl text-white font-black"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-gray-500 uppercase tracking-widest">Hasta Hora</label>
+                  <input
+                    type="number"
+                    min={0} max={23}
+                    value={simParams.end_hour}
+                    onChange={(e) => setSimParams({ ...simParams, end_hour: Number(e.target.value) })}
+                    className="w-full bg-black border border-gray-800 p-4 rounded-2xl text-white font-black"
+                  />
+                </div>
+              </div>
+
+              <div className="flex gap-4">
+                <button
+                  onClick={async () => {
+                    setSimLoading(true);
+                    try {
+                      const res = await fetch("http://localhost:8000/simulator/run", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify(simParams)
+                      });
+                      const result = await res.json();
+                      setSimResult(result);
+                    } catch (err) {
+                      alert("Error conectando con el motor de simulación.");
+                    } finally {
+                      setSimLoading(false);
+                    }
+                  }}
+                  disabled={simLoading}
+                  className="flex-1 bg-gray-800 hover:bg-gray-700 text-white p-6 rounded-3xl font-black uppercase italic tracking-widest active:scale-95 transition-all flex items-center justify-center gap-4"
+                >
+                  {simLoading ? "PROCESANDO..." : <><Activity size={20} /> TESTEAR ACTUAL</>}
+                </button>
+
+                <button
+                  onClick={async () => {
+                    setSimLoading(true);
+                    try {
+                      // Primero corremos una simulación de 30 días para encontrar el óptimo
+                      const res = await fetch("http://localhost:8000/simulator/run", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ ...simParams, days: 30, start_hour: 0, end_hour: 23 })
+                      });
+                      const result = await res.json();
+
+                      // Extraer el rango recomendado del string (ej: "Operar entre las 9:00 y las 16:00")
+                      const match = result.recommendation.match(/(\d+):00 y las (\d+):00/);
+                      if (match) {
+                        setSimParams({
+                          ...simParams,
+                          start_hour: parseInt(match[1]),
+                          end_hour: parseInt(match[2])
+                        });
+                      }
+                      setSimResult(result);
+                    } catch (err) {
+                      alert("Error en auto-optimización.");
+                    } finally {
+                      setSimLoading(false);
+                    }
+                  }}
+                  disabled={simLoading}
+                  className="flex-[2] bg-gradient-to-r from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white p-6 rounded-3xl font-black uppercase italic tracking-[0.2em] shadow-xl shadow-cyan-500/20 active:scale-95 transition-all flex items-center justify-center gap-4 border border-cyan-400/30"
+                >
+                  {simLoading ? "IA CALCULANDO RUTA ÓPTIMA..." : <><Zap size={20} className="animate-pulse" /> OPTIMIZAR ESTRATEGIA (AUTO-FIND)</>}
+                </button>
+              </div>
+
+              {simResult && simResult.recommendation && (
+                <div className="mt-8 p-6 bg-cyan-500/10 border border-cyan-500/30 rounded-[2rem] animate-bounce-subtle">
+                  <div className="flex items-center gap-4 text-cyan-400">
+                    <BrainCircuit size={32} />
+                    <div>
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em]">IA RECOMMENDATION // OPTIMIZED WINDOW</p>
+                      <p className="text-xl font-black italic uppercase tracking-tighter">{simResult.recommendation}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {simResult && !simResult.error && (
+                <div className="mt-12 space-y-12 animate-in zoom-in-95 duration-500">
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                    <StatBox label="PROFIT NETO" value={`$${simResult.net_profit.toFixed(2)}`} color={simResult.net_profit > 0 ? "emerald" : "red"} icon={<TrendingUp size={14} />} />
+                    <StatBox label="WIN RATE" value={simResult.win_rate} color="cyan" icon={<Target size={14} />} />
+                    <StatBox label="TRADES TOTALES" value={simResult.total_trades} color="white" icon={<Activity size={14} />} />
+                    <StatBox label="BALANCE FINAL" value={`$${simResult.final_balance.toFixed(2)}`} color="emerald" icon={<DollarSign size={14} />} />
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div className="bg-black/50 border border-white/5 p-8 rounded-[2rem]">
+                      <h3 className="text-xs font-black text-cyan-500 uppercase tracking-widest mb-6 italic">Rendimiento por Hora (Smart Analysis)</h3>
+                      <div className="space-y-3">
+                        {Object.entries(simResult.hourly_performance).sort((a: any, b: any) => b[1] - a[1]).map(([h, pnl]: any) => (
+                          <div key={h} className="flex items-center justify-between text-[11px] font-bold">
+                            <span className="text-gray-500">Hora {h.padStart(2, '0')}:00</span>
+                            <div className="flex-1 mx-4 h-1 bg-gray-800 rounded-full overflow-hidden">
+                              <div className={`h-full ${pnl > 0 ? 'bg-emerald-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, Math.abs(pnl) * 10)}%` }} />
+                            </div>
+                            <span className={pnl > 0 ? 'text-emerald-400' : 'text-red-400'}>${pnl.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                    <div className="bg-black/50 border border-white/5 p-8 rounded-[2rem]">
+                      <h3 className="text-xs font-black text-cyan-500 uppercase tracking-widest mb-6 italic">Rendimiento por Día</h3>
+                      <div className="space-y-4">
+                        {Object.entries(simResult.daily_performance).map(([day, pnl]: any) => (
+                          <div key={day} className="flex justify-between items-center text-sm font-black italic">
+                            <span className="text-gray-400 uppercase tracking-tighter">{day}</span>
+                            <span className={pnl > 0 ? 'text-emerald-400' : 'text-red-400'}>${pnl.toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
         {activeTab === "history" && (
           <div className="max-w-4xl mx-auto animate-in fade-in duration-500">
             <div className="bg-gray-900 border-2 border-dashed border-gray-800 rounded-[3rem] p-24 text-center space-y-8">

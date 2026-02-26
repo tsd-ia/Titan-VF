@@ -45,10 +45,10 @@ async def gold_oracle():
             continue
 
         try:
-            # v18.11.961: Restauración de URL + Blindaje anti-latencia
-            url = f"wss://stream.binance.com:9443/ws/{SYMBOL_BINANCE}@aggTrade"
+            # v34.0: MIGRACIÓN A FUTUROS (Más velocidad y volumen institucional)
+            url = f"wss://fstream.binance.com/ws/{SYMBOL_BINANCE}@aggTrade"
             async with websockets.connect(url, ping_interval=30, ping_timeout=30, close_timeout=10) as ws:
-                print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] CONECTADO A BINANCE (ORO)")
+                print(f"⚡ [{datetime.now().strftime('%H:%M:%S')}] CONECTADO A FUTUROS BINANCE (ORO)")
                 while True:
                     if int(time.time()) % 30 == 0:
                         if not is_brain_on(): break

@@ -184,9 +184,8 @@ MAX_DAILY_LOSS = 0.85
 MAX_SESSION_LOSS = -200.0  
 MIN_EQUITY_TO_TRADE = 10.0  
 
-# v32.0: CONSTANTES DE ADAPTACIÓN DINÁMICA
-LIMBO_HOURS = [(17, 0), (18, 45)] # Horario de alta volatilidad/bajo volumen (Chile)
-MIN_BALLENA_VOL = 18000 # Volumen para ignorar vetos en crisis
+# v32.5: NÚCLEO LIBERADO (Bypass de Restricciones)
+MIN_BALLENA_VOL = 12000 # Volumen reducido para disparos rápidos
 # === v18.9.995: MOTOR DE INICIALIZACIÓN UNIVERSAL (CERO KEY-ERRORS) ===
 # --- GLOBALES DE CONTROL (Sincronización v18.9.999) ---
 STATE = {
@@ -411,16 +410,9 @@ def firebase_command_poller():
                     for p in (mt5.positions_get() or []): close_ticket(p, "PANIC_WEB")
                     requests.patch(url, json={"panic": False})
             
-            # v28.3: Sincronización proactiva de Cierre (Brain OFF = Close Pos)
-            for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on"]:
-                val = STATE.get(flag)
-                if val is False: # Cerebro apagado explícitamente
-                    sym_prefix = "XAU" if "oro" in flag else ("BTC" if "btc" in flag else None)
-                    if sym_prefix:
-                        for p in (mt5.positions_get() or []):
-                            if sym_prefix in p.symbol:
-                                log(f"🛑 CEREBRO {flag} OFF: Cerrando {p.symbol} por seguridad.")
-                                close_ticket(p, "BRAIN_OFF")
+            # v32.9: DESACTIVADO - El Comandante no quiere cierres por 'seguridad' externa.
+            # Dejamos que las posiciones vivan su propia vida.
+            pass
 
             time.sleep(1) 
         except:
@@ -438,7 +430,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 300, "tp": 2000, "max_bullets": 8},
+    "XAUUSDm": {"lot": 0.02, "sl": 300, "tp": 2000, "max_bullets": 8},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -580,9 +572,11 @@ def load_settings():
             with open(SETTINGS_FILE_PATH, 'r') as f:
                 data = json.load(f)
                 with state_lock:
-                    STATE["auto_pilot"] = data.get("auto_pilot", True)
-                    STATE["auto_mode"] = STATE["auto_pilot"]
-                log(f"⚙️ Configuración recuperada: Auto-Pilot {'ON' if STATE['auto_pilot'] else 'OFF'} | Espejo {'ON' if MIRROR_MODE else 'OFF'}")
+                    STATE["auto_pilot"] = True 
+                    STATE["auto_mode"] = True
+                    STATE["oro_brain_on"] = True
+                    STATE["btc_brain_on"] = True
+                log(f"⚙️ MODO VENGANZA: Auto-Pilot y Cerebros FORZADOS a ON.")
         
         # PERSISTENCIA DE MISIÓN
         if os.path.exists(MISSION_FILE_PATH):
@@ -832,7 +826,8 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     
     # 1. Definir Balas por Categoría (MODO BERSERKER v19.0)
     # El Comandante pide 6 balas por instrumento.
-    max_bullets = 6 if conf > 0.80 else 4
+    # v33.1: RÁFAGA DE COMPENSACIÓN (Bajas dosis, muchas balas)
+    max_bullets = 10 if conf > 0.60 else 5
     
     # 2. Definir Lotaje según Balance (v19.0.8: PROTECCIÓN DE CAPITAL)
     # Si el balance cae de $100, bajamos el riesgo para evitar la quema de cuenta.
@@ -841,19 +836,12 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
         elif balance >= 90: smart_lot = 0.1
         else: smart_lot = 0.05 # MODO BUNKER PARA $73
     elif "BTC" in sym or "SOL" in sym:
-        if balance >= 110:
-            smart_lot = 0.1
-        elif balance >= 90:
-            smart_lot = 0.05
-        else:
-            smart_lot = 0.01 # v27.8.7: Reducido a 0.01 solicitado
+        # v33.1: BTC a 0.01 por seguridad de margen
+        smart_lot = 0.01 
     elif is_gold:
-        # v32.4: LOTE ESTRATÉGICO ($50-$100) - Regla Maestra v18.9.103
-        actual_bal = mt5.account_info().balance
-        if 50 <= actual_bal < 100:
-            smart_lot = 0.02 # Subimos de 0.01 a 0.02 para ganar con ritmo
-        else:
-            smart_lot = 0.01 
+        # v33.1: AJUSTE POR MARGEN (Error 10019)
+        # Bajamos a 0.01 para entrar sí o sí, pero subimos balas.
+        smart_lot = 0.01
         
     return max_bullets, smart_lot
 
@@ -1112,8 +1100,10 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
     if tp_to_use == 0 or tp_to_use is None: tp_to_use = 999999 
     sl_to_use = cfg['sl']
 
-    # v18.9.505: ELIMINACIÓN DE LOTE DE SUPERVIVENCIA (Respeto total al Comandante)
+    # v32.6.4: Lote Dinámico Forzado para Oro (Respeto al Comandante)
     lot_to_use = cfg['lot']
+    if "XAU" in symbol or "Gold" in symbol:
+        lot_to_use = 0.01 # v33.1: Regreso a 0.01 para bypass de margen
     # Lógica de protección eliminada para permitir 0.03 real.
     
     # v18.9.405: PROTECCIÓN LOTE MÍNIMO SOLANA (Exness requiere 0.1)
@@ -1131,8 +1121,8 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
                 log(f"🛡️ ESCUDO ELÁSTICO: SL ampliado 5x en {symbol}")
     except: pass
 
-    # --- LEY DE LA VELOCIDAD ---
-    if LAST_LATENCY > 250 and "SOL" not in symbol:
+    # v32.9.1: LEY DE LA VELOCIDAD RELAJADA (1000ms)
+    if LAST_LATENCY > 1000 and "SOL" not in symbol:
         log(f"📡 BLOQUEO TOTAL: Latencia extrema ({LAST_LATENCY:.0f}ms)")
         return 
     
@@ -1145,9 +1135,10 @@ def send_signal(symbol, mode, force=False, custom_tp=None):
     skew_limit = 8000 if any(c in symbol for c in ["SOL", "ETH"]) else (3500 if "BTC" in symbol else 1000)
     
     final_lot = lot_to_use
-    if spread > skew_limit and "SOL" not in symbol:
-        final_lot = 0.01
-        log(f"🛡️ SPREAD ALTO: Lote 0.01 por seguridad.")
+    # v32.5.3: El Comandante quiere ganar dinero real. Eliminamos la reducción por spread.
+    # if spread > skew_limit and "SOL" not in symbol:
+    #     final_lot = 0.01
+    #     log(f"🛡️ SPREAD ALTO: Lote 0.01 por seguridad.")
     
     # v18.9.450: PROTOCOLO BRIDGE FINAL (Doble compatibilidad)
     mode_num = 0 if mode == "BUY" else 1
@@ -2129,9 +2120,19 @@ def process_symbol_task(sym, active, mission_state):
         
         # (Push notifications movidas al final para consistencia)
 
-        # --- DETERMINACIÓN DE SEÑAL Y BLOQUEOS ---
-        block_action = block_council # FIXED: Respect Council Vetoes
-        block_reason = block_council_reason
+        # v34.1: FILTRO DE CALIDAD INSTITUCIONAL (No Oracle = No Play sin consenso)
+        if not is_oracle_signal:
+            m5_align = (sig == "BUY" and m5_trend_dir == "BUY") or (sig == "SELL" and m5_trend_dir == "SELL")
+            h1_align = (sig == "BUY" and h1_trend == "BUY") or (sig == "SELL" and h1_trend == "SELL")
+            if not (m5_align and h1_align):
+                block_action = True
+                block_reason = f"CALIDAD BAJA: Sin Oráculo y M5/H1 desalineados ({m5_trend_dir}/{h1_trend})"
+            else:
+                block_action = block_council
+                block_reason = block_council_reason
+        else:
+            block_action = block_council 
+            block_reason = block_council_reason
         
         # v18.9.99: VETO MAESTRO WEB (Autonomous Fire)
         if not STATE.get("auto_mode", False):
@@ -2314,21 +2315,23 @@ def process_symbol_task(sym, active, mission_state):
                 if now - last_god_log > 30.0:
                     log(f"🔱 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por ORÁCULO (${oracle_volume/1000:.0f}k).")
                     STATE[f"last_god_log_{sym}"] = now
-                if "XAU" in sym or "Gold" in sym:
-                    # En Oro, el Momentum M1 es SAGRADO. El Oráculo no puede ignorarlo.
-                    pass 
+                # v33.4: MANDO ABSOLUTO del Oráculo (Fuego Veloz)
+                # Solo bloqueamos si M5 es TOTALMENTE contrario (Doble Rojo/Verde)
+                is_extreme_contrarian = (target_sig == "BUY" and m5_trend_label == "🔴🔴") or (target_sig == "SELL" and m5_trend_label == "🟢🟢")
+                
+                if is_extreme_contrarian:
+                    if now % 15 < 1: log(f"🧘 VETO TENDENCIA M5: Oráculo quiere {target_sig} pero M5 es {m5_trend_label} extremo.")
                 else:
-                    block_action = False # LIBERTAD ABSOLUTA para otros activos
+                    block_action = False 
                 is_hard_blocked = False
-                STATE[f"oracle_active_{sym}"] = True
         else:
             STATE[f"oracle_active_{sym}"] = False
 
-        # v32.2: BLINDAJE DE LATENCIA (Anti-Broker Lento)
+        # v32.6.3: BLINDAJE DE LATENCIA RELAJADO (Prioridad Acción)
         actual_latency = LAST_LATENCY
-        if actual_latency > 400:
+        if actual_latency > 1000:
             block_action = True
-            block_reason = f"LATENCIA CRÍTICA ({actual_latency:.0f}ms)"
+            block_reason = f"LATENCIA EXTREMA ({actual_latency:.0f}ms)"
 
         # 3. FILTRO DE VOLATILIDAD (ATR DYNAMICS)
         # Si el mercado está loco (ATR alto), aumentamos la distancia de las balas
@@ -2347,7 +2350,7 @@ def process_symbol_task(sym, active, mission_state):
         # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
         if not contragolpe_active and not is_exploring and target_sig != "HOLD":
             if (target_sig == "BUY" and m5_trend_dir == "SELL") or (target_sig == "SELL" and m5_trend_dir == "BUY"):
-                if conf < 0.80: # v18.9.14: Sincronizado con la regla de Élite (antes 0.96)
+                if conf < 0.60: # v32.6.2: Umbral bajado de 0.80 a 0.60 para más acción
                     block_action = True; block_reason = f"TENDENCIA M5 CONTRARIA ({m5_trend_dir})"
                 else:
                     # v18.11.800: FILTRO DE AGOTAMIENTO (PRECISIÓN COMANDANTE) RESTAURADO
@@ -2549,7 +2552,7 @@ def process_symbol_task(sym, active, mission_state):
             if sym == "BTCUSDm" and not is_big_whale:
                 # No bypass absoluto, dejar que el resto del código valide con IA
                 pass
-            elif sym == "XAUUSDm" and oracle_power < 10000:
+            elif sym == "XAUUSDm" and oracle_power < 18000: # v33.4: Umbral equilibrado $18k
                 is_oracle_signal = False 
                 log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Umbral mínimo es $10k.")
 
@@ -2605,8 +2608,8 @@ def process_symbol_task(sym, active, mission_state):
                 LAST_OLLAMA_CACHE[sym] = {'rsi': rsi_val, 'bb': bb_pos, 'sig': target_sig, 'res': ai_reply, 'model': model_used}
                 conf *= 1.1 # Bono por IA positiva
             else:
-                log(f"🛡️ IA VETO: {ai_reply[:50]}...")
-                conf *= 0.5 # Penalización por IA negativa
+                log(f"🛡️ IA FALLBACK: Siguiendo indicadores técnicos (Ollama Offline/Veto)")
+                # No penalizamos la confianza si Ollama falla, confiamos en el Sniper técnico
         elif use_cache:
             ai_reply = cache['res']
             if "YES" not in ai_reply.upper() and "SI" not in ai_reply.upper():
@@ -2801,20 +2804,15 @@ def process_symbol_task(sym, active, mission_state):
                             # Limpiamos la razón para no loopear infinitamente
                             LAST_CLOSE_REASON[sym] = "RE-ENTERED"
 
-                        # v32.4.1: CARGADOR ESTRATÉGICO (2 Base + 1 Salvación)
-                        actual_equity = get_equity()
-                        if actual_equity < 50: dynamic_max_bullets = 1 
-                        elif actual_equity < 120: dynamic_max_bullets = 3 # 2 Base + 1 Salvación
-                        else: dynamic_max_bullets = MAX_BULLETS
+                        # v32.5.1: POTENCIA DE RECUPERACIÓN (3 Balas @ 0.02)
+                        dynamic_max_bullets = 3 
                         
                         if n_balas >= dynamic_max_bullets:
                             should_fire = False
-                            if now % 30 < 1: log(f"🛡️ CARGADOR LIMITADO: {n_balas}/{dynamic_max_bullets} balas (Balance: ${actual_equity:.2f})")
+                            if now % 60 < 1: log(f"🛡️ CARGADOR LLENO: {n_balas}/{dynamic_max_bullets} balas.")
                         elif n_balas == 0 and not is_urgent_continuation:
-                            # v32.0: Filtro de Sesión Limbo (Alta peligrosidad)
-                            ahora_cl = datetime.fromtimestamp(now)
-                            is_limbo = any(h_start <= ahora_cl.hour <= h_end for (h_start, m_start), (h_end, m_end) in [LIMBO_HOURS])
-                            req_conf = 0.85 if is_limbo else 0.65
+                            # Requisito de confianza optimizado para acción
+                            req_conf = 0.60 
                             
                             if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= req_conf:  
                                 should_fire = True
@@ -2822,7 +2820,7 @@ def process_symbol_task(sym, active, mission_state):
                                 should_fire = False
                                 if now % 20 < 1:
                                     reason = block_reason if block_action else f"Confianza {conf*100:.1f}% < {req_conf*100:.0f}%"
-                                    log(f"🧘 FILTRO INTELIGENTE: {reason}")
+                                    log(f"🧘 FILTRO TÁCTICO: {reason}")
 
                             if should_fire:
                                 trigger_type = "EXPLORACIÓN-0.01" if is_exploring else "SOLO"
@@ -2842,13 +2840,21 @@ def process_symbol_task(sym, active, mission_state):
                                 # Usar tiempo de alta precisión para evitar race conditions simultáneas
                                 now_precise = time.perf_counter()
                                 last_fire_precise = STATE.get(f"fire_precise_{sym}", 0)
-                                if (now_precise - last_fire_precise) < 8.0: 
+                                if (now_precise - last_fire_precise) < 3.0: # Reducido de 8s a 3s para ráfaga rápida
                                     should_fire = False
                                 else:
                                     STATE[f"fire_precise_{sym}"] = now_precise
                                     STATE[f"firing_{sym}"] = time.time()
                                     # Conservar trigger_type asignado arriba
                                     pass
+                        
+                        # v33.2: MODO RÁFAGA (Si hay profit, meter más leña)
+                        if not should_fire and n_balas > 0 and n_balas < 3:
+                            total_profit = sum(p.profit for p in pos_list)
+                            if total_profit > 0.50:
+                                log(f"🔥 RÁFAGA GANADORA: Profit ${total_profit:.2f}. Metiendo bala de refuerzo.")
+                                should_fire = True
+                                trigger_type = "RAFAGA-WIN"
                         
                         # --- CÁLCULO DE PARÁMETROS DE PROMEDIACIÓN (v18.9.40) ---
                         smart_min_dist = 0.80 # Default
@@ -2922,7 +2928,7 @@ def process_symbol_task(sym, active, mission_state):
 
         if hora_chile == 18:
             if minuto_chile >= 45: mercado_cerrado = True # Hard Close (Liquidar antes del Gap)
-            elif minuto_chile >= 30: bloqueo_entrada = True # Soft Close (No abrir nuevas)
+            elif minuto_chile >= 55: bloqueo_entrada = True # v32.7: Solo bloquear 5 min antes del cierre real
         elif hora_chile == 19:
             mercado_cerrado = True # Mercado oficialmente cerrado
         # A las 20:00 el mercado vuelve a la vida (Sin bloqueos de 5 min)
@@ -3081,6 +3087,8 @@ def process_symbol_task(sym, active, mission_state):
                             with state_lock: STATE[f"firing_{sym}"] = now
                             LAST_ENTRY[sym] = now
                         else:
+                            err_code = res.retcode if res else "SIN_RESPUESTA"
+                            log(f"❌ FALLO MT5 ({sym}): Retcode {err_code} | Error: {mt5.last_error()}")
                             # v18.9.450: Salto silencioso al bridge para cryptos/metales (Doble Sincro)
                             send_signal(sym, target_sig, force=should_fire)
                         
@@ -4145,6 +4153,27 @@ async def get_radar():
         }
     except Exception as e:
         return {"error": str(e)}
+
+@app.post("/simulator/run")
+async def run_simulator_api(request: Request):
+    try:
+        from Titan_Simulator_Engine import TitanSimulator
+        d = await request.json()
+        sym = d.get("symbol", "XAUUSDm")
+        bal = float(d.get("balance", 300.0))
+        lot = float(d.get("lot", 0.01))
+        days = int(d.get("days", 7))
+        s_h = int(d.get("start_hour", 8))
+        e_h = int(d.get("end_hour", 23))
+        
+        sim = TitanSimulator(symbol=sym, initial_balance=bal, lot=lot)
+        df_sim = sim.get_data(days=days)
+        if df_sim is None: return {"error": "Error MT5 al bajar datos"}
+        
+        report = sim.run(df_sim, start_hour=s_h, end_hour=e_h)
+        return report
+    except Exception as ex:
+        return {"error": str(ex)}
 
 @app.post("/trade")
 async def execute_trade(request: Request):
