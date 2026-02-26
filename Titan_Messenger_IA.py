@@ -66,8 +66,10 @@ def get_account_context():
     
     return context
 
+OLLAMA_MODELS = ["gpt-oss:20b-cloud", "gpt-oss:120b-cloud", "deepseek-coder:1.3b"]
+
 def call_ia(user_msg, context, is_audit=False):
-    """ Llama a la IA con el contexto de la cuenta y la duda del usuario """
+    """ Llama a la IA con rotación de modelos para asegurar respuesta (v38.6) """
     tipo_mision = "AUDITORÍA DE MERCADO" if is_audit else "COMUNICACIÓN DE PUENTE"
     
     prompt = f"""
@@ -83,24 +85,27 @@ def call_ia(user_msg, context, is_audit=False):
     INSTRUCCIONES PARA SER UN HUMANO REAL:
     1. No hables como un manual de instrucciones. Habla como un socio que está en la trinchera con él.
     2. Usa lenguaje natural y cercano. Si el Comandante te putea o está enojado, asúmelo con respeto y empatía, no respondas como un robot frío.
-    3. Tienes permiso para usar modismos chilenos sutiles pero respetuosos (ej: 'está pelúo', 'cachai', 'sacamos el chorro', 'fome', 'bacán').
-    4. Interpreta los datos: No digas 'Spread 40'. Di 'Jefe, el spread está tranquilo, está especial para entrar'.
-    5. Honestidad Brutal: Si estamos perdiendo o el mercado está lateral y aburrido, admítelo. No trates de adornar la realidad.
-    6. Tu lealtad al Comandante es total. Si cometimos un error técnico (bugs), admítelo y dile que estamos trabajando para arreglar la caguera.
+    3. Tienes permiso para usar modismos chilenos sutiles pero respetuosos.
+    4. Interpreta los datos. Honestidad Brutal.
     
     RESPUESTA HUMANA Y LEAL:
     """
     
-    try:
-        payload = {
-            "model": "gpt-oss:20b-cloud",
-            "prompt": prompt,
-            "stream": False
-        }
-        res = requests.post(OLLAMA_URL, json=payload, timeout=20)
-        return res.json().get('response', 'Error de respuesta IA')
-    except Exception as e:
-        return f"Error conectando con el Cerebro IA: {e}"
+    for model in OLLAMA_MODELS:
+        try:
+            payload = {
+                "model": model,
+                "prompt": prompt,
+                "stream": False
+            }
+            res = requests.post(OLLAMA_URL, json=payload, timeout=15)
+            if res.status_code == 200:
+                return res.json().get('response', 'Error de respuesta IA')
+        except Exception as e:
+            print(f"⚠️ IA {model} falló en Messenger. Probando siguiente...")
+            continue
+            
+    return "Comandante, mis sistemas de comunicación están bajo ataque (Error de IAs). Pero aquí sigo vigilando la cuenta por usted."
 
 def speak_to_commander(chat_id, text):
     """ Convierte texto a voz y lo envía a Telegram """
@@ -284,5 +289,12 @@ if __name__ == "__main__":
     t.start()
     
     print("🦅 OFICIAL DE PUENTE TITAN ONLINE - Esperando al Comandante...")
-    bot.infinity_polling()
+    
+    # v38.6: BUCLE DE RECONEXIÓN INFINITA (Eterno)
+    while True:
+        try:
+            bot.infinity_polling(timeout=10, long_polling_timeout=5)
+        except Exception as e:
+            print(f"⚠️ Caída de Telegram: {e}. Reintentando en 5s...")
+            time.sleep(5)
 
