@@ -825,13 +825,8 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_gold = ("XAU" in sym or "Gold" in sym)
     is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
-    # 1. Gestión de Balas según Reglas Maestras (Protocolo v18.9.103)
-    if balance < 150:
-        max_bullets = 3  # v37.6: Límite seguro para apalancamiento 1:200
-    elif balance < 300:
-        max_bullets = 5  
-    else:
-        max_bullets = 10 
+    # 1. Gestión de Balas: MODO METRALLETA v38.0
+    max_bullets = 10 # Fuego máximo exigido por el Comandante
     
     # 2. Definir Lotaje según Balance (v19.0.8: PROTECCIÓN DE CAPITAL)
     # Si el balance cae de $100, bajamos el riesgo para evitar la quema de cuenta.
@@ -1374,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v37.9 | HFT SCALPING (FUEGO CONTINUO) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v38.1 | PULMÓN DE GODZILLA (MÁXIMO AIRE) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -2808,7 +2803,7 @@ def process_symbol_task(sym, active, mission_state):
                             LAST_CLOSE_REASON[sym] = "RE-ENTERED"
 
                         # v32.5.1: POTENCIA DE RECUPERACIÓN (3 Balas @ 0.02)
-                        dynamic_max_bullets = 3 
+                        dynamic_max_bullets = 10 # v38.0: Modo Metralleta
                         
                         if n_balas >= dynamic_max_bullets:
                             should_fire = False
@@ -2863,7 +2858,7 @@ def process_symbol_task(sym, active, mission_state):
                         smart_min_dist = 0.80 # Default
                         if n_balas > 0:
                             # v18.9.81: Distancia reducida si la confianza es BRUTAL
-                            smart_min_dist = 0.80  # v18.9.94: Min 80 pts entre balas en Oro
+                            smart_min_dist = 0.20  # v38.0: Distancia mínima reducida a 20 puntos para saturar
                             
                             # 3. Confirmación de color de vela (Flexibilizado para Máxima Potencia)
                             confirmacion_vela = False
@@ -3254,10 +3249,10 @@ def metralleta_loop():
                     max_b = current_open_pnl
                 
                 secure_b = -999.0
-                if max_b >= 10.0:
-                    secure_b = (max_b // 5) * 5 - 5 # Asegura de 5 en 5 (ej: en 11 asegura 5)
-                elif max_b >= 5.0:
-                    secure_b = 0.5 # A los $5 solo aseguramos centavos para no asfixiar la ráfaga
+                if max_b >= 20.0:
+                    secure_b = (max_b // 10) * 10 - 10 # v38.1: Air de $10 USD para la canasta
+                elif max_b >= 10.0:
+                    secure_b = 2.0 # Primer escalón: a los $10 asegura solo $2 para dar mucho aire
                 
                 if current_open_pnl <= secure_b and len(open_positions) > 0:
                     log(f"🧺 ESCUDO DE CANASTA: Asegurando ${current_open_pnl:.2f} (Pico: ${max_b:.2f})")
@@ -3275,7 +3270,7 @@ def metralleta_loop():
                         # 1. HARD STOP ADAPTATIVO (v32.0: Basado en ATR)
                         # El stop ya no es un número frío, se adapta al ruido del mercado.
                         current_atr = STATE.get(f"atr_{p_sym}", 1.5)
-                        limit_hs = -25.00 if "XAU" in p_sym else -10.00
+                        limit_hs = -25.00 # v38.0: Blindaje total. Prohibido cerrar a -$10.
                         
                         if profit <= limit_hs:
                             log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
@@ -3395,15 +3390,15 @@ def metralleta_loop():
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
                             # v37.3: ESCALERA "PULMÓN DE ACERO" (Mucho más aire para el profit)
-                            locked_steps = -10.0 # Empezamos con SL de -$10 o -$12.5 (según hard stop)
+                            locked_steps = -25.0 # Empezamos con SL de -$25 para dar aire total
                             if profit >= 40.0:
-                                locked_steps = profit - 15.0 # 15 USD de aire en ráfagas grandes
+                                locked_steps = profit - 20.0 # v38.1: Aire de $20 USD en ráfagas grandes
                             elif profit >= 20.0:
-                                locked_steps = 10.0 # 10 USD de aire
+                                locked_steps = 8.0  # $12 USD de aire
                             elif profit >= 10.0:
-                                locked_steps = 5.0  # 5 USD de aire
+                                locked_steps = 3.0  # $7 USD de aire
                             elif profit >= 5.0:
-                                locked_steps = 2.0  # 3 USD de aire (Antes era 1.5)
+                                locked_steps = 1.0  # $4 USD de aire
                             elif profit >= 3.5:
                                 locked_steps = 1.0  # Asegura algo, pero deja 2.5 de aire
                             elif profit >= 2.0:
