@@ -133,7 +133,7 @@ export default function TitanDashboard() {
               Titan <span className="text-cyan-500">Sentinel</span>
               <div className="w-2 h-2 bg-emerald-500 rounded-full animate-pulse shadow-[0_0_10px_rgba(16,185,129,0.8)]" />
             </h1>
-            <span className="text-[10px] bg-cyan-500/10 text-cyan-500 px-2 py-0.5 rounded border border-cyan-500/20 font-black">v7.8 RADAR</span>
+            <span className="text-[10px] bg-cyan-500/10 text-cyan-500 px-2 py-0.5 rounded border border-cyan-500/20 font-black tracking-tighter">DATA SYNC: {data.ts ? new Date(data.ts).toLocaleTimeString() : 'WAITING...'}</span>
           </div>
 
           <div className="flex bg-black/40 rounded-xl p-1 border border-gray-800 backdrop-blur-md">
@@ -538,8 +538,8 @@ export default function TitanDashboard() {
                   <div className="flex items-center gap-4 text-cyan-400">
                     <BrainCircuit size={32} />
                     <div>
-                      <p className="text-[10px] font-black uppercase tracking-[0.3em]">IA RECOMMENDATION // OPTIMIZED WINDOW</p>
-                      <p className="text-xl font-black italic uppercase tracking-tighter">{simResult.recommendation}</p>
+                      <p className="text-[10px] font-black uppercase tracking-[0.3em] text-cyan-500/50">IA STRATEGIC ANALYSIS // HIGH-FIDELITY MULTI-BULLET ENGINE (v34.5)</p>
+                      <p className="text-xl font-black italic uppercase tracking-tighter text-white">{simResult.recommendation}</p>
                     </div>
                   </div>
                 </div>

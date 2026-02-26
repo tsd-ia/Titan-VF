@@ -194,6 +194,7 @@ STATE = {
     "price_history": [], "oro_brain_on": True, "btc_brain_on": True,
     "crypto_brain_on": True, "auto_mode": True, "start_mission": True,
     "auto_pilot": True,
+    "health": {"mt5": True, "ai": True},
     "whale_memory": {"symbol": None, "signal": "HOLD", "power": 0, "timestamp": 0},
     "throttles": {"firebase": 0, "candles": 0, "ping": 0, "dashboard": 0, "telemetry": 0}
 }
@@ -824,10 +825,13 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_gold = ("XAU" in sym or "Gold" in sym)
     is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
-    # 1. Definir Balas por Categoría (MODO BERSERKER v19.0)
-    # El Comandante pide 6 balas por instrumento.
-    # v33.1: RÁFAGA DE COMPENSACIÓN (Bajas dosis, muchas balas)
-    max_bullets = 10 if conf > 0.60 else 5
+    # 1. Gestión de Balas según Reglas Maestras (Protocolo v18.9.103)
+    if balance < 50:
+        max_bullets = 1  # 1 Bala máxima. Solo Scalping de precisión.
+    elif balance < 100:
+        max_bullets = 2  # Máximo 2 posiciones simultáneas.
+    else:
+        max_bullets = 5  # 3 base + 2 salvación.
     
     # 2. Definir Lotaje según Balance (v19.0.8: PROTECCIÓN DE CAPITAL)
     # Si el balance cae de $100, bajamos el riesgo para evitar la quema de cuenta.
@@ -839,9 +843,13 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
         # v33.1: BTC a 0.01 por seguridad de margen
         smart_lot = 0.01 
     elif is_gold:
-        # v33.1: AJUSTE POR MARGEN (Error 10019)
-        # Bajamos a 0.01 para entrar sí o sí, pero subimos balas.
-        smart_lot = 0.01
+        # v37.2: Lote Dinámico Retroactivo (Caza Mayor)
+        if balance < 50:
+            smart_lot = 0.01
+        elif balance < 100:
+            smart_lot = 0.02
+        else:
+            smart_lot = 0.04 # Escalado seguro para evitar Error 10019 (Margen)
         
     return max_bullets, smart_lot
 
@@ -2710,7 +2718,7 @@ def process_symbol_task(sym, active, mission_state):
                     # --- ENFRIAMIENTO DINÁMICO v18.9.12 (Ajuste Máxima Potencia) ---
                     close_time = LAST_CLOSE_TS.get(sym, 0)
                     is_last_win = LAST_CLOSE_DIR.get(sym) == "WIN"
-                    wait_time = 1 if is_last_win else 3 # MODO URGENCIA CUMPLEAÑOS: Metralleta real (Sin demoras)
+                    wait_time = 900 if is_last_win else 1800 # v36.9: Filtro Sniper Realista (15-30 min cooldown)
                     
                     if (now - close_time) < wait_time:
                         block_action = True
@@ -3243,6 +3251,25 @@ def metralleta_loop():
                 # v22.0: PRIORIDAD ABSOLUTA - PROTECCIÓN ANTES QUE CUALQUIER OTRA COSA
                 open_positions = [pos for pos in positions if (pos.magic == 777 or (pos.magic == 0 and pos.symbol in SYMBOLS))]
                 current_open_pnl = sum(p.profit for p in open_positions)
+
+                # --- C. ESCUDO DE CANASTA v37.1 (Trailing Profit Colectivo) ---
+                max_b = STATE.get("max_basket_pnl", 0.0)
+                if current_open_pnl > max_b:
+                    STATE["max_basket_pnl"] = current_open_pnl
+                    max_b = current_open_pnl
+                
+                secure_b = -999.0
+                if max_b >= 5.0:
+                    if max_b >= 10.0:
+                        secure_b = (max_b // 5) * 5 - 5 # Asegura de 5 en 5 (ej: en 11 asegura 5, en 16 asegura 10)
+                    else:
+                        secure_b = 1.0 # Primer escalón: a los $5 asegura $1
+                
+                if current_open_pnl <= secure_b and len(open_positions) > 0:
+                    log(f"🧺 ESCUDO DE CANASTA: Asegurando ${current_open_pnl:.2f} (Pico: ${max_b:.2f})")
+                    for p in open_positions: close_ticket(p, "BASKET_TRAIL_v37")
+                    STATE["max_basket_pnl"] = 0.0
+                    continue
                 
                 # B. PROTOCOLO DE BLINDAJE INDIVIDUAL (v22.0: Movido arriba para inmunidad a crashes)
                 for p in open_positions:
@@ -3254,7 +3281,7 @@ def metralleta_loop():
                         # 1. HARD STOP ADAPTATIVO (v32.0: Basado en ATR)
                         # El stop ya no es un número frío, se adapta al ruido del mercado.
                         current_atr = STATE.get(f"atr_{p_sym}", 1.5)
-                        limit_hs = -max(3.5, current_atr * 3.8) # Mínimo $3.5 de stop, máximo según volatilidad
+                        limit_hs = -12.50 if "XAU" in p_sym else -max(3.5, current_atr * 3.8) 
                         
                         if profit <= limit_hs:
                             log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
@@ -3333,7 +3360,7 @@ def metralleta_loop():
                     # v21.1: SALIDA POR AGOTAMIENTO (Análisis Madrugada 24/02)
                     # Probabilidad de retorno < 20% después de -$13.5 en BTC (0.1 lot).
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
-                    limit_hs = -6.5 if is_gold_hs else -13.5 
+                    limit_hs = -12.50 if is_gold_hs else -13.5 
                     if profit <= limit_hs:
                         log(f"🚨 CORTE POR AGOTAMIENTO: {sym} (${profit:.2f}). No vale la pena esperar retorno.")
                         close_ticket(p, "EXHAUSTION_CUT_v21"); continue
@@ -3366,18 +3393,22 @@ def metralleta_loop():
                                 new_sl_shadow = entry - shadow_dist if p.type == 0 else entry + shadow_dist
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
-                            # v31.10: ESCUDO MICRO (Asegurar desde centavos)
-                            locked_steps = -2.0
-                            if profit >= 10.0: locked_steps = profit - 2.00
-                            elif profit >= 5.0: locked_steps = 3.90
-                            elif profit >= 3.0: locked_steps = 2.10
-                            elif profit >= 2.0: locked_steps = 1.30 
-                            elif profit >= 1.20: locked_steps = 0.65
-                            elif profit >= 0.80: locked_steps = 0.35
-                            elif profit >= 0.45: locked_steps = 0.15
+                            # v37.0: ESCALERA TITÁN "CAZA MAYOR" (Configuración del Comandante)
+                            locked_steps = -5.0 # Mínimo aire de $5 inicial
+                            if profit >= 20.0:
+                                locked_steps = (profit // 5) * 5 - 5 
+                            elif profit >= 10.0:
+                                locked_steps = 7.5
+                            elif profit >= 5.0:
+                                locked_steps = 3.5
+                            elif profit >= 3.5:
+                                locked_steps = 2.7
+                            elif profit >= 2.7:
+                                locked_steps = 2.0
+                            elif profit >= 2.0:
+                                locked_steps = 1.0
                             
-                            # v28.13: Tomar el mayor entre pasos fijos y porcentaje dinámico (0.50%)
-                            locked_p = max(locked_steps, profit * 0.50) if profit >= 1.0 else locked_steps
+                            locked_p = locked_steps
                             
                             new_sl_trail = entry + (dist_sl * locked_p) if p.type == mt5.ORDER_TYPE_BUY else entry - (dist_sl * locked_p)
                             curr_sl = float(p.sl)
@@ -3475,9 +3506,7 @@ def metralleta_loop():
                         close_ticket(worst_pos, "MARGIN_EMERGENCY_CUT")
                         continue 
 
-                # v31.18.2: GESTIÓN POR POSICIÓN INDIVIDUAL (Sin Basket Trailing)
-                # Se elimina el bloque de Cosecha Global por orden del Comandante.
-                with state_lock: STATE["basket_pico"] = 0.0
+                # v18.9.175: VIGILANCIA GLOBAL DESHABILITADA (Movida a nivel de símbolo)
 
                 # v18.9.175: VIGILANCIA GLOBAL DESHABILITADA (Movida a nivel de símbolo)
                 # if current_open_pnl <= MAX_SESSION_LOSS:
@@ -3486,6 +3515,12 @@ def metralleta_loop():
                 #         metralleta_loop.last_vigilancia = now_loop
                 #         log(f"🧘 VIGILANCIA VANGUARDIA: PnL {current_open_pnl:.2f}. Manteniendo posiciones.")
                 #     continue
+
+                if not open_positions: 
+                    with state_lock: STATE["max_basket_pnl"] = 0.0
+
+            else:
+                with state_lock: STATE["max_basket_pnl"] = 0.0
 
             # --- 2. PROCESAMIENTO PARALELO (THE OCTOPUS) ---
             # ... (resto del loop) ...
@@ -3705,6 +3740,14 @@ def metralleta_loop():
                 STATE["throttles"]["firebase"] = now_loop
                 try:
                     acc = mt5.account_info()
+                    with state_lock:
+                        if "health" not in STATE: STATE["health"] = {"mt5": True, "ai": True}
+                        if not acc:
+                            log("⚠️ ERROR CRÍTICO: No se pudo obtener información de cuenta de MT5.")
+                            STATE["health"]["mt5"] = False
+                        else:
+                            STATE["health"]["mt5"] = True
+
                     tick_oro = mt5.symbol_info_tick("XAUUSDm")
                     sym_info = mt5.symbol_info("XAUUSDm")
                     
@@ -3714,9 +3757,11 @@ def metralleta_loop():
                     # Formatear posiciones
                     pos_formatted = []
                     all_pos = mt5.positions_get()
+                    current_open_pnl = 0.0
                     if all_pos:
                         for p in all_pos:
                             if p.symbol in SYMBOLS or p.symbol == "XAUUSDm":
+                                current_open_pnl += p.profit
                                 pos_formatted.append({
                                     "tipo": "BUY" if p.type == mt5.POSITION_TYPE_BUY else "SELL",
                                     "open": p.price_open,
@@ -3726,11 +3771,11 @@ def metralleta_loop():
                                 })
 
                     current_pnl = 0.0
-                    if mission_state.get("active"):
-                        current_pnl = (acc.equity - mission_state.get("start_equity", acc.equity)) if acc else 0
+                    if mission_state.get("active") and acc:
+                        current_pnl = (acc.equity - mission_state.get("start_equity", acc.equity))
                     
-                    # Calcular progreso hacia la meta de 500% ($34.79 * 5 = $173.95)
-                    goal_usd = 173.95
+                    # Calcular progreso hacia la meta de 200% del balance actual
+                    goal_usd = (acc.balance * 2.0) if acc else 100.0
                     progress_pct = min(100, max(0, (current_pnl / goal_usd) * 100)) if current_pnl > 0 else 0
                     
                     ai_status = STATE.get("last_ollama_res", "Ollama Sentinel Active")
