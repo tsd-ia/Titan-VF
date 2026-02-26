@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v38.2 | PULMÓN DE GODZILLA (SILENCIO TÁCTICO) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v38.3 | ESCUDO DE MARGEN (RESCATE ACTIVO) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1674,17 +1674,26 @@ def process_symbol_task(sym, active, mission_state):
     try:
         now = time.time()
         
-        # 🛡️ FRENO DE EMERGENCIA: CARGADOR DINÁMICO (v28.6)
+        # 🛡️ FRENO DE EMERGENCIA: CARGADOR DINÁMICO (v38.3: SINCRO METRALLETA)
+        acc = mt5.account_info()
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
-        balance = mt5.account_info().balance
-        limit = 5 if balance >= 100 else 3
+        balance = acc.balance if acc else 0.0
+        
+        # v38.3: PROTOCOLO DE RESCATE POR MARGEN (Solicitud Comandante)
+        # Si el margen es crítico (< 125%), liquidamos la peor posición para dar "aire".
+        if acc and hasattr(acc, 'margin_level') and acc.margin_level < 125.0 and len(pos_list) >= 2:
+            peor_p = min(pos_list, key=lambda x: x.profit)
+            if peor_p.profit < -10.0: # Solo si la pérdida es significativa
+                log(f"🆘 ESCUDO DE MARGEN: Liquidando #{peor_p.ticket} (${peor_p.profit:.2f}) para liberar aire. Margen: {acc.margin_level:.1f}%")
+                close_ticket(peor_p, "MARGIN_RESCUE")
+                return None # Re-evaluar en el siguiente ciclo
+        
+        limit = 10 if balance >= 100 else 5
         if len(pos_list) >= limit:
             return None
             
         now_dt = datetime.fromtimestamp(now)
-        acc = mt5.account_info()
-        sym_pnl = sum(p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0) for p in pos_list)
         sym_pnl = sum(p.profit + getattr(p, 'swap', 0.0) + getattr(p, 'commission', 0.0) for p in pos_list)
 
         if sym_pnl <= MAX_SESSION_LOSS and len(pos_list) > 0:
