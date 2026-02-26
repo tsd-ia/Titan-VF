@@ -139,7 +139,7 @@ print("✅ LIMPIEZA COMPLETA.")
 PORT = 8000
 # LISTA DE ACTIVOS MONITORIZADOS (RADAR MÚLTIPLE v7.8)
 # CEREBRO DUAL: ORO (Prioridad) y BTC (Bala Especial)
-SYMBOLS = ["XAUUSDm", "BTCUSDm"] 
+SYMBOLS = ["XAUUSDm"] # v37.4: SOLO ORO. BTC ELIMINADO.
 
 # REPARACIÓN DE RUTA (Basada en LOGS del Robot)
 MQL5_FILES_PATH = r"C:\Users\dfa21\AppData\Roaming\MetaQuotes\Terminal\53785E099C927DB68A545C249CDBCE06\MQL5\Files"
@@ -826,12 +826,12 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
     # 1. Gestión de Balas según Reglas Maestras (Protocolo v18.9.103)
-    if balance < 50:
-        max_bullets = 1  # 1 Bala máxima. Solo Scalping de precisión.
-    elif balance < 100:
-        max_bullets = 2  # Máximo 2 posiciones simultáneas.
+    if balance < 150:
+        max_bullets = 3  # v37.6: Límite seguro para apalancamiento 1:200
+    elif balance < 300:
+        max_bullets = 5  
     else:
-        max_bullets = 5  # 3 base + 2 salvación.
+        max_bullets = 10 
     
     # 2. Definir Lotaje según Balance (v19.0.8: PROTECCIÓN DE CAPITAL)
     # Si el balance cae de $100, bajamos el riesgo para evitar la quema de cuenta.
@@ -843,13 +843,13 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
         # v33.1: BTC a 0.01 por seguridad de margen
         smart_lot = 0.01 
     elif is_gold:
-        # v37.2: Lote Dinámico Retroactivo (Caza Mayor)
-        if balance < 50:
-            smart_lot = 0.01
-        elif balance < 100:
+        # v37.3: Ajuste de Margen Realista (Oro a $5000+)
+        if balance < 150:
+            smart_lot = 0.01 # Balance de $100 solo soporta 0.01 con seguridad
+        elif balance < 300:
             smart_lot = 0.02
         else:
-            smart_lot = 0.04 # Escalado seguro para evitar Error 10019 (Margen)
+            smart_lot = 0.04 
         
     return max_bullets, smart_lot
 
@@ -870,9 +870,7 @@ def get_bunker_sl_price(sym, lot, side, price):
         if atr_val > 2.0: vol_multiplier = 2.5
         elif atr_val > 1.2: vol_multiplier = 1.5
 
-        target_loss = 5.0 * vol_multiplier # Riesgo dinámico entre $5 y $12.50 por bala
-        if mt5.account_info().balance >= 500: # Solo si la cuenta crece aumentamos el riesgo base
-             target_loss = 25.0 * vol_multiplier
+        target_loss = 25.0 # v37.4: REGLA DE ORO DEL JEFE - AIRE REAL PARA ESCALAR
 
         # Formula: PriceDelta = Loss / (Lot * ContractSize)
         cs = s_info.trade_contract_size
@@ -1376,13 +1374,13 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v18.11.400 | PULMÓN DE ACERO (FUEGO TOTAL) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v37.9 | HFT SCALPING (FUEGO CONTINUO) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
     tick = mt5.symbol_info_tick(target_tick_sym)
+    # v37.4: Fallback solo a Oro
     if not tick or (time.time() - tick.time > 60):
-        target_tick_sym = "BTCUSDm"
         tick = mt5.symbol_info_tick(target_tick_sym)
     
     current_spread = tick.ask - tick.bid if tick else 0.0
@@ -2716,13 +2714,10 @@ def process_symbol_task(sym, active, mission_state):
                     last_price = LAST_ENTRY_PRICE.get(sym, 0.0)
                     
                     # --- ENFRIAMIENTO DINÁMICO v18.9.12 (Ajuste Máxima Potencia) ---
-                    close_time = LAST_CLOSE_TS.get(sym, 0)
-                    is_last_win = LAST_CLOSE_DIR.get(sym) == "WIN"
-                    wait_time = 900 if is_last_win else 1800 # v36.9: Filtro Sniper Realista (15-30 min cooldown)
-                    
+                    wait_time = 10 # v37.9: HFT MODE (10 segundos de análisis)
                     if (now - close_time) < wait_time:
                         block_action = True
-                        block_reason = f"ENFRIAMIENTO {'POST-WIN' if is_last_win else 'POST-LOSS'} ({wait_time}s)"
+                        block_reason = f"HFT SCANNING ({wait_time}s)"
 
                     if not MIRROR_MODE and target_sig == "BUY" and delta < -0.80: # Relajado v13.5
                         block_action = True
@@ -3259,11 +3254,10 @@ def metralleta_loop():
                     max_b = current_open_pnl
                 
                 secure_b = -999.0
-                if max_b >= 5.0:
-                    if max_b >= 10.0:
-                        secure_b = (max_b // 5) * 5 - 5 # Asegura de 5 en 5 (ej: en 11 asegura 5, en 16 asegura 10)
-                    else:
-                        secure_b = 1.0 # Primer escalón: a los $5 asegura $1
+                if max_b >= 10.0:
+                    secure_b = (max_b // 5) * 5 - 5 # Asegura de 5 en 5 (ej: en 11 asegura 5)
+                elif max_b >= 5.0:
+                    secure_b = 0.5 # A los $5 solo aseguramos centavos para no asfixiar la ráfaga
                 
                 if current_open_pnl <= secure_b and len(open_positions) > 0:
                     log(f"🧺 ESCUDO DE CANASTA: Asegurando ${current_open_pnl:.2f} (Pico: ${max_b:.2f})")
@@ -3281,7 +3275,7 @@ def metralleta_loop():
                         # 1. HARD STOP ADAPTATIVO (v32.0: Basado en ATR)
                         # El stop ya no es un número frío, se adapta al ruido del mercado.
                         current_atr = STATE.get(f"atr_{p_sym}", 1.5)
-                        limit_hs = -12.50 if "XAU" in p_sym else -max(3.5, current_atr * 3.8) 
+                        limit_hs = -25.00 if "XAU" in p_sym else -10.00
                         
                         if profit <= limit_hs:
                             log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
@@ -3292,7 +3286,8 @@ def metralleta_loop():
                         if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
                         # v31.17: DOMA DE BALLENAS (v32.0: Umbral dinámico por ATR)
                         # Si el mercado está muy loco, pedimos más profit antes del veto.
-                        base_veto = max(1.10, current_atr * 0.8) 
+                        # v37.5: CAZA MAYOR - No vetar por menos de $10.00
+                        base_veto = 10.0 
                         target_pico = base_veto
                         
                         is_whale = False
@@ -3360,10 +3355,16 @@ def metralleta_loop():
                     # v21.1: SALIDA POR AGOTAMIENTO (Análisis Madrugada 24/02)
                     # Probabilidad de retorno < 20% después de -$13.5 en BTC (0.1 lot).
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
-                    limit_hs = -12.50 if is_gold_hs else -13.5 
+                    limit_hs = -25.00 if is_gold_hs else -13.5 
                     if profit <= limit_hs:
                         log(f"🚨 CORTE POR AGOTAMIENTO: {sym} (${profit:.2f}). No vale la pena esperar retorno.")
                         close_ticket(p, "EXHAUSTION_CUT_v21"); continue
+                    
+                    # v37.7: SALIDA POR ESTANCAMIENTO (MERCADO PANTANO)
+                    trade_life = now_loop - p.time
+                    if trade_life > 1800 and abs(profit) < 1.0: # 30 min y < $1 pnl
+                        log(f"🐢 CIERRE POR ESTANCAMIENTO: {sym} (${profit:.2f}) sin rumbo por 30 min. Reciclando margen.")
+                        close_ticket(p, "STAGNANT_EXIT"); continue
 
                     # === PROTOCOLO DE TRIPLE TRAILING (Unificado v18.9.366) ===
                     # v21.5: SENSOR ANTI-LATIGAZO (Breakeven Dinámico)
@@ -3387,26 +3388,30 @@ def metralleta_loop():
                             
                             # v28.13: Blindaje Sombra mejorado (Unificado BUY/SELL)
                             is_in_risk_zone = (p.type == 0 and p.sl < entry) or (p.type == 1 and p.sl > entry)
-                            if profit >= 0.50 and is_in_risk_zone:
-                                # Trailing Sombra: Bajamos el riesgo de -$25 canónico a -$5 inicial
-                                shadow_dist = 5.0 / (lot * symbol_info.trade_contract_size)
+                            if profit >= 5.00 and is_in_risk_zone:
+                                # Trailing Sombra: Aumentado a -$25 para dar aire real
+                                shadow_dist = 25.0 / (lot * symbol_info.trade_contract_size)
                                 new_sl_shadow = entry - shadow_dist if p.type == 0 else entry + shadow_dist
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
-                            # v37.0: ESCALERA TITÁN "CAZA MAYOR" (Configuración del Comandante)
-                            locked_steps = -5.0 # Mínimo aire de $5 inicial
-                            if profit >= 20.0:
-                                locked_steps = (profit // 5) * 5 - 5 
+                            # v37.3: ESCALERA "PULMÓN DE ACERO" (Mucho más aire para el profit)
+                            locked_steps = -10.0 # Empezamos con SL de -$10 o -$12.5 (según hard stop)
+                            if profit >= 40.0:
+                                locked_steps = profit - 15.0 # 15 USD de aire en ráfagas grandes
+                            elif profit >= 20.0:
+                                locked_steps = 10.0 # 10 USD de aire
                             elif profit >= 10.0:
-                                locked_steps = 7.5
+                                locked_steps = 5.0  # 5 USD de aire
                             elif profit >= 5.0:
-                                locked_steps = 3.5
+                                locked_steps = 2.0  # 3 USD de aire (Antes era 1.5)
                             elif profit >= 3.5:
-                                locked_steps = 2.7
-                            elif profit >= 2.7:
-                                locked_steps = 2.0
+                                locked_steps = 1.0  # Asegura algo, pero deja 2.5 de aire
                             elif profit >= 2.0:
-                                locked_steps = 1.0
+                                locked_steps = 0.1  # Apenas toca breakeven para dejarlo correr
+                            
+                            # v37.7: AIRE DINÁMICO POR VELOCIDAD
+                            if is_fast and locked_steps > 0:
+                                locked_steps *= 0.70 # En mercado rápido, bajamos el seguro para dejarlo correr un 30% más
                             
                             locked_p = locked_steps
                             
