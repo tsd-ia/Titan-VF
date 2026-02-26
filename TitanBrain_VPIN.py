@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v38.4 | MARGEN INTELIGENTE (SCALPING SNIPER) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v38.5 | MARGEN INTELIGENTE (FIX ARRANQUE) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1689,8 +1689,8 @@ def process_symbol_task(sym, active, mission_state):
                 close_ticket(peor_p, "MARGIN_RESCUE")
                 return None # Re-evaluar en el siguiente ciclo
         
-        # v38.4: FRENO PROACTIVO POR MARGEN
-        if acc and hasattr(acc, 'margin_level') and acc.margin_level < 180.0:
+        # v38.5: FRENO PROACTIVO POR MARGEN (Corregido: 0% significa sin posiciones)
+        if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 180.0:
              if now % 60 < 1: log(f"🧘 FILTRO MARGEN: Nivel {acc.margin_level:.1f}% insuficiente para nueva bala.")
              return None # No abrir nada nuevo si no hay aire real
         
