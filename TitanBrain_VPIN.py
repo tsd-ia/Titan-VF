@@ -3532,10 +3532,10 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v40.7: PARACAÍDAS ORO "DEEP BREATH" (Buffer de Seguridad Ampliado) ===
-                    parachute_ratio = 0.40 if (("XAU" in sym or "Gold" in sym)) else 0.70
-                    if max_p > 2.0 and profit < (max_p * parachute_ratio) and profit >= 0.50:
-                        log(f"🪂 PARACAÍDAS v40.7: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
+                    # === v40.9: PARACAÍDAS SÓNICO "NO RESPIRA MÁS" (Blindaje Total) ===
+                    parachute_ratio = 0.85 if (("XAU" in sym or "Gold" in sym)) else 0.80
+                    if max_p > 1.5 and profit < (max_p * parachute_ratio) and profit >= 0.50:
+                        log(f"🪂 PARACAÍDAS v40.9: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
                         close_ticket(p, "PROFIT_PARACHUTE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
