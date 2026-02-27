@@ -9,15 +9,16 @@ Este documento sirve como la "Constitución" para cualquier IA o desarrollador q
     *   **IA Híbrida**: Combina modelos LSTM locales (`.h5`) con sentimientos de Ollama.
 3.  **CAPA VISUAL (Vercel)**: Next.js 15 conectado por Firebase. Solo sirve para monitoreo y mandos remotos (toggles de cerebros).
 
-## 2. Reglas de Gestión de Riesgo (Protocolo v18.9.170)
-El bot utiliza un sistema de **Independencia de Balas** (Buckets) por cada instrumento:
-- **ORO (XAUUSDm)**: 3 Balas máximo (Excluyente de otros).
-- **BTC (BTCUSDm)**: 3 Balas máximo (Excluyente de otros).
-- **CRYPTO (SOL, ETH, etc.)**: 5 Balas máximo por símbolo (Excluyente de otros).
-- **Regla God Mode ($280k)**: Si el volumen del Oráculo supera $280k, se ignoran grilletes técnicos y se dispara la bala obligatoriamente.
-- **Lotaje**: Adaptativo según balance y activo (Crypto usa lotaje base 0.10 para mayor impacto).
-- **Salvación**: Solo se activa si las posiciones base llevan > 5 minutos estancadas.
+## 2. Reglas de Gestión de Riesgo (Protocolo SNIPER v40.10 - COMPROBADO)
+*REGISTRO HISTÓRICO: Esta configuración generó +$90.53 USD en 45 minutos (45% de retorno) operando Oro con cuenta de $200. NINGUNA IA FUTURA DEBE ELIMINAR ESTAS REGLAS SIN ORDEN EXPRESA DEL COMANDANTE.*
 
+El bot utiliza el sistema de **Enjambre Blindado**:
+- **ORO (XAUUSDm)**: 10 Balas máximo para Capital Variable de $200. Lote fijo 0.01 inamovible. Solo sube en múltiplos aprobados (Ej. $400 = Lote 0.02).
+- **VETO DE TENDENCIA (CRÍTICO)**: Jamás disparar SELL si el M5 es alcista, ni BUY si el M5 es bajista.
+- **VETO DE MOMENTUM (CRÍTICO)**: Prohibido disparar contra el M1 inmediato. Si la mecha cae, no hay Buy.
+- **VETO DE RSI**: Prohibido BUY con RSI > 80. Prohibido SELL con RSI < 20.
+- **CERO CIERRES POR MARGEN**: El bot jamás debe cerrar operaciones en pérdida asumiendo riesgo por nivel bajo de margen.
+- **MURO SEGUIDOR (TRAILING 80%)**: Las escaleras de trailing fijas están prohibidas. Se debe usar ratchet dinámico continuo: si profit > $3.5, se asegura el 80% del PICO Máximo. Un Paracaídas secundario asegura el 85% a partir de $1.50 ("No respira más").
 ## 3. Lógica de Inteligencia Artificial
 - **Ollama Throttling**: No pedir confirmación a la IA si los indicadores técnicos (RSI/BB) no han cambiado más de un 3% (Caché Cognitivo).
 - **Veto IA**: Si la IA local dice "BUY" pero Ollama dice "NO", se descarta el trade o se reduce la confianza al 50%.
