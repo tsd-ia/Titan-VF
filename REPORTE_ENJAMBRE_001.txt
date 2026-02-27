@@ -1,0 +1,13 @@
+TITAN PROTOCOLO ENJAMBRE: 0.01 SIEMPRE
+============================================================
+Total Retirado (60 dias): $3779.40
+Sueldo Promedio Semanal: $472.42
+
+SEM 1 | Retiro: $    486.63 | FAIL
+SEM 2 | Retiro: $    567.16 | OK
+SEM 3 | Retiro: $      0.00 | FAIL
+SEM 4 | Retiro: $    460.62 | FAIL
+SEM 5 | Retiro: $    891.45 | OK
+SEM 6 | Retiro: $    150.49 | FAIL
+SEM 7 | Retiro: $    513.93 | OK
+SEM 8 | Retiro: $    709.11 | OK

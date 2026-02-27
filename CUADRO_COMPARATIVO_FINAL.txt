@@ -1,0 +1,57 @@
+TITAN v39.3: COMPARATIVA DIARIA DE 60 DIAS
+================================================================================
+FECHA      | BAL. CAZADOR (v39.2) | BAL. PROTECTOR (v39.3) | STATUS
+--------------------------------------------------------------------------------
+2025-12-29 |             299.59 |               200.00 | CAZADOR GANA
+2025-12-30 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2025-12-31 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-01 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-02 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-04 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-05 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-06 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-07 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-08 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-09 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-11 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-12 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-13 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-14 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-15 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-16 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-18 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-19 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-20 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-21 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-22 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-23 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-25 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-26 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-27 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-28 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-29 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-01-30 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-01 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-02 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-03 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-04 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-05 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-06 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-08 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-09 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-10 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-11 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-12 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-13 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-15 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-16 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-17 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-18 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-19 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-20 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-22 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-23 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-24 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-25 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-26 |             -99.71 |               200.00 | CAZADOR QUEMADO
+2026-02-27 |             -99.71 |               200.00 | CAZADOR QUEMADO

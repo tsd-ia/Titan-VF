@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v39.3 | CEREBRO ESTRATEGA (PROTECTOR) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v39.4 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1723,12 +1723,14 @@ def process_symbol_task(sym, active, mission_state):
                  STATE[f"last_log_margin_{sym}"] = now
              return None 
         
-        # v39.1: MODO METRALLETA (Restaurado)
-        if balance < 150: limit = 3
-        elif balance < 300: limit = 6
-        else: limit = 10
+        # v39.4: LIMITADOR DE CARGADOR ENJAMBRE
+        # Unificado: El Comandante decide la capacidad del enjambre según balance.
+        if balance < 150: limit = 15
+        elif balance < 300: limit = 30
+        else: limit = 50
         
         if len(pos_list) >= limit:
+            if now % 60 < 1: log(f"🐝 ENJAMBRE LLENO: {len(pos_list)}/{limit} abejas activas.")
             return None
             
         now_dt = datetime.fromtimestamp(now)
@@ -2310,20 +2312,17 @@ def process_symbol_task(sym, active, mission_state):
         # v18.8: Conteo físico preservado de la inicialización
         # n_balas_reales ya viene definido desde el inicio de la tarea
         
-        # 2. LIMITADOR DE CARGADOR DINÁMICO v18.9.35 (BASADO EN MARGEN)
-        margin_level = acc.margin_level if acc else 0.0
-        
-        # Regla del Comandante v18.9.37 (Margen) + v18.9.103 (Balance)
-        if margin_level >= 200:
-            user_max_bullets_margin = 6 # v18.11.950: FUEGO TOTAL AUTORIZADO
-        elif margin_level >= 130:
-            user_max_bullets_margin = 4 # Margen de maniobra en batalla
+        # v39.4: CARGADOR ENJAMBRE (CAPACIDAD HFT)
+        # 0.01 siempre, pero con volumen masivo de posiciones para sumar miles de puntos.
+        if balance > 300:
+            effective_max = 50 # Enjambre masivo
+        elif balance > 150:
+            effective_max = 25 # Enjambre táctico
         else:
-            user_max_bullets_margin = 2 # Defensa mínima
-            
+            effective_max = 12 # Enjambre de rescate
+        
         # El balance define el límite maestro (Constitución v18.9.103)
-        user_max_bullets = min(current_max_bullets, user_max_bullets_margin)
-        effective_max = user_max_bullets
+        user_max_bullets = effective_max
         
         # Ayuda de rescate tras 5 min atascado
         time_since_last_bullet = 0
@@ -2852,15 +2851,10 @@ def process_symbol_task(sym, active, mission_state):
                             # Limpiamos la razón para no loopear infinitamente
                             LAST_CLOSE_REASON[sym] = "RE-ENTERED"
 
-                        # v32.5.1: POTENCIA DE RECUPERACIÓN (3 Balas @ 0.02)
-                        # v38.4: Metralleta Escalable por Balance
-                        if balance < 150: dynamic_max_bullets = 3
-                        elif balance < 300: dynamic_max_bullets = 6
-                        else: dynamic_max_bullets = 10
-                        
-                        if n_balas >= dynamic_max_bullets:
+                        # v39.4: CARGADOR DINÁMICO RESTRITO (0.01 ENJAMBRE)
+                        if n_balas >= limit:
                             should_fire = False
-                            if now % 60 < 1: log(f"🛡️ CARGADOR LLENO: {n_balas}/{dynamic_max_bullets} balas.")
+                            if now % 60 < 1: log(f"🐝 CARGADOR LLENO: {n_balas}/{limit} balas.")
                         elif n_balas == 0 and not is_urgent_continuation:
                             # Requisito de confianza optimizado para acción
                             req_conf = 0.60 
@@ -3082,9 +3076,9 @@ def process_symbol_task(sym, active, mission_state):
                         if not tick: return
                         price = tick.ask if target_sig == "BUY" else tick.bid
                         
-                        # v28.3: MODO METRALLETA OPTIMIZADO (0.25 dist)
-                        # Subido de 0.10 a 0.25 para evitar 'suicidio por spread' en Oro.
-                        base_dist = 0.25 if "XAU" in sym else (10.0 if "BTC" in sym else 0.15)
+                        # v39.4: MODO METRALLETA ENJAMBRE (0.15 dist)
+                        # Reducido para permitir la ráfaga de $1100/día que el Comandante conoce.
+                        base_dist = 0.15 if "XAU" in sym else (10.0 if "BTC" in sym else 0.10)
                         # Stacking controlado: Si hay confianza > 85%, permitimos entrar más cerca
                         dist_min = base_dist / 2 if conf > 0.85 else base_dist
                         
@@ -3099,10 +3093,9 @@ def process_symbol_task(sym, active, mission_state):
                             if now % 10 < 1: log(f"⏳ ZONA PROHIBIDA: Precio demasiado cerca de bala existente. Esperando espacio...")
                             return
                     
-                        # v18.9.115: REGLA BUNKER $25 USD (Recuperación/Stacking)
-                        # v18.9.170: Lote Dinámico (Smart Lot) según balance
+                        # v39.4: REGLA DE ORO (0.01 SIEMPRE)
                         side_mt5 = mt5.ORDER_TYPE_BUY if target_sig == "BUY" else mt5.ORDER_TYPE_SELL
-                        final_lot = smart_lot if smart_lot > 0 else (ASSET_CONFIG.get(sym, DEFAULT_CONFIG).get("lot", 0.01))
+                        final_lot = 0.01
                         sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
 
                         request = {
