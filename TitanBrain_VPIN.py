@@ -1741,19 +1741,16 @@ def process_symbol_task(sym, active, mission_state):
         #          close_ticket(peor_p, "MARGIN_RESCUE")
         #          return None 
         
-        # v39.1: FRENO PROACTIVO POR MARGEN (Restaurado 180%)
-        if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 180.0:
+        # v39.1: FRENO PROACTIVO POR MARGEN (Ajustado para balance de $200)
+        if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 110.0:
              last_log_margin = STATE.get(f"last_log_margin_{sym}", 0)
              if now - last_log_margin > 60:
-                 log(f"🧘 FILTRO MARGEN: Nivel {acc.margin_level:.1f}% insuficiente para nueva bala.")
+                 log(f"🧘 FILTRO MARGEN RESCATE: Nivel {acc.margin_level:.1f}% al limite.")
                  STATE[f"last_log_margin_{sym}"] = now
              return None 
         
-        # v39.4: LIMITADOR DE CARGADOR ENJAMBRE
-        # Unificado: El Comandante decide la capacidad del enjambre según balance.
-        if balance < 150: limit = 15
-        elif balance < 300: limit = 30
-        else: limit = 50
+        # v39.4: LIMITADOR DE CARGADOR ENJAMBRE (ORDEN DEL JEFE)
+        limit = 10 # Limite estricto de 10 abejas para capital de $200
         
         if len(pos_list) >= limit:
             if now % 60 < 1: log(f"🐝 ENJAMBRE LLENO: {len(pos_list)}/{limit} abejas activas.")
@@ -2764,27 +2761,31 @@ def process_symbol_task(sym, active, mission_state):
             # v18.9.7: LOG DE PERSISTENCIA (Para que el Comandante no piense que el bot murió)
             elif block_action and now % 30 < 1:
                 log(f"📡 ESTATUS: IA en {sig} ({conf*100:.1f}%) pero BLOQUEADO por {block_reason}. Vigilando...")
-            # Caso B: Acumular (Piramidación Inteligente v7.60)
+            # Caso B: Acumular (ESCALADOR DE METRALLETA v39.9)
             elif target_sig == LAST_SIGNALS.get(sym):
+                n_balas = len(pos_list)
+                
+                # REGLA DEL JEFE: La primera bala es de prueba. 
+                # Solo abrimos la segunda si la primera ya cubrió la comisión (Profit > 0)
+                if n_balas >= 1:
+                    total_pnl = sum(p.profit for p in pos_list)
+                    # v39.9: Si no estamos en ganancia, prohibido expandir el enjambre
+                    if total_pnl <= 0.10: # Pequeño buffer para cubrir el spread
+                        if now % 30 < 1: log(f"🧘 ESCALADOR: Esperando que bala 1 rinda (PnL: {total_pnl:.2f})")
+                        return None
+                    
+                    # Para la bala 3 en adelante, pedimos $0.50 adicionales de profit por cada una
+                    required_pnl = (n_balas - 1) * 0.50
+                    if total_pnl < required_pnl:
+                        if now % 30 < 1: log(f"🧘 ESCALADOR: Esperando momentum para bala {n_balas+1} (Req: ${required_pnl:.2f})")
+                        return None
+
                 if not block_action or (is_oracle_signal and not is_hard_blocked):
                     # --- PIRAMIDACIÓN INTELIGENTE v7.60 ---
-                    # Bala 1: Entrada normal (ya fue Caso A)
-                    # Bala 2: Si la bala 1 ya va ganando O si hay momentum fuerte
-                    # Bala 3-5: Solo si la tendencia se confirma progresivamente
-                    
-                    n_balas = len(pos_list)
-                    rsi_safe = not ((target_sig == "SELL" and rsi_val < 30) or (target_sig == "BUY" and rsi_val > 70))
-                    
-                    # v13.5: BLOQUEO RSI COMENTADO PARA PERMITIR "JOC" EN EXTREMOS
-                    # if not rsi_safe:
-                    #     block_action = True
-                    #     if rsi_val > 70: block_reason = f"TECHO ADVERTENCIA (RSI {rsi_val:.1f})"
-                    #     elif rsi_val < 30: block_reason = f"PISO ADVERTENCIA (RSI {rsi_val:.1f})"
-                    
                     last_price = LAST_ENTRY_PRICE.get(sym, 0.0)
                     
                     # --- ENFRIAMIENTO DINÁMICO v18.9.12 (Ajuste Máxima Potencia) ---
-                    wait_time = 10 # v37.9: HFT MODE (10 segundos de análisis)
+                    wait_time = 5 # Scalping real: 5 segundos de respiro
                     if (now - close_time) < wait_time:
                         block_action = True
                         block_reason = f"HFT SCANNING ({wait_time}s)"
