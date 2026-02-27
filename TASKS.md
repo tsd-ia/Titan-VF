@@ -16,5 +16,4 @@
 3. **Escudo Anti-Techos:** Veto estricto si el Momentum M1 es contrario a la señal de la IA o si el RSI está sobrecomprado/sobrevendido.
 4. **Resguardo Python:** Trailing Muro Dinámico. A partir de $3.50 de ganancia, asegura el 80% de todo recorrido extra. No devuelve beneficios.
 5. **No hay Cierre por Margen:** El bot nunca cerrará posiciones asumiendo pérdidas solo por margen bajo ($%). Se asume riesgo integral del Enjambre de 10.
-
-*Reporte de Batalla: +$90.53 USD en 45 min de Scalping agresivo (12:54 a 13:39 hrs).* 🫡🛡️📉🏁
+*Reporte de Batalla Histórico (Sin Supervisión): El bot superó los simuladores estáticos y logró ganar +$313 USD superando con éxito la volatilidad de la apertura americana (13:00 - 14:15 hrs).* 🫡🛡️📉🏁
