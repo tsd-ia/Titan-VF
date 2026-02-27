@@ -888,6 +888,31 @@ def get_bunker_sl_price(sym, lot, side, price):
         return round(price - 2000.0, 2) if side in [mt5.ORDER_TYPE_BUY, "BUY"] else round(price + 2000.0, 2)
 
 
+def get_bunker_tp_price(sym, lot, side, price):
+    """ v39.8: TP FÍSICO DE SEGURIDAD - Si el PC se apaga, cerramos en profit. """
+    try:
+        s_info = mt5.symbol_info(sym)
+        if not s_info: return 0.0
+        
+        # Seteamos un TP físico de $4.50 (Meta alta de seguridad)
+        target_profit = 4.50 
+
+        cs = s_info.trade_contract_size
+        if cs <= 0: cs = 1.0 
+        
+        delta = target_profit / (lot * cs)
+        
+        if side == mt5.ORDER_TYPE_BUY or side == "BUY":
+            tp_final = price + delta
+        else:
+            tp_final = price - delta
+            
+        return round(tp_final, s_info.digits)
+    except Exception as e:
+        log(f"⚠️ Error get_bunker_tp: {e}")
+        return 0.0
+
+
 def close_ticket(pos, reason="UNK"):
     # v18.9.900: SUELO DE PROFIT ORO (Solicitud Comandante: Nunca menos de $0.50)
     profit = pos.profit + getattr(pos, 'swap', 0.0) + getattr(pos, 'commission', 0.0)
@@ -1369,7 +1394,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v39.4 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v39.8 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3097,13 +3122,14 @@ def process_symbol_task(sym, active, mission_state):
                         side_mt5 = mt5.ORDER_TYPE_BUY if target_sig == "BUY" else mt5.ORDER_TYPE_SELL
                         final_lot = 0.01
                         sl_price = get_bunker_sl_price(sym, final_lot, side_mt5, price)
+                        tp_price = get_bunker_tp_price(sym, final_lot, side_mt5, price)
 
                         request = {
                             "action": mt5.TRADE_ACTION_DEAL,
                             "symbol": sym, "volume": final_lot,
                             "type": side_mt5,
-                            "price": price, "sl": sl_price, "magic": 777,
-                            "comment": f"TITAN-BUNKER-25USD",
+                            "price": price, "sl": sl_price, "tp": tp_price, "magic": 777,
+                            "comment": f"TITAN-BUNKER-v39.8",
                             "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC,
                         }
                         
@@ -4270,12 +4296,13 @@ async def execute_trade(request: Request):
         price = tick.ask if action == "BUY" else tick.bid
         side = mt5.ORDER_TYPE_BUY if action == "BUY" else mt5.ORDER_TYPE_SELL
         sl = get_bunker_sl_price(symbol, lot, side, price)
+        tp = get_bunker_tp_price(symbol, lot, side, price)
         
         req = {
             "action": mt5.TRADE_ACTION_DEAL,
             "symbol": symbol, "volume": lot,
-            "type": side, "price": price, "sl": sl, "magic": 999,
-            "comment": "TELEGRAM_REMOTE",
+            "type": side, "price": price, "sl": sl, "tp": tp, "magic": 999,
+            "comment": "TELEGRAM_REMOTE_v39.8",
             "type_time": mt5.ORDER_TIME_GTC, "type_filling": mt5.ORDER_FILLING_IOC,
         }
         res = mt5.order_send(req)
