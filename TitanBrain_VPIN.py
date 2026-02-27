@@ -3455,24 +3455,26 @@ def metralleta_loop():
                                 new_sl_shadow = entry - shadow_dist if p.type == 0 else entry + shadow_dist
                                 update_sl(p.ticket, new_sl_shadow, "SOMBRA_v28")
                                 locked_p = profit * 0.60
-                            # v37.3: ESCALERA "PULMÓN DE ACERO" (Mucho más aire para el profit)
-                            locked_steps = -25.0 # Empezamos con SL de -$25 para dar aire total
-                            if profit >= 40.0:
-                                locked_steps = profit - 20.0 # v38.1: Aire de $20 USD en ráfagas grandes
-                            elif profit >= 20.0:
-                                locked_steps = 8.0  # $12 USD de aire
-                            elif profit >= 10.0:
-                                locked_steps = 3.0  # $7 USD de aire
-                            elif profit >= 5.0:
-                                locked_steps = 1.0  # $4 USD de aire
-                            elif profit >= 3.5:
-                                locked_steps = 1.0  # Asegura algo, pero deja 2.5 de aire
-                            elif profit >= 2.0:
-                                locked_steps = 0.1  # Apenas toca breakeven para dejarlo correr
+                            # === v40.10: ESCALERA MILIMÉTRICA (MURO SEGUIDOR PARA SCALPING) ===
+                            # Se elimina la escalera fija. Se asegura un porcentaje continuo del PICO.
+                            locked_steps = -25.0 # SL de -$25 para volatilidad inicial
+                            
+                            pico_actual = PNL_MEMORIA.get(f"PIK_{p.ticket}", profit)
+                            if profit > pico_actual: 
+                                PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
+                                pico_actual = profit
+                            
+                            if pico_actual >= 3.50:
+                                # A partir de $3.50, asegura el 80% del PICO para que no haya retrocesos
+                                # Si llega a $10, va a guardar $8.0.
+                                locked_steps = pico_actual * 0.80
+                            elif pico_actual >= 2.00:
+                                # Entre $2.0 y $3.5, aseguramos un Breakeven sólido de $1.00
+                                locked_steps = 1.00
                             
                             # v37.7: AIRE DINÁMICO POR VELOCIDAD
                             if is_fast and locked_steps > 0:
-                                locked_steps *= 0.70 # En mercado rápido, bajamos el seguro para dejarlo correr un 30% más
+                                locked_steps *= 0.90 # En mercado rápido bajamos el seguro un poco (10% de aire)
                             
                             locked_p = locked_steps
                             
