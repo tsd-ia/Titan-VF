@@ -819,10 +819,10 @@ def get_equity():
     acc = mt5.account_info()
     return acc.equity if acc else 0.0
 
-    # 1. Gestión de Balas: MODO SUPERVIVENCIA (Solo 1 bala activa)
-    max_bullets = 1 
+    # 1. Gestión de Balas: ENJAMBRE BLINDADO (10 abejas)
+    max_bullets = 10 
     
-    # 2. Definir Lotaje Dinámico (Protección Extrema para $19)
+    # 2. Definir Lotaje para $200
     smart_lot = 0.01
     
     # --- BONO DE ORÁCULO (REGLA DEL JEFE) ---
