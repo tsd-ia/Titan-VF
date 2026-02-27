@@ -894,8 +894,8 @@ def get_bunker_tp_price(sym, lot, side, price):
         s_info = mt5.symbol_info(sym)
         if not s_info: return 0.0
         
-        # Seteamos un TP físico de $4.50 (Meta alta de seguridad)
-        target_profit = 4.50 
+        # Seteamos un TP físico de $15.00 (Seguridad contra desconexión)
+        target_profit = 15.00 
 
         cs = s_info.trade_contract_size
         if cs <= 0: cs = 1.0 
@@ -1704,6 +1704,7 @@ def process_symbol_task(sym, active, mission_state):
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
         balance = acc.balance if acc else 0.0
+        margin_level = acc.margin_level if (acc and hasattr(acc, 'margin_level')) else 0.0
         
         # v39.3: CIRCUITO DE PROTECCIÓN (CIRCUIT BREAKER)
         # Si la pérdida de sesión acumulada es muy alta, el protector apaga motores por 15 min.
