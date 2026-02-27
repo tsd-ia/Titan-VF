@@ -6,7 +6,8 @@
 ## 🎯 Tareas Críticas
 - [x] **v39.3:** Cerebro Estratega (Circuit Breaker -$40 y Veto M5).
 - [x] **v39.4:** Protocolo ENJAMBRE 0.01 (Límite 50 balas, ráfaga hipersónica).
-- [x] **v39.8:** Blindaje de TP Físico ($4.50) para proteger contra apagones de PC.
+- [x] **v39.8:** Blindaje de TP Físico ($15.00) para proteger contra apagones de PC.
+- [ ] **Simulador:** Perfeccionar realismo (spread/latencia) para auditoría de 60 días.
 - [ ] **Prevención:** Configurar Windows Updates para no reiniciar durante la semana.
 
 ## 🐝 Reglas de Enjambre (v39.8)
