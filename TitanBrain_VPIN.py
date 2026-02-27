@@ -1719,14 +1719,25 @@ def process_symbol_task(sym, active, mission_state):
         hora_chile = now_chile.hour
         minuto_chile = now_chile.minute
         
-        # Bloqueos para Oro (XAU) en el Gap Diario (19:00 - 20:00 Chile)
+        # Bloqueos para Oro (XAU) en el Gap Diario y Horas Suicidas (Transiciones/Noticias)
         if "XAU" in sym:
+            # Horas Suicidas Validadas por Auditoría v40.10: 10, 13, 14, 16, 17, 18, 23 (Hrs Chile)
+            # 16 a 18:45 es la transición de NY a Asia (Spread tóxico)
+            horas_suicidas = [10, 13, 14, 16, 17, 23]
+            if hora_chile in horas_suicidas:
+                 last_log_toxic = STATE.get(f"last_log_toxic_{sym}", 0)
+                 if now - last_log_toxic > 300: # Log cada 5 min para no hacer spam
+                     log(f"💤 HORARIOS TÓXICOS: Escudos arriba en {sym} ({hora_chile:02d}:00 Hrs). Spread y Latigazos muy altos.")
+                     STATE[f"last_log_toxic_{sym}"] = now
+                 return None # 🛡️ BLOQUEO TOTAL DE GATILLO. Las órdenes abiertas siguen su curso.
+                 
+            # Bloqueo Físico y Cierre antes del apagón diario del Broker (18:45 a 20:00)
             if hora_chile == 18 and minuto_chile >= 45:
                 if len(pos_list) > 0:
                     log(f"🔒 VENTANA DE CIERRE (18:45-19:00): Liquidando {sym} para evitar Gap.")
                     for p in pos_list: close_ticket(p, "MERCADO_CERRADO")
                     stop_mission()
-                return None # Bloqueo total de nuevas entradas hasta las 20:00
+                return None 
             elif hora_chile == 19:
                 if now % 60 < 1: log(f"🧘 FILTRO HORARIO: Mercado {sym} en GAP diario (19h-20h).")
                 return None
