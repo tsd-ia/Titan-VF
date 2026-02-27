@@ -824,7 +824,8 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     # 1. Gestión de Balas: ENJAMBRE BLINDADO (10 abejas)
     max_bullets = 10 
     # 2. Definir Lotaje para $200
-    smart_lot = 0.01
+    base_lot = 0.01
+    smart_lot = base_lot
     
     # --- BONO DE ORÁCULO (REGLA DEL JEFE) ---
     # Si la confianza es máxima por Oráculo de Binance, duplicamos el lote de esa bala
