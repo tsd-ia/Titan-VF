@@ -3564,14 +3564,9 @@ def metralleta_loop():
                         if is_better:
                             update_sl(p.ticket, new_sl, comment)
 
-                # v31.6: ESCUDO DE MARGEN (RELAJADO A 75%)
-                # Si el margen cae del 75%, matamos la peor posición para salvar la cuenta.
-                if acc_check and has_open_pos and 0.1 < m_level < 75:
-                    worst_pos = min(open_positions, key=lambda x: x.profit)
-                    if worst_pos.profit < -3.0: # Solo si realmente está restando fuerte
-                        log(f"🚨 ESCUDO DE MARGEN ACTIVADO ({m_level:.1f}%): Liquidando peor posición #{worst_pos.ticket} para salvar cuenta.")
-                        close_ticket(worst_pos, "MARGIN_EMERGENCY_CUT")
-                        continue 
+                # v31.6: ESCUDO DE MARGEN ELIMINADO POR ORDEN DEL JEFE (v40.4)
+                # Ya no se liquidan posiciones por margen bajo. El usuario asume el riesgo.
+                pass
 
                 # v18.9.175: VIGILANCIA GLOBAL DESHABILITADA (Movida a nivel de símbolo)
 
