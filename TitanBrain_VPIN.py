@@ -820,31 +820,35 @@ def get_equity():
     return acc.equity if acc else 0.0
 
 def get_adaptive_risk_params(balance, conf, rsi_val, sym):
-    """ Protocolo v18.9.165: Independencia de Balas (3 Oro, 3 BTC, 5 Crypto) """
-    is_btc = (sym == "BTCUSDm")
+    """ Protocolo v40.0: Misión $500 Semanales - Interés Compuesto + Bono Oráculo """
     is_gold = ("XAU" in sym or "Gold" in sym)
-    is_crypto = any(c in sym for c in ["SOL", "ETH", "ADA", "DOT", "MSTR", "OPN"])
     
-    # 1. Gestión de Balas: MODO METRALLETA v38.0
-    max_bullets = 10 # Fuego máximo exigido por el Comandante
+    # 1. Gestión de Balas: MANTENER LIMITADO PARA EVITAR AHOGO DE MARGEN
+    max_bullets = 10 
     
-    # 2. Definir Lotaje según Balance (v19.0.8: PROTECCIÓN DE CAPITAL)
-    # Si el balance cae de $100, bajamos el riesgo para evitar la quema de cuenta.
+    # 2. Definir Lotaje Dinámico (Escalado por Balance)
+    # Por cada $100, sumamos 0.01 al lote base
+    lot_multiplier = max(1, int(balance / 100))
+    base_lot = 0.01 * lot_multiplier
+    
+    # --- BONO DE ORÁCULO (REGLA DEL JEFE) ---
+    # Si la confianza es máxima por Oráculo de Binance, duplicamos el lote de esa bala
+    if conf >= 0.99:
+        smart_lot = base_lot * 2
+        # Limite de seguridad para no quemar margen en un solo error
+        if smart_lot > 0.05: smart_lot = 0.05 
+    else:
+        smart_lot = base_lot
+
+    # --- AJUSTES POR ACTIVO ---
     if "ETH" in sym:
-        if balance >= 100: smart_lot = 0.3
-        elif balance >= 90: smart_lot = 0.1
-        else: smart_lot = 0.05 # MODO BUNKER PARA $73
-    elif "BTC" in sym or "SOL" in sym:
-        # v33.1: BTC a 0.01 por seguridad de margen
-        smart_lot = 0.01 
+        smart_lot = 0.10 if balance > 100 else 0.05
+    elif "BTC" in sym:
+        # BTC es muy caro en margen, mantenemos conservador para no bloquear el ORO
+        smart_lot = 0.01
     elif is_gold:
-        # v37.3: Ajuste de Margen Realista (Oro a $5000+)
-        if balance < 150:
-            smart_lot = 0.01 # Balance de $100 solo soporta 0.01 con seguridad
-        elif balance < 300:
-            smart_lot = 0.02
-        else:
-            smart_lot = 0.04 
+        # El Oro es nuestra fuente principal de ingresos
+        smart_lot = max(0.01, smart_lot)
         
     return max_bullets, smart_lot
 
