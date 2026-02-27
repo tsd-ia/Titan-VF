@@ -818,10 +818,11 @@ def perform_ai_health_audit():
 def get_equity():
     acc = mt5.account_info()
     return acc.equity if acc else 0.0
-
+def get_adaptive_risk_params(balance, conf, rsi_val, sym):
+    """ Protocolo v40.8: REPARACIÓN CRÍTICA """
+    is_gold = ("XAU" in sym or "Gold" in sym)
     # 1. Gestión de Balas: ENJAMBRE BLINDADO (10 abejas)
     max_bullets = 10 
-    
     # 2. Definir Lotaje para $200
     smart_lot = 0.01
     
