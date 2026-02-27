@@ -1,0 +1,29 @@
+INFORME DE PATRONES HORARIOS (ULTIMAS 2 SEMANAS)
+============================================================
+ HORA BROKER | VOLATILIDAD | CALIFICACION TACTICA
+------------------------------------------------------------
+   00:00     |    31.94    | NORMAL: Operacion estandar.
+   01:00     |    35.09    | NORMAL: Operacion estandar.
+   02:00     |    25.68    | NORMAL: Operacion estandar.
+   03:00     |    21.45    | NORMAL: Operacion estandar.
+   04:00     |    18.47    | NORMAL: Operacion estandar.
+   05:00     |    25.79    | NORMAL: Operacion estandar.
+   06:00     |    22.71    | NORMAL: Operacion estandar.
+   07:00     |    24.33    | NORMAL: Operacion estandar.
+   08:00     |    23.96    | IDEAL: Scalping fluido y rítmico (London Session).
+   09:00     |    20.62    | IDEAL: Scalping fluido y rítmico (London Session).
+   10:00     |    22.74    | IDEAL: Scalping fluido y rítmico (London Session).
+   11:00     |    21.60    | IDEAL: Scalping fluido y rítmico (London Session).
+   12:00     |    23.52    | IDEAL: Scalping fluido y rítmico (London Session).
+   13:00     |    32.26    | HORA DE ORO: Maximo profit, maximo riesgo (NY Open).
+   14:00     |    45.77    | HORA DE ORO: Maximo profit, maximo riesgo (NY Open).
+   15:00     |    47.08    | HORA DE ORO: Maximo profit, maximo riesgo (NY Open).
+   16:00     |    32.30    | HORA DE ORO: Maximo profit, maximo riesgo (NY Open).
+   17:00     |    25.81    | HORA DE ORO: Maximo profit, maximo riesgo (NY Open).
+   18:00     |    24.13    | NORMAL: Operacion estandar.
+   19:00     |    21.96    | PELIGRO: Gap de mercado y spreads altos.
+   20:00     |    22.83    | PELIGRO: Gap de mercado y spreads altos.
+   21:00     |    17.88    | NORMAL: Operacion estandar.
+   23:00     |    32.40    | NORMAL: Operacion estandar.
+============================================================
+CONCLUSION: Sus mejores ráfagas ocurren entre las 13:00 y las 17:00 (Hora Broker).

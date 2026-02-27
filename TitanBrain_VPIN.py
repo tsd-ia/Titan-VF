@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🚀 TITAN v39.1 | MODO METRALLETA HFT (AGRESIVO) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v39.3 | CEREBRO ESTRATEGA (PROTECTOR) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1679,6 +1679,14 @@ def process_symbol_task(sym, active, mission_state):
         positions = mt5.positions_get() or []
         pos_list = [p for p in positions if p.symbol == sym]
         balance = acc.balance if acc else 0.0
+        
+        # v39.3: CIRCUITO DE PROTECCIÓN (CIRCUIT BREAKER)
+        # Si la pérdida de sesión acumulada es muy alta, el protector apaga motores por 15 min.
+        session_pnl = mission_state.get('pnl', 0.0)
+        if session_pnl <= -40.0: # Umbral de dolor estratégico
+            log(f"🛑 CIRCUIT BREAKER ACTIVADO: Pérdida ${session_pnl:.2f}. Protegiendo capital por 15 min.")
+            time.sleep(900) # Parada técnica
+            return None
         
         # v38.7: CONTROL PREVENTIVO DE HORARIO (Ubicación Proactiva)
         now_chile = datetime.now() # O usar horario del broker si es más preciso
@@ -2343,12 +2351,15 @@ def process_symbol_task(sym, active, mission_state):
         if not is_god_entry and oracle_volume < 1000 and "BTC" in sym:
             is_oracle_signal = False # Es solo un latido de vida
         
-        # v18.9.750: MODERACIÓN DE VENTAS EN ORO (No ir contra tendencia fuerte)
-        if is_god_entry and "XAU" in sym and target_sig == "SELL":
-            if m5_trend_dir == "BUY" and oracle_volume < 100000:
-                if now % 30 < 1: log(f"🧘 FILTRO ANTI-SUICIDIO ORO: Ignorando Whale SELL de ${oracle_volume/1000:.0f}k por Tendencia M5 ALCISTA.")
-                is_god_entry = False
-        
+        # v39.3: FILTRO PROTECTOR "ANTI-CUCHILLO" (Veto por M5)
+        # Si las velas de M5 son puras caídas, prohibido comprar por más que el Oráculo grite.
+        if target_sig == "BUY" and m5_trend_dir == "SELL" and price < ema20:
+             if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Compra. El Oro está cayendo fuerte en M5. No atrapar cuchillos.")
+             return None 
+        elif target_sig == "SELL" and m5_trend_dir == "BUY" and price > ema20:
+             if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5. No ir contra el tren.")
+             return None
+
         if is_god_entry:
             if block_action and "MARGEN" not in block_reason and "BALAS" not in block_reason:
                 last_god_log = STATE.get(f"last_god_log_{sym}", 0)
@@ -3257,6 +3268,11 @@ def metralleta_loop():
                 m_speed = (max(ph_v) - min(ph_v)) * 6.0 # $/min aprox con 0.01
             
             is_fast = m_speed > 35.0 # Definición v18.9.20
+            
+            # v39.3: PROTECCIÓN ANTI-LATIGAZO (Latencia Emocional)
+            if m_speed > 60.0: # Movimiento ultra-violento
+                if now % 30 < 1: log("🛡️ PROTECTOR: Mercado fuera de control (Latigazo). Esperando calma.")
+                return # Detenemos el ciclo hasta que baje la velocidad
             with state_lock: STATE["market_speed_val"] = m_speed
 
             # --- GESTOR DE RIESGO HIPER-VELOCIDD (PACMAN) ---
