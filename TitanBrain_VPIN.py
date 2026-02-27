@@ -819,17 +819,11 @@ def get_equity():
     acc = mt5.account_info()
     return acc.equity if acc else 0.0
 
-def get_adaptive_risk_params(balance, conf, rsi_val, sym):
-    """ Protocolo v40.0: Misión $500 Semanales - Interés Compuesto + Bono Oráculo """
-    is_gold = ("XAU" in sym or "Gold" in sym)
+    # 1. Gestión de Balas: MODO SUPERVIVENCIA (Solo 1 bala activa)
+    max_bullets = 1 
     
-    # 1. Gestión de Balas: MANTENER LIMITADO PARA EVITAR AHOGO DE MARGEN
-    max_bullets = 10 
-    
-    # 2. Definir Lotaje Dinámico (Escalado por Balance)
-    # Por cada $100, sumamos 0.01 al lote base
-    lot_multiplier = max(1, int(balance / 100))
-    base_lot = 0.01 * lot_multiplier
+    # 2. Definir Lotaje Dinámico (Protección Extrema para $19)
+    smart_lot = 0.01
     
     # --- BONO DE ORÁCULO (REGLA DEL JEFE) ---
     # Si la confianza es máxima por Oráculo de Binance, duplicamos el lote de esa bala
@@ -2507,6 +2501,13 @@ def process_symbol_task(sym, active, mission_state):
         # Se elimina el super_conf / IA-OVERRIDE. La realidad del precio manda.
         super_conf = False 
         
+        # === VETO ABSOLUTO DE TENDENCIA v40.5 (RESCATE) ===
+        m5_trend_dir = mission_state.get('m5_trend_dir', 'NONE')
+        if sig == "SELL" and (m5_trend_dir == "BUY" or m5_trend_dir == "STRONG_BUY"):
+            block_action = True; block_reason = "VETO: TENDENCIA M5 ALCISTA 🟢"
+        if sig == "BUY" and (m5_trend_dir == "SELL" or m5_trend_dir == "STRONG_SELL"):
+            block_action = True; block_reason = "VETO: TENDENCIA M5 BAJISTA 🔴"
+
         # Veto de Momentum Inmediato (v18.9.42)
         if sig == "SELL" and df.iloc[-1]['close'] > df.iloc[-2]['close']:
             block_action = True; block_reason = "PRECIO SUBIENDO (Veto M1)"
