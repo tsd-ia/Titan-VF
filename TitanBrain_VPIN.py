@@ -3435,7 +3435,7 @@ def metralleta_loop():
                     pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
                     if profit > pico_pnl: PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
                     
-                    if pico_pnl >= 3.0 and profit <= (pico_pnl * 0.3):
+                    if pico_pnl >= 7.0 and profit <= (pico_pnl * 0.3):
                         log(f"🪪 VETO DE LATIGAZO: {sym} protegiendo profit ganado (${profit:.2f} de pico ${pico_pnl:.2f})")
                         close_ticket(p, "WHIPSAW_PROTECTION"); continue
 
@@ -3531,10 +3531,10 @@ def metralleta_loop():
                     # --- PROFIT PARACHUTE v7.93 (MÁS TOLERANTE) ---
                     max_p = STATE.get(f"max_p_{p.ticket}", 0.0)
                     if profit > max_p: STATE[f"max_p_{p.ticket}"] = profit
-                    # === v28.13: PARACAÍDAS ORO "DEEP BREATH" (Buffer de Seguridad) ===
-                    parachute_ratio = 0.60 if (("XAU" in sym or "Gold" in sym)) else 0.75
-                    if max_p > 1.20 and profit < (max_p * parachute_ratio) and profit >= 0.50:
-                        log(f"🪂 PARACAÍDAS v28: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
+                    # === v40.7: PARACAÍDAS ORO "DEEP BREATH" (Buffer de Seguridad Ampliado) ===
+                    parachute_ratio = 0.40 if (("XAU" in sym or "Gold" in sym)) else 0.70
+                    if max_p > 2.0 and profit < (max_p * parachute_ratio) and profit >= 0.50:
+                        log(f"🪂 PARACAÍDAS v40.7: {sym} protegiendo ${profit:.2f} (Pico: ${max_p:.2f}).")
                         close_ticket(p, "PROFIT_PARACHUTE"); continue
 
                     # === PROTOCOLO BUNKER TOTAL v7.97 ===
