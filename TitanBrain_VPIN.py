@@ -1697,14 +1697,15 @@ def process_symbol_task(sym, active, mission_state):
                 if now % 60 < 1: log(f"🧘 FILTRO HORARIO: Mercado {sym} en GAP diario (19h-20h).")
                 return None
         
-        # v38.3: PROTOCOLO DE RESCATE POR MARGEN (Solicitud Comandante)
-        # Si el margen es crítico (< 125%), liquidamos la peor posición para dar "aire".
-        if acc and hasattr(acc, 'margin_level') and acc.margin_level < 125.0 and len(pos_list) >= 2:
-            peor_p = min(pos_list, key=lambda x: x.profit)
-            if peor_p.profit < -10.0: # Solo si la pérdida es significativa
-                log(f"🆘 ESCUDO DE MARGEN: Liquidando #{peor_p.ticket} (${peor_p.profit:.2f}) para liberar aire. Margen: {acc.margin_level:.1f}%")
-                close_ticket(peor_p, "MARGIN_RESCUE")
-                return None # Re-evaluar en el siguiente ciclo
+        # v39.2: ESCUDO DE MARGEN DESACTIVADO POR ORDEN DEL COMANDANTE
+        # if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 120.0:
+        #      pos_list_all = mt5.positions_get()
+        #      if pos_list_all:
+        #          pos_df = pd.DataFrame(list(pos_list_all), columns=pos_list_all[0]._asdict().keys())
+        #          peor_p = pos_df.sort_values(by='profit').iloc[0]['ticket']
+        #          log(f"🆘 ESCUDO DE MARGEN: Liquidando #{peor_p} para liberar aire. Margen: {acc.margin_level:.1f}%")
+        #          close_ticket(peor_p, "MARGIN_RESCUE")
+        #          return None 
         
         # v39.1: FRENO PROACTIVO POR MARGEN (Restaurado 180%)
         if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 180.0:
