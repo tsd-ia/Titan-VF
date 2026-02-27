@@ -1369,7 +1369,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v38.7 | BLINDAJE ANTI-GAP (RETIRO SEGURO) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v39.0 | MODO SUPERVIVENCIA (RESCATE DE CUENTA) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1706,13 +1706,17 @@ def process_symbol_task(sym, active, mission_state):
                 close_ticket(peor_p, "MARGIN_RESCUE")
                 return None # Re-evaluar en el siguiente ciclo
         
-        # v38.5: FRENO PROACTIVO POR MARGEN (Corregido: 0% significa sin posiciones)
-        if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 180.0:
-             if now % 60 < 1: log(f"🧘 FILTRO MARGEN: Nivel {acc.margin_level:.1f}% insuficiente para nueva bala.")
-             return None # No abrir nada nuevo si no hay aire real
+        # v39.0: FRENO PROACTIVO POR MARGEN (Subido a 200% para evitar liquidaciones)
+        if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 200.0:
+             last_log_margin = STATE.get(f"last_log_margin_{sym}", 0)
+             if now - last_log_margin > 60:
+                 log(f"🧘 FILTRO MARGEN: Nivel {acc.margin_level:.1f}% insuficiente (Mode 200%).")
+                 STATE[f"last_log_margin_{sym}"] = now
+             return None 
         
-        # Cargador Dinámico Realista según Balance
-        if balance < 150: limit = 3
+        # v39.0: MODO SUPERVIVENCIA (Escalado Ultra-Conservador)
+        if balance < 100: limit = 1 # SOLO UNA PARA EVITAR ASFIXIA
+        elif balance < 150: limit = 3
         elif balance < 300: limit = 6
         else: limit = 10
         
