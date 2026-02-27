@@ -2519,7 +2519,7 @@ def process_symbol_task(sym, active, mission_state):
         # v18.9.138: (BORRADO) Prohibición de Hedge removida a petición del Jefe.
         pass
 
-        is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "CAOS"])
+        is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA"])
         
         if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
@@ -2527,6 +2527,7 @@ def process_symbol_task(sym, active, mission_state):
             if block_action and (super_conf or (is_oracle_signal and not is_hard_blocked)):
                 log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
             target_sig = sig if sig != "HOLD" else "HOLD"
+
 
 
         # Compartir decisión con PACMAN (v7.99)
