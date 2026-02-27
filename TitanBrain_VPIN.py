@@ -1741,14 +1741,9 @@ def process_symbol_task(sym, active, mission_state):
         #          close_ticket(peor_p, "MARGIN_RESCUE")
         #          return None 
         
-        # v39.1: FRENO PROACTIVO POR MARGEN (Ajustado para balance de $200)
-        if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 110.0:
-             last_log_margin = STATE.get(f"last_log_margin_{sym}", 0)
-             if now - last_log_margin > 60:
-                 log(f"🧘 FILTRO MARGEN RESCATE: Nivel {acc.margin_level:.1f}% al limite.")
-                 STATE[f"last_log_margin_{sym}"] = now
-             return None 
-        
+        # v39.1: FRENO PROACTIVO POR MARGEN (Eliminado a petición del JEFE)
+        # El bot ya NO dejará de disparar por margen bajo. 
+
         # v39.4: LIMITADOR DE CARGADOR ENJAMBRE (ORDEN DEL JEFE)
         limit = 10 # Limite estricto de 10 abejas para capital de $200
         
