@@ -8,7 +8,11 @@
 - [x] **v40.6:** Enjambre a 10 Balas (Solo si el mercado lo permite).
 - [x] **v40.9:** Candados Duros (Veto M1 Inmediato y RSI).
 - [x] **v40.10:** Muro Seguidor Dinámico (Ratchet 80% sobre picos de profit).
-- [ ] **Monitorización:** Evaluar el "Muro Seguidor" en la sesión actual.
+- [x] **v40.11:** **Entorno Matrix**: Simulador v5.0 (Puro) 100% fiel a MT5 (Sin tocar el bot).
+- [x] **v40.12:** **Extracción BigData**: 1.1 millones de ticks (7 días) para combate real.
+- [x] **v40.13:** **Protocolo Fénix**: Cooldown 30 min + Bala de Prueba (0.01) tras el Guardián.
+- [x] **v40.14:** **Parche de Prioridad**: El Guardián ahora tiene mando absoluto sobre bloqueos.
+- [ ] **Auditoría:** Ejecutando Auditoría Semanal de Febrero 2026 en la Matrix v5.0 (En proceso...).
 
 ## 🐝 Reglas de Enjambre (v40.10)
 1. **Lote Fijo:** 0.01 lot siempre.

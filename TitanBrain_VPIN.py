@@ -827,7 +827,11 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
     base_lot = 0.01
     smart_lot = base_lot
     
-    # --- BONO DE ORÁCULO (REGLA DEL JEFE) ---
+    # --- PROTOCOLO FÉNIX: BALA DE PRUEBA ---
+    # Si venimos de un bloqueo del Guardián o de una racha de pérdidas, 
+    # forzamos el lote mínimo hasta que demostremos que el mercado es seguro.
+    if STATE.get("is_test_bullet_mode", False):
+        return max_bullets, 0.01
     # Si la confianza es máxima por Oráculo de Binance, duplicamos el lote de esa bala
     if conf >= 0.99:
         smart_lot = base_lot * 2
@@ -1007,6 +1011,10 @@ def close_ticket(pos, reason="UNK"):
         if pos.profit > 0:
             LAST_CLOSE_DIR[pos.symbol] = "WIN"
             CONSECUTIVE_LOSSES[pos.symbol] = 0
+            # v40.10: Restaurar confianza si ganamos la bala de prueba
+            if STATE.get("is_test_bullet_mode", False):
+                log(f"🛡️ BALA DE PRUEBA EXITOSA: Confianza restaurada en {pos.symbol}. Volviendo a lotaje normal.")
+                STATE["is_test_bullet_mode"] = False
         else:
             LAST_CLOSE_DIR[pos.symbol] = "LOSS"
             # Guardar el tipo de operación que falló (SELL/BUY)
@@ -1693,12 +1701,23 @@ def stop_mission():
         
     log("🏁 MISIÓN FINALIZADA | EA Restaurado y Posiciones Cerradas.")
 
+# --- VARIABLES CONFIGURABLES POR EL COMANDANTE O LA MATRIX ---
+COMANDANTE_CONFIG = {
+    "GUARDIAN_PEAK_TRIGGER": 350.0,
+    "GUARDIAN_DROP_ALLOWANCE": 50.0,
+    "HORAS_SUICIDAS": [10, 13, 14, 23],
+    "TOQUE_DE_QUEDA_HORA": 16,
+    "TOQUE_DE_QUEDA_MINUTO": 30,
+    "REAPERTURA_HORA_INICIO": 17,
+    "REAPERTURA_HORA_FIN": 19
+}
+
 def process_symbol_task(sym, active, mission_state):
     """ Tarea individual para cada activo en paralelo [v18.9.380] """
     global LAST_LATENCY_UPDATE
     try:
         now = time.time()
-        
+        # print(f"DEBUG: Procesando {sym} en {now}") # Silenciado para no spam, pero verificado
         # 🛡️ FRENO DE EMERGENCIA: CARGADOR DINÁMICO (v38.3: SINCRO METRALLETA)
         acc = mt5.account_info()
         positions = mt5.positions_get() or []
@@ -1706,24 +1725,65 @@ def process_symbol_task(sym, active, mission_state):
         balance = acc.balance if acc else 0.0
         margin_level = acc.margin_level if (acc and hasattr(acc, 'margin_level')) else 0.0
         
-        # v39.3: CIRCUITO DE PROTECCIÓN (CIRCUIT BREAKER)
-        # Si la pérdida de sesión acumulada es muy alta, el protector apaga motores por 15 min.
-        session_pnl = mission_state.get('pnl', 0.0)
-        if session_pnl <= -40.0: # Umbral de dolor estratégico
-            log(f"🛑 CIRCUIT BREAKER ACTIVADO: Pérdida ${session_pnl:.2f}. Protegiendo capital por 15 min.")
-            time.sleep(900) # Parada técnica
-            return None
-        
         # v38.7: CONTROL PREVENTIVO DE HORARIO (Ubicación Proactiva)
-        now_chile = datetime.now() # O usar horario del broker si es más preciso
+        now_chile = datetime.now()
         hora_chile = now_chile.hour
         minuto_chile = now_chile.minute
+        
+        # --- [PRIORIDAD 1] TRAILING STOP DE CUENTA (EL GUARDIAN DE GANANCIAS) ---
+        # Verificamos esto ANTES de cualquier retorno temprano para asegurar que las posiciones se cierren
+        equity = acc.equity if acc else balance
+        current_peak = STATE.get("peak_equity_day", 0.0)
+        daily_reset = STATE.get("peak_equity_day_date", None)
+        
+        if daily_reset != now_chile.date():
+             STATE["peak_equity_day"] = equity
+             STATE["peak_equity_day_date"] = now_chile.date()
+             current_peak = equity
+        elif equity > current_peak:
+             STATE["peak_equity_day"] = equity
+             current_peak = equity
+             
+        if current_peak >= COMANDANTE_CONFIG["GUARDIAN_PEAK_TRIGGER"] and equity <= (current_peak - COMANDANTE_CONFIG["GUARDIAN_DROP_ALLOWANCE"]):
+             log(f"🚨 GUARDIAN INSTITUCIONAL: El Pico del día fue ${current_peak:.2f}, el Mercado lo bajó a ${equity:.2f}. CERRANDO Y ENFRIANDO 30 MIN.")
+             for p in positions: close_ticket(p, "GUARDIAN_PROTECTOR")
+             # En lugar de stop_mission(), solo bloqueamos temporalmente y marcamos para 'Bala de Prueba'
+             STATE["guardian_cooldown_until"] = now + 1800 # 30 min
+             STATE["is_test_bullet_mode"] = True # Próxima operación será cautelosa
+             STATE["peak_equity_day"] = equity # Resetear pico para evitar bucle inmediato
+             return None
+
+        # Verificar si estamos en enfriamiento del Guardián
+        until = STATE.get("guardian_cooldown_until", 0)
+        if now < until:
+             if now % 300 < 1: log(f"⏳ ENFRIAMIENTO GUARDIÁN: Reabriendo en {int((until-now)/60)} min para Bala de Prueba.")
+             return None
+        elif until > 0: # Si ya pasó el tiempo, reseteamos PnL de sesión para permitir operar
+             log("🔓 REAPERTURA: Reset de PnL de Sesión tras Enfriamiento Guardián.")
+             mission_state['pnl'] = 0.0
+             STATE["guardian_cooldown_until"] = 0
+
+        # --- [PRIORIDAD 2] CIRCUITO DE PROTECCIÓN (CIRCUIT BREAKER) ---
+        session_pnl = mission_state.get('pnl', 0.0)
+        if session_pnl <= -40.0: 
+            log(f"🛑 CIRCUIT BREAKER ACTIVADO: Pérdida ${session_pnl:.2f}. Protegiendo capital por 30 min.")
+            STATE["is_test_bullet_mode"] = True 
+            STATE["cb_cooldown_until"] = now + 1800 # 30 min
+            mission_state['pnl'] = 0.0 # Placeholder reset para evitar bucle interno
+            return None
+        
+        # Verificar enfriamiento de Circuit Breaker
+        cb_until = STATE.get("cb_cooldown_until", 0)
+        if now < cb_until:
+             return None
+        elif cb_until > 0:
+             log("🔓 REAPERTURA: Cooldown Circuit Breaker finalizado.")
+             STATE["cb_cooldown_until"] = 0
         
         # Bloqueos para Oro (XAU) en el Gap Diario y Horas Suicidas (Transiciones/Noticias)
         if "XAU" in sym:
             # Horas Suicidas Validadas por Auditoría v40.10: 10, 13, 14, 16, 17, 18, 23 (Hrs Chile)
-            # 16 a 18:45 es la transición de NY a Asia (Spread tóxico)
-            horas_suicidas = [10, 13, 14, 16, 17, 23]
+            horas_suicidas = COMANDANTE_CONFIG["HORAS_SUICIDAS"]
             if hora_chile in horas_suicidas:
                  last_log_toxic = STATE.get(f"last_log_toxic_{sym}", 0)
                  if now - last_log_toxic > 300: # Log cada 5 min para no hacer spam
@@ -1731,15 +1791,16 @@ def process_symbol_task(sym, active, mission_state):
                      STATE[f"last_log_toxic_{sym}"] = now
                  return None # 🛡️ BLOQUEO TOTAL DE GATILLO. Las órdenes abiertas siguen su curso.
                  
-            # Bloqueo Físico y Cierre antes del apagón diario del Broker (18:45 a 20:00)
-            if hora_chile == 18 and minuto_chile >= 45:
+            # CIERRE TOTAL INSTITUCIONAL (16:30 Hrs Chile - Cierre de Cortina para Scalpers)
+            if hora_chile == COMANDANTE_CONFIG["TOQUE_DE_QUEDA_HORA"] and minuto_chile >= COMANDANTE_CONFIG["TOQUE_DE_QUEDA_MINUTO"]:
                 if len(pos_list) > 0:
-                    log(f"🔒 VENTANA DE CIERRE (18:45-19:00): Liquidando {sym} para evitar Gap.")
-                    for p in pos_list: close_ticket(p, "MERCADO_CERRADO")
+                    log(f"🔒 TOQUE DE QUEDA ({COMANDANTE_CONFIG['TOQUE_DE_QUEDA_HORA']}:{COMANDANTE_CONFIG['TOQUE_DE_QUEDA_MINUTO']:02d}): Liquidando {sym} para evitar la trampa de liquidez de la tarde.")
+                    for p in pos_list: close_ticket(p, "TOQUE_DE_QUEDA")
                     stop_mission()
                 return None 
-            elif hora_chile == 19:
-                if now % 60 < 1: log(f"🧘 FILTRO HORARIO: Mercado {sym} en GAP diario (19h-20h).")
+            # Si se inicia durante horario tóxico inoperable, mantenerlo durmiendo
+            elif hora_chile >= COMANDANTE_CONFIG["REAPERTURA_HORA_INICIO"] and hora_chile <= COMANDANTE_CONFIG["REAPERTURA_HORA_FIN"]:
+                if now % 60 < 1: log(f"🧘 FILTRO HORARIO: Descansando. Mercado de la tarde está altamente manipulado ({COMANDANTE_CONFIG['REAPERTURA_HORA_INICIO']}h-{COMANDANTE_CONFIG['REAPERTURA_HORA_FIN']}h).")
                 return None
         
         # v39.2: ESCUDO DE MARGEN DESACTIVADO POR ORDEN DEL COMANDANTE
