@@ -2532,22 +2532,21 @@ def process_symbol_task(sym, active, mission_state):
              if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5. No ir contra el tren.")
              return None
         
-        # --- PULLBACK TÁCTICO v42.1 (REQUERIMIENTO DEL COMANDANTE) ---
+        # v42.3: PULLBACK TÁCTICO SNIPER (REQUERIMIENTO DEL COMANDANTE)
         # No comprar en el techo de la vela, esperar un pequeño respiro de ticks.
-        # Solo aplica para la primera entrada (B0) o si no hay señal de Oráculo Institucional.
         if not is_oracle_signal and n_balas_reales == 0:
              if target_sig == "BUY":
                   high_m1 = df['high'].iloc[-1]
-                  # Exigimos al menos 8 puntos de retroceso desde el máximo de la vela actual
-                  if (high_m1 - price) < (8 * mt5.symbol_info(sym).point):
+                  # v42.3: Exigimos al menos 15 puntos de retroceso (1.5 pips) para entrar mejor
+                  if (high_m1 - price) < (15 * mt5.symbol_info(sym).point):
                        block_action = True
-                       block_reason = "ESPERANDO RETROCESO BUY (Pullback)"
+                       block_reason = "ESPERANDO RETROCESO BUY SNIPER (Pullback 1.5)"
              elif target_sig == "SELL":
                   low_m1 = df['low'].iloc[-1]
-                   # Exigimos que haya subido al menos 8 puntos desde el mínimo de la vela
-                  if (price - low_m1) < (8 * mt5.symbol_info(sym).point):
+                   # v42.3: Exigimos que haya subido al menos 15 puntos desde el mínimo de la vela
+                  if (price - low_m1) < (15 * mt5.symbol_info(sym).point):
                        block_action = True
-                       block_reason = "ESPERANDO REBOTE SELL (Pullback)"
+                       block_reason = "ESPERANDO REBOTE SELL SNIPER (Pullback 1.5)"
 
         if is_god_entry:
             if block_action and "MARGEN" not in block_reason and "BALAS" not in block_reason:
@@ -2603,8 +2602,9 @@ def process_symbol_task(sym, active, mission_state):
         # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
         if not contragolpe_active and not is_exploring and target_sig != "HOLD":
             if (target_sig == "BUY" and m5_trend_dir == "SELL") or (target_sig == "SELL" and m5_trend_dir == "BUY"):
-                if conf < 0.60: # v32.6.2: Umbral bajado de 0.80 a 0.60 para más acción
-                    block_action = True; block_reason = f"TENDENCIA M5 CONTRARIA ({m5_trend_dir})"
+                # v42.3: Umbral subido de 0.60 a 0.85 para evitar operar contra la tendencia M5
+                if conf < 0.85: 
+                    block_action = True; block_reason = f"VETO TENDENCIA M5: Sniper requiere 85% para contratendencia ({m5_trend_dir})"
                 else:
                     # v18.11.800: FILTRO DE AGOTAMIENTO (PRECISIÓN COMANDANTE) RESTAURADO
                     if not block_action:
@@ -2704,9 +2704,14 @@ def process_symbol_task(sym, active, mission_state):
         if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
         else:
-            if block_action and (super_conf or (is_oracle_signal and not is_hard_blocked)):
-                log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
-            target_sig = sig if sig != "HOLD" else "HOLD"
+            # v42.3: Requisito de confianza GLOBAL para entrar al mercado (Modo Sniper)
+            if not is_oracle_signal and conf < 0.85:
+                 target_sig = "HOLD"
+                 if now % 10 < 1: block_reason = f"SNIPER: Confianza insuficiente ({conf*100:.1f}% < 85%)"
+            else:
+                 if block_action and (super_conf or (is_oracle_signal and not is_hard_blocked)):
+                     log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
+                 target_sig = sig if sig != "HOLD" else "HOLD"
 
 
 
@@ -3072,15 +3077,15 @@ def process_symbol_task(sym, active, mission_state):
                             should_fire = False
                             if now % 60 < 1: log(f"🐝 CARGADOR LLENO: {n_balas}/{limit} balas.")
                         elif n_balas == 0 and not is_urgent_continuation:
-                            # Requisito de confianza optimizado para acción
-                            req_conf = 0.60 
+                            # v42.3: Requisito SNIPER ALTA PRECISIÓN 
+                            req_conf = 0.85 
                             
                             if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= req_conf:  
                                 should_fire = True
                             else:
                                 should_fire = False
                                 if now % 20 < 1:
-                                    reason = block_reason if block_action else f"Confianza {conf*100:.1f}% < {req_conf*100:.0f}%"
+                                    reason = block_reason if block_action else f"SNIPER: Confianza {conf*100:.1f}% < {req_conf*100:.0f}%"
                                     log(f"🧘 FILTRO TÁCTICO: {reason}")
 
                             if should_fire:

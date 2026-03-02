@@ -16,6 +16,7 @@
 - [x] **v41.7:** **Horarios y Logs**: Refinamiento 6-17h / 21-23h y eliminación de spam de consola.
 - [x] **v42.1:** **Fix Crítico + Smart Pullback**: Normalización de variables y entradas en retroceso.
 - [x] **v42.2:** **Blindaje Real $15**: Reducción de SL y cortes de pánico de $25 a $15 por orden del Comandante.
+- [x] **v42.3:** **Protocolo Sniper**: Entrada 85% Conf | Pullback 15pts | Veto M5 Hard (Precisión Real).
 - [ ] **Auditoría:** Ejecutando Auditoría Semanal de Febrero 2026 en la Matrix v5.0 (En proceso...).
 
 ## 🐝 Reglas de Enjambre (v41.7)
