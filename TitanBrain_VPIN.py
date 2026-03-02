@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v41.9.3 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v41.9.4 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3511,21 +3511,10 @@ def metralleta_loop():
                             log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
                             close_ticket(p, "ADAPTIVE_EXIT_v32"); continue
                             
-                        # === v41.0: EXTERMINIO POR TSUNAMI (Corte Rápido del Jinete) ===
-                        # No desangrarse hasta -$25 si el Jinete ve 1000 puntos de cascada en contra.
-                        if profit <= -5.00:
-                            rates_m1 = mt5.copy_rates_from_pos(p_sym, mt5.TIMEFRAME_M1, 0, 3)
-                            if rates_m1 is not None and len(rates_m1) >= 3:
-                                s_info = mt5.symbol_info(p_sym)
-                                if s_info:
-                                    move_pts = (rates_m1['close'][-1] - rates_m1['open'][0]) / s_info.point
-                                    is_against_buy = (p.type in [mt5.ORDER_TYPE_BUY, mt5.POSITION_TYPE_BUY]) and (move_pts < -800)
-                                    is_against_sell = (p.type in [mt5.ORDER_TYPE_SELL, mt5.POSITION_TYPE_SELL]) and (move_pts > 800)
-                                    
-                                    if is_against_buy or is_against_sell:
-                                        log(f"🌊 TSUNAMI PANIC: {p_sym} aplastando. Jinete cortando sangría en ${profit:.2f}")
-                                        close_ticket(p, "TSUNAMI_PANIC_v41")
-                                        continue
+                        # === v41.9.4: TSUNAMI PANIC DESACTIVADO POR ORDEN DEL JEFE ===
+                        # Se permite que el enjambre aguante la cascada hasta el SL físico de -$25.
+                        # (Anteriormente cerraba a los -$5 si veía 800 puntos de caída)
+                        pass
                             
                         # v31.10: Micro-Veto (Blindaje desde $1.10)
                         pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
@@ -3543,9 +3532,9 @@ def metralleta_loop():
                                 is_whale = True
                                 target_pico = max(5.00, current_atr * 3.5)
                         
-                        # v32.3: Veto por Latencia (Asegurar si el broker falla)
-                        if LAST_LATENCY > 350 and profit > 0.50:
-                            log(f"🐌 VETO LATENCIA: Asegurando {profit:.2f} por broker lento ({LAST_LATENCY:.0f}ms)")
+                        # v41.9.4: Veto por Latencia RELAJADO (Asegurar solo si hay lag real > 1.5s)
+                        if LAST_LATENCY > 1500 and profit > 5.00:
+                            log(f"🐌 VETO LATENCIA: Asegurando {profit:.2f} por broker colapsado ({LAST_LATENCY:.0f}ms)")
                             close_ticket(p, "LATENCY_VETO_v32"); continue
 
                         if pico_pnl >= target_pico and profit <= (pico_pnl * 0.75):
