@@ -11,11 +11,12 @@
 - [x] **v40.11:** **Entorno Matrix**: Simulador v5.0 (Puro) 100% fiel a MT5 (Sin tocar el bot).
 - [x] **v40.12:** **Extracción BigData**: 1.1 millones de ticks (7 días) para combate real.
 - [x] **v40.13:** **Protocolo Fénix**: Cooldown 30 min + Bala de Prueba (0.01) tras el Guardián.
-# 🚩 ROADMAP DE TAREAS - TITAN vF (v43.8.1)
-- **Balance Real:** `$99.66` (Meta: `$300.00`)
-- **Estado Actual:** `v43.8.1` (Rescate de Cuenta - Gatillo 70% / Spread 68)
+# 🚩 ROADMAP DE TAREAS - TITAN vF (v44.4)
+- **Balance Real:** `$142.22` (Cuenta Demo Sincronizada)
+- **Estado Actual:** `v44.4` (Gatillo Fénix + Sincronización Atómica)
 
 ### 🗡️ Misiones Realizadas (Supervivencia):
+- [x] **v44.4:** **Sincronización Atómica**: Reset de PnL y Latigazos al cambiar de cuenta.
 - [x] **v42.8 - v42.9:** Blindaje técnico total y corrección de indentación.
 - [x] **v42.9.8:** **Watchdog de Beneficio**: Cierre por software si el profit retrocede de $3 a <$1.
 - [x] **v43.1:** **Saneamiento Total**: Eliminación de indultos a Solana y fin del Modo Dios en Oráculos.

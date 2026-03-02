@@ -3443,8 +3443,24 @@ def metralleta_loop():
         try:
             now_loop = time.time()
             
-            # v18.9.385: FIX MARGEN FANTASMA (0.0% suele ser error de API)
+            # v44.4: DETECCIÓN DE CAMBIO DE CUENTA (ANTIFANTASMAS)
             acc_check = mt5.account_info()
+            if acc_check:
+                last_login = STATE.get("last_login_verified", 0)
+                if last_login != 0 and last_login != acc_check.login:
+                    log(f"🔄 SINCRONIZACIÓN DE CUENTA: Detectado cambio {last_login} -> {acc_check.login}")
+                    with state_lock:
+                        STATE["price_history"] = []
+                        STATE["price_timestamps"] = []
+                        STATE["last_pausa_log"] = 0
+                        STATE["market_was_unstable"] = False
+                        if mission_state.get("active"):
+                            log("🧹 RESET DE MISIÓN: Sincronizando equidad inicial con nueva cuenta...")
+                            mission_state["start_equity"] = acc_check.equity
+                            mission_state["target"] = 50.0 # Meta por defecto
+                            save_mission_state()
+                STATE["last_login_verified"] = acc_check.login
+
             positions_now = mt5.positions_get() or []
             has_open_pos = len(positions_now) > 0
             m_level = acc_check.margin_level if acc_check else 0.0
@@ -3935,6 +3951,11 @@ def metralleta_loop():
             if tick_gold:
                 with state_lock:
                     ph = STATE.get("price_history", [])
+                    # v44.4: SANITIZACIÓN DE PRECIOS (Anti-Latigazo por Cambio de Broker/Símbolo)
+                    if ph and abs(tick_gold.bid - ph[-1]) > 100:
+                        log(f"🧹 LIMPIEZA DE PRECIOS: Detectado salto de ${abs(tick_gold.bid - ph[-1]):.2f}. Reseteando historia.")
+                        ph = []
+                    
                     ph.append(tick_gold.bid)
                     if len(ph) > 50: ph.pop(0)
                     STATE["price_history"] = ph
