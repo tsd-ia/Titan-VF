@@ -2462,9 +2462,9 @@ def process_symbol_task(sym, active, mission_state):
             block_action = True
             block_reason = f"MARGEN CRÍTICO ({margin_level:.1f}%)"
             
-        # === v42.5: MALLA DE SEGURIDAD SNIPER (GRID SPACING) ===
-        # v42.5: Subido de 30 a 100 Puntos ($1.00 USD). Evitamos que el enjambre se amontone en un solo latigazo.
-        grid_spacing = 100 * mt5.symbol_info(sym).point
+        # === v42.6: MALLA DINÁMICA ACCIÓN (GRID SPACING) ===
+        # Regresamos a 50 Puntos (5 Pips). Más balas, más adrenalina, más profit rápido.
+        grid_spacing = 50 * mt5.symbol_info(sym).point
             
         if WAR_MODE_BUY_ONLY:
             grid_spacing = 50 * mt5.symbol_info(sym).point # 50 puntos (5 pips) de margen de guerra
@@ -2532,21 +2532,19 @@ def process_symbol_task(sym, active, mission_state):
              if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5. No ir contra el tren.")
              return None
         
-        # v42.4: PROTOCOLO DE HIERRO (Pullback Obligatorio incluso para Oráculos)
-        # No perseguir el precio. Si hay una ballena, esperamos el respiro igual.
+        # v42.6: PULLBACK HÍBRIDO (Acción Rápida)
+        # Bajamos a 10 puntos para no perder el tren, pero evitar el techo absoluto.
         if n_balas_reales == 0:
              if target_sig == "BUY":
                   high_m1 = df['high'].iloc[-1]
-                  # v42.3: Exigimos al menos 15 puntos de retroceso (1.5 pips) para entrar mejor
-                  if (high_m1 - price) < (15 * mt5.symbol_info(sym).point):
+                  if (high_m1 - price) < (10 * mt5.symbol_info(sym).point):
                        block_action = True
-                       block_reason = "ESPERANDO RETROCESO BUY SNIPER (Pullback 1.5)"
+                       block_reason = "ESPERANDO DIP (Acción)"
              elif target_sig == "SELL":
                   low_m1 = df['low'].iloc[-1]
-                   # v42.3: Exigimos que haya subido al menos 15 puntos desde el mínimo de la vela
-                  if (price - low_m1) < (15 * mt5.symbol_info(sym).point):
+                  if (price - low_m1) < (10 * mt5.symbol_info(sym).point):
                        block_action = True
-                       block_reason = "ESPERANDO REBOTE SELL SNIPER (Pullback 1.5)"
+                       block_reason = "ESPERANDO REBOTE (Acción)"
 
         if is_god_entry:
             if block_action and "MARGEN" not in block_reason and "BALAS" not in block_reason:
@@ -2708,10 +2706,10 @@ def process_symbol_task(sym, active, mission_state):
         if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
         else:
-            # v42.3: Requisito de confianza GLOBAL para entrar al mercado (Modo Sniper)
-            if not is_oracle_signal and conf < 0.85:
+            # v42.6: Requisito Híbrido (Confianza 72% para más acción)
+            if not is_oracle_signal and conf < 0.72:
                  target_sig = "HOLD"
-                 if now % 10 < 1: block_reason = f"SNIPER: Confianza insuficiente ({conf*100:.1f}% < 85%)"
+                 if now % 10 < 1: block_reason = f"MODO ACCIÓN: Confianza {conf*100:.1f}% < 72%"
             else:
                  if block_action and (super_conf or (is_oracle_signal and not is_hard_blocked)):
                      log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
