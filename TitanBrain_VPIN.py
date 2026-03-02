@@ -1992,13 +1992,72 @@ def process_symbol_task(sym, active, mission_state):
             p0 = pos_list[0]
             curr_dir = "BUY" if p0.type in [mt5.POSITION_TYPE_BUY, mt5.ORDER_TYPE_BUY] else "SELL"
         
-        # v14.0: Pre-calcular is_contrarian para filtros de seguridad
-        # (Se actualizará después de la decisión final de la IA)
-        
         # v44.8: INICIALIZACIÓN DE SEGURIDAD (ANTI-AMNESIA)
         is_oracle_signal = False
         oracle_sig = "HOLD"
         oracle_volume = 0
+        oracle_power = 0 # v45.0
+
+        # v45.0: ELEVACIÓN DEL ORÁCULO (PRIORIDAD ABSOLUTA)
+        # Leemos la señal ANTES de cualquier filtro técnico para poder bypassear vetos.
+        
+        # 1. ORÁCULO ORO (XAUUSDm)
+        if sym == "XAUUSDm":
+            try:
+                if os.path.exists("titan_gold_signals.json"):
+                    with open("titan_gold_signals.json", "r") as f:
+                        osig = json.load(f)
+                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
+                            is_oracle_signal = True
+                            oracle_sig = osig.get("signal", "HOLD")
+                            oracle_volume = osig.get("volume", 0)
+                            oracle_power = oracle_volume
+                            if oracle_sig != "HOLD":
+                                if now % 10 < 1: log(f"🔱 ORÁCULO ORO: Detectada ballena. Sopesando señal {oracle_sig}...")
+            except: pass
+
+        # 2. ORÁCULO CRYPTO (ETH/SOL via Crypto Oracle)
+        elif any(c in sym for c in ["ETH", "SOL"]):
+            try:
+                if os.path.exists("titan_crypto_signals.json"):
+                    with open("titan_crypto_signals.json", "r") as f:
+                        csigs = json.load(f)
+                        s_key = sym.lower().replace("usdm", "usdt")
+                        if s_key in csigs:
+                            csig = csigs[s_key]
+                            if (time.time() - csig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
+                                is_oracle_signal = True
+                                oracle_sig = csig.get("signal", "HOLD")
+                                oracle_volume = csig.get("volume", 0)
+                                oracle_power = oracle_volume
+                                if oracle_sig != "HOLD":
+                                    if now % 10 < 1: log(f"🔱 ORÁCULO CRYPTO [{sym}]: Detectada ballena. Evaluando...")
+            except: pass
+        
+        # 3. ORÁCULO BINANCE (BTC via Binance Oracle)
+        elif sym == "BTCUSDm":
+            try:
+                if os.path.exists("titan_oracle_signal.json"):
+                    with open("titan_oracle_signal.json", "r") as f:
+                        osig = json.load(f)
+                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
+                            is_oracle_signal = True
+                            oracle_sig = osig.get("signal", "HOLD")
+                            oracle_volume = osig.get("volume", 0)
+                            oracle_power = oracle_volume
+                            if oracle_sig != "HOLD":
+                                if now % 10 < 1: log(f"🔱 ORÁCULO BINANCE [BTC]: Ballena Detectada. Evaluando...")
+            except: pass
+
+        # v18.11.910: Validación de Bypass IA por Poder (Aplicada al inicio v45.0)
+        if is_oracle_signal and oracle_sig != "HOLD":
+            if sym == "XAUUSDm" and oracle_power < 10000: # Umbral mínimo de rescate
+                 is_oracle_signal = False
+            elif sym == "BTCUSDm" and oracle_power < 350000:
+                 pass # BTC requiere IA confirmation si es pequeña
+
+            if is_oracle_signal:
+                ai_reply = "YES"; model_used = "ORACLE_MODE"; conf = 1.0; sig = oracle_sig
 
         # --- CONSEJO DE GUERRA v7.68 ---
         if not is_sniper:
@@ -2740,114 +2799,8 @@ def process_symbol_task(sym, active, mission_state):
         # No re-inicializar aquí.
         pass
         
-        # 1. ORÁCULO ORO (XAUUSDm)
-        if sym == "XAUUSDm":
-            try:
-                if os.path.exists("titan_gold_signals.json"):
-                    with open("titan_gold_signals.json", "r") as f:
-                        osig = json.load(f)
-                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
-                            is_oracle_signal = True
-                            oracle_sig = osig.get("signal", "HOLD")
-                            if oracle_sig != "HOLD":
-                                # v42.8: Fin de la Confianza Ciega. El Oráculo es un SUGERIDOR, no un DICTADOR.
-                                log(f"🔱 ORÁCULO ORO: Detectada ballena. Sopesando señal {oracle_sig}...")
-                                # No sobreescribimos sig/conf directamente aquí.
-                                # Dejamos que el bloque de evaluación posterior maneje la lógica.
-                                pass
-            except: pass
-
-        # 2. ORÁCULO CRYPTO (ETH/SOL via Crypto Oracle)
-        elif any(c in sym for c in ["ETH", "SOL"]):
-            try:
-                if os.path.exists("titan_crypto_signals.json"):
-                    with open("titan_crypto_signals.json", "r") as f:
-                        csigs = json.load(f)
-                        s_key = sym.lower().replace("usdm", "usdt")
-                        if s_key in csigs:
-                            csig = csigs[s_key]
-                            if (time.time() - csig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
-                                is_oracle_signal = True
-                                oracle_sig = csig.get("signal", "HOLD")
-                                if oracle_sig != "HOLD":
-                                    log(f"🔱 ORÁCULO CRYPTO [{sym}]: Detectada ballena. Evaluando...")
-                                    # v43.1: Fin de confianza ciega 1.0
-                                    pass
-            except: pass
-        
-        # 3. ORÁCULO BINANCE (BTC via Binance Oracle)
-        elif sym == "BTCUSDm":
-            try:
-                if os.path.exists("titan_oracle_signal.json"):
-                    with open("titan_oracle_signal.json", "r") as f:
-                        osig = json.load(f)
-                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
-                            is_oracle_signal = True
-                            oracle_sig = osig.get("signal", "HOLD")
-                            if oracle_sig != "HOLD":
-                                log(f"🔱 ORÁCULO BINANCE [BTC]: Ballena Detectada. Evaluando...")
-                                # v43.1: Fin de confianza ciega 1.0
-                                pass
-            except: pass
-
-        if is_oracle_signal and oracle_sig != "HOLD":
-            # v18.11.900: VALIDACIÓN DE PODER (Solo bypass real si es ballena de verdad)
-            oracle_power = 0
-            if sym == "XAUUSDm" and os.path.exists("titan_gold_signals.json"):
-                try: 
-                    with open("titan_gold_signals.json", "r") as f:
-                        osig_data = json.load(f)
-                        oracle_power = osig_data.get("volume", 0)
-                except: pass
-            elif sym == "BTCUSDm" and os.path.exists("titan_oracle_signal.json"):
-                try:
-                    with open("titan_oracle_signal.json", "r") as f:
-                        osig_data = json.load(f)
-                        oracle_power = osig_data.get("volume", 0)
-                        
-                        # v27.8.2: Si es una ballena institucional gigante (> $350k), Bypass absoluto.
-                        # Si es una ballena regular ($220k - $350k), permitimos Bypass pero lo advertimos.
-                        # El factor común de falla en BTC es la absorción, por eso exigimos más poder.
-                        if oracle_power < 350000:
-                            # v18.11.910: Requiere IA para confirmar ballenas pequeñas
-                            is_big_whale = False
-                        else:
-                            is_big_whale = True
-                except:
-                    oracle_power = 220000 
-                    is_big_whale = False
-            
-            # v18.11.910: Validación de Bypass IA por Poder
-            if sym == "BTCUSDm" and not is_big_whale:
-                # No bypass absoluto, dejar que el resto del código valide con IA
-                pass
-            elif sym == "XAUUSDm" and oracle_power < 18000: # v33.4: Umbral equilibrado $18k
-                is_oracle_signal = False 
-                log(f"🐋 BALLENA PEQUEÑA (${oracle_power/1000:.1f}k): Umbral mínimo es $10k.")
-
-            else:
-                ai_reply = "YES" # Bypass absoluto para Ballenas Giga
-                model_used = "ORACLE_MODE"
-                conf = 1.0
-                last_god_log = STATE.get(f"last_god_log_{sym}", 0)
-                
-                # v27.8.4: PROTOCOLO DE INERCIA INSTITUCIONAL
-                # Guardar en memoria si es una Giga-Ballena (> $1M)
-                if oracle_power > 1000000:
-                    STATE["whale_memory"] = {
-                        "symbol": sym,
-                        "signal": oracle_sig,
-                        "power": oracle_power,
-                        "timestamp": now
-                    }
-                    log(f"🧠 MEMORIA GIGA-BALLENA: Bloqueando tendencia {oracle_sig} por 5 min.")
-
-                # Verificar si hay una ballena más poderosa gobernando
-                w_mem = STATE.get("whale_memory", {})
-                if w_mem.get("symbol") == sym and (now - w_mem.get("timestamp", 0)) < 300:
-                    if oracle_sig != w_mem["signal"] and oracle_power < (w_mem["power"] * 0.5):
-                        log(f"🛡️ VETO DE INERCIA: Ignorando {oracle_sig} (${oracle_power/1000:.0f}k) porque manda GIGA-{w_mem['signal']} anterior.")
-                        is_oracle_signal = False
+        # v45.0: Bloque de Oráculo movido al inicio para prioridad de bypass.
+        pass
                         oracle_sig = "HOLD"
                     else:
                         # Si la nueva ballena es poderosa o va a favor, actualizamos o seguimos
