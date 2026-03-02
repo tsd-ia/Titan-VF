@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v42.9.4 | SUPER-METRALLETA BLINDADA (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v43.3 | SNIPER BLINDADO (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
