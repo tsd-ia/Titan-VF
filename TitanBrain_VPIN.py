@@ -2785,6 +2785,15 @@ def process_symbol_task(sym, active, mission_state):
         
         # ¿Podemos usar el cache? (v18.9.102: Sensibilidad del 3%)
         use_cache = False
+        # Throttling inteligente: Si use_cache es True, no llamamos aunque pasen 3m.
+        # v18.9.103: Reducimos a 180s (3m) el refresco forzado para scalping minuto a minuto.
+        # v18.9.375: PROTOCOLO GIGA-FIRE 2.0 (BYPASS TOTAL)
+        # Ya viene definido desde el FAST-PATH al inicio de la tarea.
+        # No re-inicializar aquí.
+        
+        # v45.0: Bloque de Oráculo movido al inicio para prioridad de bypass.
+        # v45.1: Limpieza de residuos de bloque movido.
+        
         if cache and cache['sig'] == target_sig:
             rsi_diff = abs(rsi_val - cache['rsi'])
             bb_diff = abs(bb_pos - cache['bb'])
@@ -2792,25 +2801,6 @@ def process_symbol_task(sym, active, mission_state):
             if rsi_diff < 3.0 and bb_diff < 0.03:
                 use_cache = True
         
-        # Throttling inteligente: Si use_cache es True, no llamamos aunque pasen 3m.
-        # v18.9.103: Reducimos a 180s (3m) el refresco forzado para scalping minuto a minuto.
-        # v18.9.375: PROTOCOLO GIGA-FIRE 2.0 (BYPASS TOTAL)
-        # Ya viene definido desde el FAST-PATH al inicio de la tarea.
-        # No re-inicializar aquí.
-        pass
-        
-        # v45.0: Bloque de Oráculo movido al inicio para prioridad de bypass.
-        pass
-                        oracle_sig = "HOLD"
-                    else:
-                        # Si la nueva ballena es poderosa o va a favor, actualizamos o seguimos
-                        if oracle_sig != "HOLD":
-                            log(f"🔱 GIGA-FIRE [{sym}]: Ballena Real (${oracle_power/1000:.1f}k). Bypass IA.")
-                            STATE[f"last_god_log_{sym}"] = now
-                else:
-                    if now - last_god_log > 15.0:
-                        log(f"🔱 GIGA-FIRE [{sym}]: Ballena Real (${oracle_power/1000:.1f}k). Bypass IA.")
-                        STATE[f"last_god_log_{sym}"] = now
         elif conf >= 0.70 and (not use_cache or (time.time() - last_call_ts > 180)):
             # PROMPT MATEMÁTICO (Anti-Veto de Ollama)
             LAST_OLLAMA_CALL[sym] = time.time()
