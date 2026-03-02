@@ -2355,14 +2355,24 @@ def process_symbol_task(sym, active, mission_state):
             #         log(f"⚔️ MODO CONTRAGOLPE: Piso detectado. Abriendo BUY táctico (0.01)")
 
 
-            # v44.1: PROTOCOLO DE AUTORIDAD SUPREMA (Oráculo > 50k)
-            # Si el Oráculo detecta una ballena real, se anulan los vetos técnicos.
-            bypass_tecnico = is_oracle_signal and oracle_volume > 50000
+            # v44.7: PROTOCOLO DE AUTORIDAD SEMI-SUPREMA (Respeto al Tsunami)
+            # Solo bypasseamos si el momentum no es una locura absoluta en contra.
+            last_3_m = (df['close'].iloc[-1] - df['open'].iloc[-3]) / mt5.symbol_info(sym).point if len(df) >=3 else 0
             
+            # v44.7: Ajuste de volumen para bypass: $15k para Oro
+            bypass_vol = 15000 if "XAU" in sym else 50000
+            bypass_tecnico = is_oracle_signal and oracle_volume >= bypass_vol
+            
+            # Si el Oráculo dice Sell pero el precio subió > 500 pts (5 pips) en 3m, bloqueamos.
             if bypass_tecnico:
-                if now % 10 < 1: log(f"🎯 AUTORIDAD ORÁCULO: Ballena de ${oracle_volume/1000:.1f}k detectada. Bypasseando burocracia técnica.")
-                block_action = False
-                block_reason = ""
+                tsunami_venda = (target_sig == "SELL" and last_3_m > 500)
+                tsunami_buy   = (target_sig == "BUY" and last_3_m < -500)
+                if tsunami_venda or tsunami_buy:
+                    bypass_tecnico = False # El tsunami gana a la ballena
+                    if now % 10 < 1: log(f"⚠️ VETO TSUNAMI: Oráculo ignora ballena por fuerza contraria brutal ({last_3_m:.0f} pts)")
+                else:
+                    if now % 10 < 1: log(f"🎯 AUTORIDAD ORÁCULO: Ballena de ${oracle_volume/1000:.1f}k detectada. Bypass OK.")
+                    block_action = False; block_reason = ""
             
             if not contragolpe_active and not block_action and not bypass_tecnico:
                 if sig == "BUY" and curr_price >= b_ceiling:
@@ -3820,9 +3830,15 @@ def metralleta_loop():
                         if trade_life < 15:
                             pass 
                         else:
-                            # v17.0: BLOQUEO DE CIERRE POR PÁNICÓ (BUNKER)
-                            # El bot ya NO tiene permiso para cerrar en pérdida por cambio de señal.
-                            # Solo el usuario o el SL/TP físico pueden cerrar.
+                            # v44.7: GIRO DE RESCATE (RE-ACTIVADO)
+                            # Si tenemos una posición en pérdida (> $2) y entra una señal 
+                            # CONTRARIA de alta confianza (>90% o ballena), cerramos la perdedora.
+                            is_loser = profit < -2.0
+                            is_god_signal = (target_sig != "HOLD" and target_sig != sig_actual and (conf > 0.90 or bypass_tecnico))
+                            
+                            if is_loser and is_god_signal:
+                                log(f"🔄 GIRO DE RESCATE: Cerrando {sym} perdedor (${profit:.2f}) para entrar en señal {target_sig} superior.")
+                                close_ticket(p, "RESCUE_FLIP_v44"); continue
                             pass
 
                     # Aplicar SL si es mejor que el actual
