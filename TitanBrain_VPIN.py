@@ -2546,37 +2546,10 @@ def process_symbol_task(sym, active, mission_state):
                        block_action = True
                        block_reason = "ESPERANDO REBOTE (Acción)"
 
-        if is_god_entry:
-            if block_action and "MARGEN" not in block_reason and "BALAS" not in block_reason:
-                last_god_log = STATE.get(f"last_god_log_{sym}", 0)
-                if now - last_god_log > 30.0:
-                    log(f"🔱 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por ORÁCULO (${oracle_volume/1000:.0f}k).")
-                    STATE[f"last_god_log_{sym}"] = now
-                # v43.0.2: MURO DE CONTENCIÓN (FILTRO ANTI-SUICIDIO)
-                # No vender con RSI < 35 y no comprar con RSI > 65.
-                rsi_extremo = (target_sig == "BUY" and rsi > 65) or (target_sig == "SELL" and rsi < 35)
-                
-                # Confirmación M1: No comprar si la vela M1 actual es roja (momentum a la baja)
-                delta_m1 = 0.0
-                r_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 1)
-                if r_m1 is not None and len(r_m1) > 0:
-                    delta_m1 = price - r_m1[0]['open']
-                
-                m1_contrario = (target_sig == "BUY" and delta_m1 < -0.05) or (target_sig == "SELL" and delta_m1 > 0.05)
-                
-                # M5 Contrario (Relajado de DOBLE a SIMPLE para mayor seguridad)
-                m5_contrario = (target_sig == "BUY" and "🔴" in m5_trend_label) or (target_sig == "SELL" and "🟢" in m5_trend_label)
-
-                if rsi_extremo or m1_contrario or m5_contrario:
-                    if now % 10 < 1: 
-                        log(f"🧘 GATILLO VETADO: Oráculo quiere {target_sig} pero: RSI={rsi:.1f} | M1_Delta={delta_m1:+.2f} | M5={m5_trend_label}")
-                    block_action = True # v42.8: Bloqueo MANDATORIO
-                    is_hard_blocked = True
-                else:
-                    # v42.8: Validar que el precio ya esté rebotando (Pullback) antes de entrar
-                    pass
-        else:
-            STATE[f"oracle_active_{sym}"] = False
+        # v43.5: MODO DIOS EXTERMINADO. Sin bypass técnico.
+        if is_oracle_signal:
+             if now % 60 < 1: log(f"🔱 SEÑAL ORÁCULO: {sig} detectado. Validando con técnica Sniper...")
+             pass
 
         # v32.6.3: BLINDAJE DE LATENCIA RELAJADO (Prioridad Acción)
         actual_latency = LAST_LATENCY
@@ -2701,17 +2674,13 @@ def process_symbol_task(sym, active, mission_state):
 
         is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "DIP", "REBOTE", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA", "ZONA MUERTA", "ZONA ALTA", "ZONA BAJA"])
         
-        if block_action and (not is_oracle_signal or is_hard_blocked):
+        # v43.5: DECISIÓN SNIPER PURA (Sin excepciones)
+        if block_action:
             target_sig = "HOLD"
         else:
-            # v42.6: Requisito Híbrido (Confianza 72% para más acción)
-            # v43.3: Sniper Real (85% para no comprar basura)
             if not is_oracle_signal and conf < 0.85:
                  target_sig = "HOLD"
-                 if now % 10 < 1: block_reason = f"MODO SNIPER: Confianza {conf*100:.1f}% < 85%"
             else:
-                 if block_action and (super_conf or (is_oracle_signal and not is_hard_blocked)):
-                     log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
                  target_sig = sig if sig != "HOLD" else "HOLD"
 
 
