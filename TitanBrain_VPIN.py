@@ -2685,9 +2685,10 @@ def process_symbol_task(sym, active, mission_state):
         is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "DIP", "REBOTE", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA", "ZONA MUERTA", "ZONA ALTA", "ZONA BAJA"])
         
         # v43.8: DECISIÓN DINÁMICA (WAR_MODE vs SNIPER)
-        # Modo Guerra/Recuperación: Confianza 70% para volver al ruedo.
+        # Modo Guerra/Recuperación: Confianza 70% para volver al ruedo. (Umbral < $150)
         # Modo Sniper: Confianza 85% (Solo si el mercado es extremadamente peligroso).
-        target_conf_limit = 0.70 if (STATE.get("WAR_MODE", False) or current_equity < 150) else 0.85
+        ceq = get_equity()
+        target_conf_limit = 0.70 if (STATE.get("WAR_MODE", False) or ceq < 150) else 0.85
 
         if block_action:
             target_sig = "HOLD"
