@@ -2672,11 +2672,15 @@ def process_symbol_task(sym, active, mission_state):
 
         is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "DIP", "REBOTE", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA", "ZONA MUERTA", "ZONA ALTA", "ZONA BAJA"])
         
-        # v43.5: DECISIÓN SNIPER PURA (Sin excepciones)
+        # v43.6: DECISIÓN DINÁMICA (WAR_MODE vs SNIPER)
+        # Modo Guerra (Viernes): Confianza 72% para ametralladora.
+        # Modo Sniper (Hoy): Confianza 85% para precisión quirúrgica.
+        target_conf_limit = 0.72 if STATE.get("WAR_MODE", False) else 0.85
+
         if block_action:
             target_sig = "HOLD"
         else:
-            if not is_oracle_signal and conf < 0.85:
+            if not is_oracle_signal and conf < target_conf_limit:
                  target_sig = "HOLD"
             else:
                  target_sig = sig if sig != "HOLD" else "HOLD"
@@ -3712,9 +3716,10 @@ def metralleta_loop():
                         # Evitamos cierres por señal IA en profit alto para evadir el slippage (deslizamiento).
                         adv = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
                         is_contrarian = (p.type == mt5.ORDER_TYPE_BUY and adv["sig"] == "SELL") or (p.type == mt5.ORDER_TYPE_SELL and adv["sig"] == "BUY")
-                        if is_contrarian and adv["conf"] > 0.80:
-                            log(f"🧠 GIRO IA RÁPIDO: Cerrando {sym} con ${profit:.2f} por señal contraria.")
-                            close_ticket(p, "QUANTUM_FLIP"); continue
+                    # v43.6: CIERRE RÁPIDO DE GUERRA ($1.50)
+                    if STATE.get("WAR_MODE", False) and profit >= 1.50:
+                        log(f"⚔️ WAR-EXIT: Asegurando ${profit:.2f} (Estrategia Viernes).")
+                        close_ticket(p, "WAR_MODE_SCALP"); continue
                     
                     # 2. Cierre de Hierro (Aumentado para dejar correr)
                     elif not is_fast and profit >= 15.0: # v18.9.520: Subido de 0.85 a 15.0 para no asfixiar
