@@ -1882,35 +1882,52 @@ def process_symbol_task(sym, active, mission_state):
         oracle_volume = 0 # v18.9.155: Para Regla de Oro $280k
 
         
-        # v18.11.985: PROTOCOLO LATENCIA CERO (FAST-PATH)
+        # v18.11.985: PROTOCOLO LATENCIA CERO (FAST-PATH v45.7 UNIFICADO)
         is_oracle_signal = False
         oracle_volume = 0
+        oracle_sig = "HOLD"
         sig_pred = "HOLD"
         conf_pred = 0.0
         
         try:
-            # 1. Oráculo BTC
-            if sym == "BTCUSDm" and os.path.exists("titan_oracle_signal.json"):
-                with open("titan_oracle_signal.json", "r") as f:
-                    o_data = json.load(f)
-                    if time.time() - o_data["timestamp"] < 10.0:
-                        sig_pred = o_data["signal"]; conf_pred = 1.0; is_oracle_signal = True; oracle_volume = o_data.get("volume", 0)
-            # 2. Oráculo ORO (v18.11.999: Radar 60s / Umbral $10k)
-            elif "XAU" in sym and os.path.exists("titan_gold_signals.json"):
-                with open("titan_gold_signals.json", "r") as f:
-                    o_data = json.load(f)
-                    if time.time() - o_data["timestamp"] < 60.0:
-                        is_oracle_signal = True; sig_pred = o_data["signal"]; conf_pred = 1.0; oracle_volume = o_data.get("volume", 0)
+            # 1. Oráculo ORO (XAUUSDm) - Prioridad #1
+            if "XAU" in sym:
+                if os.path.exists("titan_gold_signals.json"):
+                    with open("titan_gold_signals.json", "r") as f:
+                        o_data = json.load(f)
+                        if (time.time() - o_data.get("timestamp", 0)) < 45.0: # v45.7: Sincronizado a 45s
+                            is_oracle_signal = True
+                            oracle_sig = o_data.get("signal", "HOLD")
+                            oracle_volume = o_data.get("volume", 0)
+                            sig_pred = oracle_sig
+                            conf_pred = 1.0
+            
+            # 2. Oráculo BTC
+            elif sym == "BTCUSDm":
+                if os.path.exists("titan_oracle_signal.json"):
+                    with open("titan_oracle_signal.json", "r") as f:
+                        o_data = json.load(f)
+                        if (time.time() - o_data.get("timestamp", 0)) < 30.0:
+                            is_oracle_signal = True
+                            oracle_sig = o_data.get("signal", "HOLD")
+                            oracle_volume = o_data.get("volume", 0)
+                            sig_pred = oracle_sig
+                            conf_pred = 1.0
 
-            # 3. Oráculo CRYPTO (ETH/SOL/MSTR/OPN) - v18.11.998: Radar de 45s
-            elif any(c in sym for c in ["ETH", "SOL", "MSTR", "OPN"]) and os.path.exists("titan_crypto_signals.json"):
-                with open("titan_crypto_signals.json", "r") as f:
-                    csigs = json.load(f)
-                    clean_sym = sym.lower().replace("usdm", "usdt").replace("usd", "usdt")
-                    if clean_sym in csigs:
-                        c_data = csigs[clean_sym]
-                        if time.time() - c_data["timestamp"] < 45.0:
-                            is_oracle_signal = True; sig_pred = c_data["signal"]; conf_pred = 1.0; oracle_volume = c_data.get("volume", 0)
+            # 3. Oráculo CRYPTO (ETH/SOL/MSTR/OPN)
+            elif any(c in sym for c in ["ETH", "SOL", "MSTR", "OPN"]):
+                if os.path.exists("titan_crypto_signals.json"):
+                    with open("titan_crypto_signals.json", "r") as f:
+                        csigs = json.load(f)
+                        clean_sym = sym.lower().replace("usdm", "usdt").replace("usd", "usdt")
+                        if clean_sym in csigs:
+                            c_data = csigs[clean_sym]
+                            if (time.time() - c_data.get("timestamp", 0)) < 45.0:
+                                is_oracle_signal = True
+                                oracle_sig = c_data.get("signal", "HOLD")
+                                oracle_volume = c_data.get("volume", 0)
+                                sig_pred = oracle_sig
+                                conf_pred = 1.0
         except: pass
 
         if is_oracle_signal:
@@ -1992,70 +2009,15 @@ def process_symbol_task(sym, active, mission_state):
             p0 = pos_list[0]
             curr_dir = "BUY" if p0.type in [mt5.POSITION_TYPE_BUY, mt5.ORDER_TYPE_BUY] else "SELL"
         
-        # v44.8: INICIALIZACIÓN DE SEGURIDAD (ANTI-AMNESIA)
-        is_oracle_signal = False
-        oracle_sig = "HOLD"
-        oracle_volume = 0
-        oracle_power = 0 # v45.0
-
-        # v45.0: ELEVACIÓN DEL ORÁCULO (PRIORIDAD ABSOLUTA)
-        # Leemos la señal ANTES de cualquier filtro técnico para poder bypassear vetos.
+        # v45.7: ELIMINADA RE-INICIALIZACIÓN QUE CAUSABA AMNESIA
+        # La señal del Oráculo ya fue capturada en el bloque FAST-PATH superior.
         
-        # 1. ORÁCULO ORO (XAUUSDm)
-        if sym == "XAUUSDm":
-            try:
-                if os.path.exists("titan_gold_signals.json"):
-                    with open("titan_gold_signals.json", "r") as f:
-                        osig = json.load(f)
-                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
-                            is_oracle_signal = True
-                            oracle_sig = osig.get("signal", "HOLD")
-                            oracle_volume = osig.get("volume", 0)
-                            oracle_power = oracle_volume
-                            if oracle_sig != "HOLD":
-                                if now % 10 < 1: log(f"🔱 ORÁCULO ORO: Detectada ballena. Sopesando señal {oracle_sig}...")
-            except: pass
-
-        # 2. ORÁCULO CRYPTO (ETH/SOL via Crypto Oracle)
-        elif any(c in sym for c in ["ETH", "SOL"]):
-            try:
-                if os.path.exists("titan_crypto_signals.json"):
-                    with open("titan_crypto_signals.json", "r") as f:
-                        csigs = json.load(f)
-                        s_key = sym.lower().replace("usdm", "usdt")
-                        if s_key in csigs:
-                            csig = csigs[s_key]
-                            if (time.time() - csig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
-                                is_oracle_signal = True
-                                oracle_sig = csig.get("signal", "HOLD")
-                                oracle_volume = csig.get("volume", 0)
-                                oracle_power = oracle_volume
-                                if oracle_sig != "HOLD":
-                                    if now % 10 < 1: log(f"🔱 ORÁCULO CRYPTO [{sym}]: Detectada ballena. Evaluando...")
-            except: pass
-        
-        # 3. ORÁCULO BINANCE (BTC via Binance Oracle)
-        elif sym == "BTCUSDm":
-            try:
-                if os.path.exists("titan_oracle_signal.json"):
-                    with open("titan_oracle_signal.json", "r") as f:
-                        osig = json.load(f)
-                        if (time.time() - osig.get("timestamp", 0)) < 30: # v27.5: Vigencia 30s
-                            is_oracle_signal = True
-                            oracle_sig = osig.get("signal", "HOLD")
-                            oracle_volume = osig.get("volume", 0)
-                            oracle_power = oracle_volume
-                            if oracle_sig != "HOLD":
-                                if now % 10 < 1: log(f"🔱 ORÁCULO BINANCE [BTC]: Ballena Detectada. Evaluando...")
-            except: pass
-
-        # v18.11.910: Validación de Bypass IA por Poder (Aplicada al inicio v45.0)
+        # Validación de Bypass IA por Poder (Basada en FAST-PATH)
         if is_oracle_signal and oracle_sig != "HOLD":
-            if sym == "XAUUSDm" and oracle_power < 10000: # Umbral mínimo de rescate
+            oracle_power = oracle_volume
+            if sym == "XAUUSDm" and oracle_power < 10000: # Umbral mínimo
                  is_oracle_signal = False
-            elif sym == "BTCUSDm" and oracle_power < 350000:
-                 pass # BTC requiere IA confirmation si es pequeña
-
+            
             if is_oracle_signal:
                 ai_reply = "YES"; model_used = "ORACLE_MODE"; conf = 1.0; sig = oracle_sig
 
@@ -2429,11 +2391,17 @@ def process_symbol_task(sym, active, mission_state):
             
             # Si el Oráculo dice Sell pero el precio subió > 500 pts (5 pips) en 3m, bloqueamos.
             if bypass_tecnico:
-                tsunami_venda = (target_sig == "SELL" and last_3_m > 500)
-                tsunami_buy   = (target_sig == "BUY" and last_3_m < -500)
-                if tsunami_venda or tsunami_buy:
-                    bypass_tecnico = False # El tsunami gana a la ballena
-                    if now % 10 < 1: log(f"⚠️ VETO TSUNAMI: Oráculo ignora ballena por fuerza contraria brutal ({last_3_m:.0f} pts)")
+                # v45.8: SENSOR DE COLOR (Bypass condonado por momentum)
+                contra_color = (target_sig == "SELL" and ultima_vela_verde) or (target_sig == "BUY" and ultima_vela_roja)
+                
+                tsunami_venda = (target_sig == "SELL" and last_3_m > 350) # v45.8: bajado de 500 a 350
+                tsunami_buy   = (target_sig == "BUY" and last_3_m < -350)
+                
+                if tsunami_venda or tsunami_buy or contra_color:
+                    bypass_tecnico = False # El tsunami o el color de la vela ganan
+                    if now % 10 < 1: 
+                        razon_v = "TSUNAMI" if (tsunami_venda or tsunami_buy) else "COLOR_CONTRA"
+                        log(f"⚠️ VETO MOMENTUM: Oráculo ignora ballena por {razon_v} ({last_3_m:.0f} pts)")
                 else:
                     if now % 10 < 1: log(f"🎯 AUTORIDAD ORÁCULO: Ballena de ${oracle_volume/1000:.1f}k detectada. Bypass OK.")
                     block_action = False; block_reason = ""
