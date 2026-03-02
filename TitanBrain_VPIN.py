@@ -1938,6 +1938,8 @@ def process_symbol_task(sym, active, mission_state):
         sig = sig_pred
         conf = conf_pred
         curr_price = tick.bid if tick else 0.0
+        price = curr_price # FIX v42.1: Definición global para filtros
+        rsi = rsi_val      # FIX v42.1: Alias para compatibilidad
 
 
         # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
@@ -2046,6 +2048,7 @@ def process_symbol_task(sym, active, mission_state):
             
             # VOTO 4: Posición vs EMA20 (tendencia de fondo) - v11.0: Reducido
             ema20_val = df_ta['close'].ewm(span=20).mean().iloc[-1]
+            ema20 = ema20_val # FIX v42.1: Alias para protecciones anti-cuchillo
             if curr_price > ema20_val + 0.5:
                 votos_buy += 1.0; razones.append("EMA:↑")  # v11.0: de 1.5 a 1.0
             elif curr_price < ema20_val - 0.5:
@@ -2277,6 +2280,7 @@ def process_symbol_task(sym, active, mission_state):
         # Capturamos la intención original antes de los filtros físicos
         intent_sig = sig
         intent_conf = conf
+        target_sig = sig # FIX v42.1: Sincronización proactiva para que los filtros funcionen
         
         # (Push notifications movidas al final para consistencia)
 
@@ -2436,6 +2440,7 @@ def process_symbol_task(sym, active, mission_state):
         
         # El balance define el límite maestro (Constitución v18.9.103)
         user_max_bullets = effective_max
+        limit = effective_max # FIX v42.1: Alias para cargador dinámico
         
         # Ayuda de rescate tras 5 min atascado
         time_since_last_bullet = 0
@@ -2443,6 +2448,8 @@ def process_symbol_task(sym, active, mission_state):
             last_p_time = max(p.time for p in pos_list)
             srv_now = tick.time if (tick and hasattr(tick, 'time')) else time.time()
             time_since_last_bullet = srv_now - last_p_time
+        
+        time_val = time_since_last_bullet # FIX v42.1: Alias para cooldowns
 
         if n_balas_reales >= user_max_bullets and time_since_last_bullet > 300: 
             effective_max = n_balas_reales + 1
@@ -2524,6 +2531,23 @@ def process_symbol_task(sym, active, mission_state):
         elif target_sig == "SELL" and m5_trend_dir == "BUY" and price > ema20:
              if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5. No ir contra el tren.")
              return None
+        
+        # --- PULLBACK TÁCTICO v42.1 (REQUERIMIENTO DEL COMANDANTE) ---
+        # No comprar en el techo de la vela, esperar un pequeño respiro de ticks.
+        # Solo aplica para la primera entrada (B0) o si no hay señal de Oráculo Institucional.
+        if not is_oracle_signal and n_balas_reales == 0:
+             if target_sig == "BUY":
+                  high_m1 = df['high'].iloc[-1]
+                  # Exigimos al menos 8 puntos de retroceso desde el máximo de la vela actual
+                  if (high_m1 - price) < (8 * mt5.symbol_info(sym).point):
+                       block_action = True
+                       block_reason = "ESPERANDO RETROCESO BUY (Pullback)"
+             elif target_sig == "SELL":
+                  low_m1 = df['low'].iloc[-1]
+                   # Exigimos que haya subido al menos 8 puntos desde el mínimo de la vela
+                  if (price - low_m1) < (8 * mt5.symbol_info(sym).point):
+                       block_action = True
+                       block_reason = "ESPERANDO REBOTE SELL (Pullback)"
 
         if is_god_entry:
             if block_action and "MARGEN" not in block_reason and "BALAS" not in block_reason:
@@ -2950,6 +2974,7 @@ def process_symbol_task(sym, active, mission_state):
                     
                     # --- ENFRIAMIENTO DINÁMICO v18.9.12 (Ajuste Máxima Potencia) ---
                     wait_time = 5 # Scalping real: 5 segundos de respiro
+                    close_time = LAST_CLOSE_TIME.get(sym, 0)
                     if (now - close_time) < wait_time:
                         block_action = True
                         block_reason = f"HFT SCANNING ({wait_time}s)"

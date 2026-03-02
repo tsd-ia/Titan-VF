@@ -14,6 +14,7 @@
 - [x] **v40.14:** **Parche de Prioridad**: El Guardián ahora tiene mando absoluto sobre bloqueos.
 - [x] **v41.6:** **Re-entrada Táctica**: Disparo de 1 bala de prueba post-cierre exitoso (confirmación M1).
 - [x] **v41.7:** **Horarios y Logs**: Refinamiento 6-17h / 21-23h y eliminación de spam de consola.
+- [x] **v42.1:** **Fix Crítico + Smart Pullback**: Normalización de variables y entradas en retroceso.
 - [ ] **Auditoría:** Ejecutando Auditoría Semanal de Febrero 2026 en la Matrix v5.0 (En proceso...).
 
 ## 🐝 Reglas de Enjambre (v41.7)
