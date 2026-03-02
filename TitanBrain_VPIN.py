@@ -3648,6 +3648,15 @@ def metralleta_loop():
                         log(f"🪪 VETO DE LATIGAZO: {sym} protegiendo profit ganado (${profit:.2f} de pico ${pico_pnl:.2f})")
                         close_ticket(p, "WHIPSAW_PROTECTION"); continue
 
+                    # v42.9.8: WATCHDOG DE BENEFICIO (Cierre Mandatorio por Software)
+                    # No confiamos solo en el SL de MT5. Si el bot ve que el profit se escapa, cierra a mercado.
+                    if pico_pnl >= 3.0 and profit < 1.0:
+                        log(f"🚨 WATCHDOG: {sym} salvando profit. Cayó de ${pico_pnl:.2f} a ${profit:.2f}. Cierre forzado.")
+                        close_ticket(p, "WATCHDOG_PROFIT_3"); continue
+                    elif pico_pnl >= 1.5 and profit < 0.2:
+                        log(f"🚨 WATCHDOG: {sym} salvando BreakEven. Cayó de ${pico_pnl:.2f} a ${profit:.2f}. Cierre forzado.")
+                        close_ticket(p, "WATCHDOG_BE_1.5"); continue
+
                     if profit >= 0.30: 
                         symbol_info = mt5.symbol_info(sym)
                         if symbol_info:
