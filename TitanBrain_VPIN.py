@@ -3835,14 +3835,20 @@ def metralleta_loop():
                         if trade_life < 15:
                             pass 
                         else:
-                            # v44.7: GIRO DE RESCATE (RE-ACTIVADO)
+                            # v44.9: SINCRONIZACIÓN DE SEÑAL PARA RESCATE
+                            ultimo_consejo = GLOBAL_ADVICE.get(sym, {"sig": "HOLD", "conf": 0.0})
+                            t_sig = ultimo_consejo.get("sig", "HOLD")
+                            t_conf = ultimo_consejo.get("conf", 0.0)
+                            t_bypass = (is_oracle_signal and oracle_volume >= 15000) if 'is_oracle_signal' in locals() else False
+
+                            # v44.7: GIRO DE RESCATE (RE-ACTIVADO Y CORREGIDO v44.9)
                             # Si tenemos una posición en pérdida (> $2) y entra una señal 
                             # CONTRARIA de alta confianza (>90% o ballena), cerramos la perdedora.
                             is_loser = profit < -2.0
-                            is_god_signal = (target_sig != "HOLD" and target_sig != sig_actual and (conf > 0.90 or bypass_tecnico))
+                            is_god_signal = (t_sig != "HOLD" and t_sig != sig_actual and (t_conf > 0.90 or t_bypass))
                             
                             if is_loser and is_god_signal:
-                                log(f"🔄 GIRO DE RESCATE: Cerrando {sym} perdedor (${profit:.2f}) para entrar en señal {target_sig} superior.")
+                                log(f"🔄 GIRO DE RESCATE: Cerrando {sym} perdedor (${profit:.2f}) para entrar en señal {t_sig} superior.")
                                 close_ticket(p, "RESCUE_FLIP_v44"); continue
                             pass
 
