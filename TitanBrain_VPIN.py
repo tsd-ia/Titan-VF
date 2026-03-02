@@ -2462,9 +2462,9 @@ def process_symbol_task(sym, active, mission_state):
             block_action = True
             block_reason = f"MARGEN CRÍTICO ({margin_level:.1f}%)"
             
-        # === v39.5: MALLA DE SEGURIDAD (GRID SPACING) ===
-        # v41.6: 30 Puntos (3 Pips). Balance entre frecuencia y cobertura.
-        grid_spacing = 30 * mt5.symbol_info(sym).point
+        # === v42.5: MALLA DE SEGURIDAD SNIPER (GRID SPACING) ===
+        # v42.5: Subido de 30 a 100 Puntos ($1.00 USD). Evitamos que el enjambre se amontone en un solo latigazo.
+        grid_spacing = 100 * mt5.symbol_info(sym).point
             
         if WAR_MODE_BUY_ONLY:
             grid_spacing = 50 * mt5.symbol_info(sym).point # 50 puntos (5 pips) de margen de guerra
