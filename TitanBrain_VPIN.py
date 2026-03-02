@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v46.3 | LIBERTAD TOTAL ABSOLUTA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v46.4 | BLOQUEOS ESTRATÉGICOS RESTAURADOS | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1711,13 +1711,16 @@ def stop_mission():
                 close_ticket(p, "MISSION_END")
                 log(f"🛑 CIERRE FIN DE MISIÓN: {p.symbol} ({p.ticket})")
     
-    # Notificar a los archivos de señal para que el EA se detenga
-    for sym in SYMBOLS:
-        send_signal(sym, "NONE", force=True)
-        
-    log("🏁 MISIÓN FINALIZADA | EA Restaurado y Posiciones Cerradas.")
-
-# v46.3: COMANDANTE_CONFIG ELIMINADO POR RUIDO.
+# --- VARIABLES CONFIGURABLES POR EL COMANDANTE O LA MATRIX ---
+COMANDANTE_CONFIG = {
+    "GUARDIAN_PEAK_TRIGGER": 350.0,
+    "GUARDIAN_DROP_ALLOWANCE": 50.0,
+    "HORAS_SUICIDAS": [10, 13, 14, 23],
+    "TOQUE_DE_QUEDA_HORA": 16,
+    "TOQUE_DE_QUEDA_MINUTO": 30,
+    "REAPERTURA_HORA_INICIO": 17,
+    "REAPERTURA_HORA_FIN": 19
+}
 
 def process_symbol_task(sym, active, mission_state):
     """ Tarea individual para cada activo en paralelo [v18.9.380] """
@@ -1742,12 +1745,30 @@ def process_symbol_task(sym, active, mission_state):
         # NADA detendrá la operativa por caídas de equidad o picos.
         pass
 
-        # v46.2: COOLDOWNS Y RESTRICCIONES DE HORARIO ELIMINADAS (Libertad Universal)
-        # El bot operará 24/7 por orden del Comandante.
-        pass
+        # v46.4: RESTAURACIÓN DE BLOQUEOS HORARIOS (Toque de Queda y Horas Suicidas)
+        tq_ch = COMANDANTE_CONFIG["TOQUE_DE_QUEDA_HORA"]
+        tq_min = COMANDANTE_CONFIG["TOQUE_DE_QUEDA_MINUTO"]
         
-        # v46.2: HORARIO XAU ELIMINADO - Operativa 24/7 habilitada.
-        pass
+        is_toque_queda = (hora_chile == tq_ch and minuto_chile >= tq_min)
+        is_suicide_hour = hora_chile in COMANDANTE_CONFIG["HORAS_SUICIDAS"]
+        
+        if is_toque_queda or is_suicide_hour:
+             last_log_tq = STATE.get(f"last_log_tq_{sym}", 0)
+             if now - last_log_tq > 300:
+                  razon = "TOQUE DE QUEDA (16:30)" if is_toque_queda else f"HORA SUICIDA ({hora_chile}h)"
+                  log(f"⏸️ BLOQUEO ESTRATÉGICO: {razon} activa. Solo vigilancia.")
+                  STATE[f"last_log_tq_{sym}"] = now
+             return None
+
+        # v46.4: Gap NY/Spread para ORO (XAU) 
+        if "XAU" in sym:
+            en_horario_permitido = (6 <= hora_chile < 17) or (21 <= hora_chile < 23)
+            if not en_horario_permitido:
+                 last_log_gap = STATE.get(f"last_log_gap_{sym}", 0)
+                 if now - last_log_gap > 300:
+                      log(f"⏸️ GAP NY/SPREAD (ORO): {hora_chile:02d}:{minuto_chile:02d}. Esperando 21:00h.")
+                      STATE[f"last_log_gap_{sym}"] = now
+                 return None
 
         # v39.2: ESCUDO DE MARGEN DESACTIVADO POR ORDEN DEL COMANDANTE
         # v39.1: FRENO PROACTIVO POR MARGEN (Eliminado a petición del JEFE)
@@ -4192,7 +4213,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v46.3", version="46.3.0")
+app = FastAPI(title="TITAN BRIDGE AI v46.4", version="46.4.0")
 
 app.add_middleware(
     CORSMiddleware,
