@@ -2552,9 +2552,9 @@ def process_symbol_task(sym, active, mission_state):
                 if now - last_god_log > 30.0:
                     log(f"🔱 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por ORÁCULO (${oracle_volume/1000:.0f}k).")
                     STATE[f"last_god_log_{sym}"] = now
-                # v41.8: MURO DE CONTENCIÓN (FILTRO ANTI-SUICIDIO POR VOLUMEN)
-                # El Oráculo no es Dios si el precio está agotado técnicamente.
-                rsi_extremo = (target_sig == "BUY" and rsi > 78) or (target_sig == "SELL" and rsi < 22)
+                # v43.0.2: MURO DE CONTENCIÓN (FILTRO ANTI-SUICIDIO)
+                # No vender con RSI < 35 y no comprar con RSI > 65.
+                rsi_extremo = (target_sig == "BUY" and rsi > 65) or (target_sig == "SELL" and rsi < 35)
                 
                 # Confirmación M1: No comprar si la vela M1 actual es roja (momentum a la baja)
                 delta_m1 = 0.0
@@ -2562,7 +2562,7 @@ def process_symbol_task(sym, active, mission_state):
                 if r_m1 is not None and len(r_m1) > 0:
                     delta_m1 = price - r_m1[0]['open']
                 
-                m1_contrario = (target_sig == "BUY" and delta_m1 < -0.10) or (target_sig == "SELL" and delta_m1 > 0.10)
+                m1_contrario = (target_sig == "BUY" and delta_m1 < -0.05) or (target_sig == "SELL" and delta_m1 > 0.05)
                 
                 # M5 Contrario (Relajado de DOBLE a SIMPLE para mayor seguridad)
                 m5_contrario = (target_sig == "BUY" and "🔴" in m5_trend_label) or (target_sig == "SELL" and "🟢" in m5_trend_label)
@@ -3492,11 +3492,11 @@ def metralleta_loop():
             is_fast = m_speed > 35.0 # Definición v18.9.20
             
             # v39.3: PROTECCIÓN ANTI-LATIGAZO (Latencia Emocional)
-            # v42.7: PROTECCIÓN ANTI-LATIGAZO (Arreglada: no matar el thread)
-            if m_speed > 150.0: # v42.7: Umbral subido a 150 para no ser tan miedoso
-                if now % 10 < 1: log("🛡️ PROTECTOR: Latigazo Violento (>150$). En espera de calma...")
-                time.sleep(1)
-                continue # NUNCA usar return aquí (mata el thread)
+            # v43.0: PROTECCIÓN ANTI-LATIGAZO EXTREMA (Freno de mano a 80)
+            if m_speed > 80.0: 
+                if now % 10 < 1: log(f"🛡️ PROTECTOR: Latigazo Detectado ({m_speed:.1f}$). Entrando en Modo Búnker...")
+                time.sleep(2)
+                continue 
             with state_lock: STATE["market_speed_val"] = m_speed
 
             # --- GESTOR DE RIESGO HIPER-VELOCIDD (PACMAN) ---
