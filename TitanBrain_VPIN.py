@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v43.8 | RESCATE DE CUENTA (HFT) | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v45.9 | ESCUDO DE VANGUARDIA | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1877,6 +1877,19 @@ def process_symbol_task(sym, active, mission_state):
         surf_tp = None
         target_sig = "HOLD"
         contragolpe_active = False
+        # v45.9: DETECCIÓN DE MOMENTUM PREMATURA Y ESCUDO DE EQUIDAD
+        ceq = get_equity()
+        if ceq < 75.0:
+            if now % 60 < 1: log(f"🛑 BÚNKER DE EMERGENCIA: Equidad (${ceq:.2f}) bajo umbral de seguridad. Operativa suspendida.")
+            return None
+
+        tick = mt5.symbol_info_tick(sym)
+        if not tick: return None
+        
+        rates_m1_snap = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 1)
+        candle_is_red = (rates_m1_snap[0]['close'] < rates_m1_snap[0]['open']) if rates_m1_snap is not None and len(rates_m1_snap) > 0 else False
+        candle_is_green = (rates_m1_snap[0]['close'] > rates_m1_snap[0]['open']) if rates_m1_snap is not None and len(rates_m1_snap) > 0 else False
+
         bb_pos = 0.5 # Valor neutro inicial
         is_oracle_signal = False 
         oracle_volume = 0 # v18.9.155: Para Regla de Oro $280k
@@ -2132,8 +2145,11 @@ def process_symbol_task(sym, active, mission_state):
             precio_sobre_ema = curr_price > (ema20_m1 + 0.05)
             precio_bajo_ema = curr_price < (ema20_m1 - 0.05)
             
-            ultima_vela_roja = df.iloc[-1]['close'] < df.iloc[-1]['open']
-            ultima_vela_verde = df.iloc[-1]['close'] > df.iloc[-1]['open']
+            ultima_vela_ro_old = df.iloc[-1]['close'] < df.iloc[-1]['open']
+            ultima_vela_ve_old = df.iloc[-1]['close'] > df.iloc[-1]['open']
+            # v45.9: Sincronizar con la detección prematura
+            ultima_vela_roja = candle_is_red
+            ultima_vela_verde = candle_is_green
 
             block_council = False
             block_council_reason = ""
@@ -3752,16 +3768,16 @@ def metralleta_loop():
                             t_conf = ultimo_consejo.get("conf", 0.0)
                             t_bypass = (is_oracle_signal and oracle_volume >= 15000) if 'is_oracle_signal' in locals() else False
 
-                            # v44.7: GIRO DE RESCATE (RE-ACTIVADO Y CORREGIDO v44.9)
-                            # Si tenemos una posición en pérdida (> $2) y entra una señal 
-                            # CONTRARIA de alta confianza (>90% o ballena), cerramos la perdedora.
+                            # v45.9: COOLDOWN DE RESCATE (Anti-Churning 600s)
+                            last_rescue = STATE.get(f"last_rescue_{sym}", 0)
                             is_loser = profit < -2.0
                             sig_actual = "BUY" if p.type == mt5.POSITION_TYPE_BUY else "SELL"
                             is_god_signal = (t_sig != "HOLD" and t_sig != sig_actual and (t_conf > 0.90 or t_bypass))
                             
-                            if is_loser and is_god_signal:
+                            if is_loser and is_god_signal and (now - last_rescue) > 600:
                                 log(f"🔄 GIRO DE RESCATE: Cerrando {sym} perdedor (${profit:.2f}) para entrar en señal {t_sig} superior.")
-                                close_ticket(p, "RESCUE_FLIP_v44"); continue
+                                STATE[f"last_rescue_{sym}"] = now
+                                close_ticket(p, "RESCUE_FLIP_v45"); continue
                             pass
 
                     # Aplicar SL si es mejor que el actual
@@ -4249,7 +4265,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v4.0", version="7.54")
+app = FastAPI(title="TITAN BRIDGE AI v45.9", version="45.9.0")
 
 app.add_middleware(
     CORSMiddleware,
