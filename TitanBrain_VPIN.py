@@ -2355,27 +2355,22 @@ def process_symbol_task(sym, active, mission_state):
             #         log(f"⚔️ MODO CONTRAGOLPE: Piso detectado. Abriendo BUY táctico (0.01)")
 
 
-            if not contragolpe_active and not block_action:
+            # v44.1: PROTOCOLO DE AUTORIDAD SUPREMA (Oráculo > 50k)
+            # Si el Oráculo detecta una ballena real, se anulan los vetos técnicos.
+            bypass_tecnico = is_oracle_signal and oracle_volume > 50000
+            
+            if bypass_tecnico:
+                if now % 10 < 1: log(f"🎯 AUTORIDAD ORÁCULO: Ballena de ${oracle_volume/1000:.1f}k detectada. Bypasseando burocracia técnica.")
+                block_action = False
+                block_reason = ""
+            
+            if not contragolpe_active and not block_action and not bypass_tecnico:
                 if sig == "BUY" and curr_price >= b_ceiling:
                     block_action = True; block_reason = f"TECHO CRÍTICO: Esperando retroceso."
                 elif sig == "SELL" and curr_price <= b_floor:
                     block_action = True; block_reason = f"PISO CRÍTICO: Esperando rebote."
                 elif sig == "BUY" and curr_price >= mid_band and m5_trend_dir != "BUY":
                     block_action = True; block_reason = "ZONA ALTA: Compra prohibida en tendencia débil."
-            
-            # --- FILTRO DE GRAVEDAD v14.0 (CO-PILOT CONSENSUS) ---
-            # EXCEPCIÓN: El Contragolpe ignora la gravedad porque busca precisamente el rebote/retroceso.
-            if not contragolpe_active:
-                is_contrarian = (curr_dir != "NONE" and sig != curr_dir)
-                if sig == "BUY" and delta < -0.60: 
-                    if not is_contrarian and conf < 0.95: 
-                        block_action = True; block_reason = "GRAVEDAD (CO-PILOT VETO)"
-                elif sig == "SELL" and delta > 0.60:
-                    if not is_contrarian and conf < 0.95:
-                        block_action = True; block_reason = "GRAVEDAD (CO-PILOT VETO)"
-            
-            # FILTRO DE MOMENTUM CRÍTICO ELIMINADO v7.38 (LIBERTAD TOTAL)
-            pass
 
             # Bloqueo por zona neutra (v11.1: Rango reducido, IA bypass)
             if not contragolpe_active:
@@ -2404,8 +2399,7 @@ def process_symbol_task(sym, active, mission_state):
                         pass
             
             # --- v15.36: FILTRO DE SEGURIDAD RSI (SENTINEL) ---
-            # EXCEPCIÓN: Si es CONTRAGOLPE, ignoramos el Sentinel porque buscamos la reversión.
-            if True: # MODO PERRO RABIOSO (ACTIVO EN DEMO): Cero veto por RSI para cazar todo el rebote.
+            if not bypass_tecnico:
                 if sig == "BUY" and rsi_val > 75:
                     block_action = True; block_reason = "RSI SOBRECOMPRADO (TECHO)"
                 elif sig == "SELL" and rsi_val < 25:
@@ -2529,12 +2523,14 @@ def process_symbol_task(sym, active, mission_state):
         
         # v39.3: FILTRO PROTECTOR "ANTI-CUCHILLO" (Veto por M5)
         # Si las velas de M5 son puras caídas, prohibido comprar por más que el Oráculo grite.
-        if target_sig == "BUY" and m5_trend_dir == "SELL" and price < ema20:
-             if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Compra. El Oro está cayendo fuerte en M5. No atrapar cuchillos.")
-             return None 
-        elif target_sig == "SELL" and m5_trend_dir == "BUY" and price > ema20:
-             if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5. No ir contra el tren.")
-             return None
+        # v44.1: El Oráculo Gigante (>100k) puede ignorar incluso esto si hay pánico comprador.
+        if not (bypass_tecnico and oracle_volume > 100000):
+            if target_sig == "BUY" and m5_trend_dir == "SELL" and price < ema20:
+                 if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Compra. El Oro está cayendo fuerte en M5.")
+                 return None 
+            elif target_sig == "SELL" and m5_trend_dir == "BUY" and price > ema20:
+                 if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5.")
+                 return None
         
         # v42.6: PULLBACK HÍBRIDO (Acción Rápida)
         # Bajamos a 10 puntos para no perder el tren, pero evitar el techo absoluto.
@@ -2572,7 +2568,7 @@ def process_symbol_task(sym, active, mission_state):
         #     block_action = False
         
         # v43.7.3: AGRESIVIDAD TENDENCIAL (Para recuperar cuenta)
-        if not contragolpe_active and not is_exploring and target_sig != "HOLD":
+        if not contragolpe_active and not is_exploring and target_sig != "HOLD" and not bypass_tecnico:
             if (target_sig == "BUY" and m5_trend_dir == "SELL") or (target_sig == "SELL" and m5_trend_dir == "BUY"):
                 # Si vamos EN CONTRA de la tendencia M5, exigimos el 90%
                 if conf < 0.90:
@@ -2587,7 +2583,7 @@ def process_symbol_task(sym, active, mission_state):
                     block_action = False # LIBERADO PARA CAZAR
         
         # --- SUELO DE CRISTAL Y MOMENTUM M1 (VETO RIGUROSO ORO) ---
-        if target_sig != "HOLD" and ("XAU" in sym or "Gold" in sym):
+        if target_sig != "HOLD" and ("XAU" in sym or "Gold" in sym) and not bypass_tecnico:
             curr_candle = df['close'].iloc[-1] - df['open'].iloc[-1]
             
             # v42.4: Filtros de agotamiento de RSI (Niveles Reales de Peligro)
@@ -2598,7 +2594,6 @@ def process_symbol_task(sym, active, mission_state):
                 block_action = True; block_reason = f"RSI AGOTADO-SELL ({rsi_val:.1f})"
                 is_hard_blocked = True
             
-            # Bloqueo de Zona Neutra Sucia (Evitar pérdida por spread en RSI 45-55)
             # Bloqueo de Zona Neutra Sucia (Evitar pérdida por spread en RSI 45-55)
             if 46 < rsi_val < 54: # v43.1: Nadie opera en zona muerta, ni el Oráculo.
                 block_action = True; block_reason = f"ZONA MUERTA (RSI:{rsi_val:.1f})"
@@ -2613,9 +2608,7 @@ def process_symbol_task(sym, active, mission_state):
                  is_hard_blocked = True
 
         # 6. FILTRO DE MOMENTUM (MOMENTUM RIDER v18.9.19)
-
-        # Si el precio se mueve demasiado rápido, dejamos de ser "tercos" y seguimos la ola.
-        if not is_exploring and len(df) >= 3:
+        if not is_exploring and len(df) >= 3 and not bypass_tecnico:
             last_3_move = (df['close'].iloc[-1] - df['open'].iloc[-3]) / mt5.symbol_info(sym).point
             
             # BLOQUEO Y GIRO (v18.9.19: El Titan se vuelve Híbrido)
@@ -2663,17 +2656,18 @@ def process_symbol_task(sym, active, mission_state):
         super_conf = False 
         
         # === VETO ABSOLUTO DE TENDENCIA v40.5 (RESCATE) ===
-        m5_trend_dir = mission_state.get('m5_trend_dir', 'NONE')
-        if sig == "SELL" and (m5_trend_dir == "BUY" or m5_trend_dir == "STRONG_BUY"):
-            block_action = True; block_reason = "VETO: TENDENCIA M5 ALCISTA 🟢"
-        if sig == "BUY" and (m5_trend_dir == "SELL" or m5_trend_dir == "STRONG_SELL"):
-            block_action = True; block_reason = "VETO: TENDENCIA M5 BAJISTA 🔴"
-
-        # Veto de Momentum Inmediato (v18.9.42)
-        if sig == "SELL" and df.iloc[-1]['close'] > df.iloc[-2]['close']:
-            block_action = True; block_reason = "PRECIO SUBIENDO (Veto M1)"
-        if sig == "BUY" and df.iloc[-1]['close'] < df.iloc[-2]['close']:
-            block_action = True; block_reason = "PRECIO CAYENDO (Veto M1)"
+        if not bypass_tecnico:
+            m5_trend_dir = mission_state.get('m5_trend_dir', 'NONE')
+            if sig == "SELL" and (m5_trend_dir == "BUY" or m5_trend_dir == "STRONG_BUY"):
+                block_action = True; block_reason = "VETO: TENDENCIA M5 ALCISTA 🟢"
+            if sig == "BUY" and (m5_trend_dir == "SELL" or m5_trend_dir == "STRONG_SELL"):
+                block_action = True; block_reason = "VETO: TENDENCIA M5 BAJISTA 🔴"
+    
+            # Veto de Momentum Inmediato (v18.9.42)
+            if sig == "SELL" and df.iloc[-1]['close'] > df.iloc[-2]['close']:
+                block_action = True; block_reason = "PRECIO SUBIENDO (Veto M1)"
+            if sig == "BUY" and df.iloc[-1]['close'] < df.iloc[-2]['close']:
+                block_action = True; block_reason = "PRECIO CAYENDO (Veto M1)"
 
         # v43.4: PROHIBICIÓN TOTAL DE HEDGE (Orden del Comandante)
         opp_type = mt5.POSITION_TYPE_SELL if sig == "BUY" else mt5.POSITION_TYPE_BUY
@@ -2684,13 +2678,20 @@ def process_symbol_task(sym, active, mission_state):
 
         is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "DIP", "REBOTE", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA", "ZONA MUERTA", "ZONA ALTA", "ZONA BAJA"])
         
+        # v44.3: IDENTIFICACIÓN DE BLOQUEOS DUROS (RESTORED)
+        is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "REBOTE", "CAOS", "VETO: TENDENCIA", "MALLA", "ZONA MUERTA", "ZONA ALTA", "ZONA BAJA"])
+        
         # v43.8: DECISIÓN DINÁMICA (WAR_MODE vs SNIPER)
         # Modo Guerra/Recuperación: Confianza 70% para volver al ruedo. (Umbral < $150)
         # Modo Sniper: Confianza 85% (Solo si el mercado es extremadamente peligroso).
         ceq = get_equity()
         target_conf_limit = 0.70 if (STATE.get("WAR_MODE", False) or ceq < 150) else 0.85
 
-        if block_action:
+        if bypass_tecnico:
+            target_sig = sig
+            block_action = False
+            is_hard_blocked = False
+        elif block_action:
             target_sig = "HOLD"
         else:
             if not is_oracle_signal and conf < target_conf_limit:
@@ -2718,11 +2719,10 @@ def process_symbol_task(sym, active, mission_state):
         
         # Throttling inteligente: Si use_cache es True, no llamamos aunque pasen 3m.
         # v18.9.103: Reducimos a 180s (3m) el refresco forzado para scalping minuto a minuto.
-        # v18.9.123: Salto de IA si es señal de Oráculo (Confianza ciega en ballenas)
-        # v18.9.250: Permitir IA incluso en misión para confirmar oráculos
         # v18.9.375: PROTOCOLO GIGA-FIRE 2.0 (BYPASS TOTAL)
-        is_oracle_signal = False
-        oracle_sig = "HOLD"
+        # Ya viene definido desde el FAST-PATH al inicio de la tarea.
+        # No re-inicializar aquí.
+        pass
         
         # 1. ORÁCULO ORO (XAUUSDm)
         if sym == "XAUUSDm":
@@ -3063,21 +3063,21 @@ def process_symbol_task(sym, active, mission_state):
                         if n_balas >= limit:
                             should_fire = False
                             if now % 60 < 1: log(f"🐝 CARGADOR LLENO: {n_balas}/{limit} balas.")
+                        elif bypass_tecnico:
+                            # v44.3: GATILLO SUPREMO ORÁCULO
+                            should_fire = True
+                            trigger_type = "GIGA-FIRE"
                         elif n_balas == 0 and not is_urgent_continuation:
                             # v42.3: Requisito SNIPER ALTA PRECISIÓN 
                             req_conf = 0.85 
-                            
-                            if (not block_action or (is_oracle_signal and not is_hard_blocked)) and conf >= req_conf:  
+                            if (not block_action or is_oracle_signal) and conf >= req_conf:  
                                 should_fire = True
+                                trigger_type = "EXPLORACIÓN-0.01" if is_exploring else "SOLO"
                             else:
                                 should_fire = False
                                 if now % 20 < 1:
                                     reason = block_reason if block_action else f"SNIPER: Confianza {conf*100:.1f}% < {req_conf*100:.0f}%"
                                     log(f"🧘 FILTRO TÁCTICO: {reason}")
-
-                            if should_fire:
-                                trigger_type = "EXPLORACIÓN-0.01" if is_exploring else "SOLO"
-                        
                         elif stacking_trigger:
                             # v18.9.225: Aplicar límite adaptativo y preparar para verificación atómica
                             if n_balas < current_max_bullets:
