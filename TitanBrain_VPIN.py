@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v46.2 | LIBERTAD UNIVERSAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v46.3 | LIBERTAD TOTAL ABSOLUTA | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1717,16 +1717,7 @@ def stop_mission():
         
     log("🏁 MISIÓN FINALIZADA | EA Restaurado y Posiciones Cerradas.")
 
-# --- VARIABLES CONFIGURABLES POR EL COMANDANTE O LA MATRIX ---
-COMANDANTE_CONFIG = {
-    "GUARDIAN_PEAK_TRIGGER": 350.0,
-    "GUARDIAN_DROP_ALLOWANCE": 50.0,
-    "HORAS_SUICIDAS": [10, 13, 14, 23],
-    "TOQUE_DE_QUEDA_HORA": 16,
-    "TOQUE_DE_QUEDA_MINUTO": 30,
-    "REAPERTURA_HORA_INICIO": 17,
-    "REAPERTURA_HORA_FIN": 19
-}
+# v46.3: COMANDANTE_CONFIG ELIMINADO POR RUIDO.
 
 def process_symbol_task(sym, active, mission_state):
     """ Tarea individual para cada activo en paralelo [v18.9.380] """
@@ -1747,38 +1738,9 @@ def process_symbol_task(sym, active, mission_state):
         hora_chile = now_chile.hour
         minuto_chile = now_chile.minute
         
-        # --- [PRIORIDAD 1] TRAILING STOP DE CUENTA (EL GUARDIAN DE GANANCIAS) ---
-        # Verificamos esto ANTES de cualquier retorno temprano para asegurar que las posiciones se cierren
-        equity = acc.equity if acc else balance
-        current_peak = STATE.get("peak_equity_day", 0.0)
-        daily_reset = STATE.get("peak_equity_day_date", None)
-        
-        if daily_reset != now_chile.date():
-             STATE["peak_equity_day"] = equity
-             STATE["peak_equity_day_date"] = now_chile.date()
-             current_peak = equity
-        elif equity > current_peak:
-             STATE["peak_equity_day"] = equity
-             current_peak = equity
-             
-        # v42.0: GUARDIÁN DINÁMICO E INSTITUCIONAL (Trailing Stop Diario)
-        start_eq = mission_state.get("start_equity", balance if balance > 0 else 200.0)
-        
-        # Meta estricta del Comandante: Al menos $300 a $500 USD diarios.
-        guardian_peak_target = start_eq + 300.0 
-        
-        # Tolerancia dinámica apretada: Solo dejamos respirar el 15% de la ganancia masiva (o $50 por defecto).
-        ganancia_diaria = current_peak - start_eq
-        drop_allowance = max(50.0, ganancia_diaria * 0.15) if ganancia_diaria > 0 else 50.0
-
-        if current_peak >= guardian_peak_target and equity <= (current_peak - drop_allowance):
-             log(f"🚨 GUARDIAN INSTITUCIONAL: El Pico del día fue ${current_peak:.2f} (+${ganancia_diaria:.2f}). Mercado intentó quitarlo, cayendo a ${equity:.2f}. CERRANDO Y ASEGURANDO GANANCIA.")
-             for p in positions: close_ticket(p, "GUARDIAN_PROTECTOR")
-             # En lugar de stop_mission(), solo bloqueamos temporalmente y marcamos para 'Bala de Prueba'
-             STATE["guardian_cooldown_until"] = now + 1800 # 30 min
-             STATE["is_test_bullet_mode"] = True # Próxima operación será cautelosa
-             STATE["peak_equity_day"] = equity # Resetear pico para evitar bucle inmediato
-             return None
+        # v46.3: EL GUARDIÁN INSTITUCIONAL HA SIDO EXTERMINADO.
+        # NADA detendrá la operativa por caídas de equidad o picos.
+        pass
 
         # v46.2: COOLDOWNS Y RESTRICCIONES DE HORARIO ELIMINADAS (Libertad Universal)
         # El bot operará 24/7 por orden del Comandante.
@@ -2371,9 +2333,9 @@ def process_symbol_task(sym, active, mission_state):
             bypass_tecnico = is_oracle_signal and oracle_volume >= bypass_vol
             
             if bypass_tecnico:
-                # v45.8: SENSOR DE COLOR (Bypass condonado por momentum)
-                # v46.1: FIX - Usar 'sig' en lugar de 'target_sig' (target_sig es HOLD aquí)
-                contra_color = (sig == "SELL" and ultima_vela_verde) or (sig == "BUY" and ultima_vela_roja)
+                # v46.3: VETO DE COLOR ELIMINADO PARA ORÁCULO.
+                # NADA detendrá al Dios de las Ballenas. 
+                contra_color = False 
                 
                 tsunami_venda = (sig == "SELL" and last_3_m > 350) 
                 tsunami_buy   = (sig == "BUY" and last_3_m < -350)
@@ -4230,7 +4192,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v46.2", version="46.2.0")
+app = FastAPI(title="TITAN BRIDGE AI v46.3", version="46.3.0")
 
 app.add_middleware(
     CORSMiddleware,
