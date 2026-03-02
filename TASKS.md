@@ -19,6 +19,8 @@
 - [x] **v42.3:** **Protocolo Sniper**: Entrada 85% Conf | Pullback 15pts | Veto M5 Hard (Precisión Real).
 - [x] **v42.4:** **Protocolo de Hierro**: Oráculo sin Bypass (Pullback obligatorio) | RSI Sniper (32-68) | Bloqueo Zona Muerta.
 - [x] **v42.5:** **Espaciado Sniper**: Grid de 100pts ($1.00 USD) para evitar amontonamiento de balas.
+- [x] **v42.6:** **Modo Híbrido**: Relajación de filtros 72% Conf | Pullback 10pts | Grid 50pts.
+- [x] **v42.7:** **Blindaje Anti-Stuck**: Fix crítico 'return' destructivo | Umbral Latigazo 150 | Versión Visual.
 - [ ] **Auditoría:** Ejecutando Auditoría Semanal de Febrero 2026 en la Matrix v5.0 (En proceso...).
 
 ## 🐝 Reglas de Enjambre (v41.7)

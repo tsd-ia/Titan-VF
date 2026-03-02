@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v41.9.7 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v42.7 | SUPER-METRALLETA SNIPER (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3490,9 +3490,11 @@ def metralleta_loop():
             is_fast = m_speed > 35.0 # Definición v18.9.20
             
             # v39.3: PROTECCIÓN ANTI-LATIGAZO (Latencia Emocional)
-            if m_speed > 60.0: # Movimiento ultra-violento
-                if now % 30 < 1: log("🛡️ PROTECTOR: Mercado fuera de control (Latigazo). Esperando calma.")
-                return # Detenemos el ciclo hasta que baje la velocidad
+            # v42.7: PROTECCIÓN ANTI-LATIGAZO (Arreglada: no matar el thread)
+            if m_speed > 150.0: # v42.7: Umbral subido a 150 para no ser tan miedoso
+                if now % 10 < 1: log("🛡️ PROTECTOR: Latigazo Violento (>150$). En espera de calma...")
+                time.sleep(1)
+                continue # NUNCA usar return aquí (mata el thread)
             with state_lock: STATE["market_speed_val"] = m_speed
 
             # --- GESTOR DE RIESGO HIPER-VELOCIDD (PACMAN) ---
