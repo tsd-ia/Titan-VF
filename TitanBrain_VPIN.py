@@ -3668,20 +3668,22 @@ def metralleta_loop():
                                 locked_p = profit * 0.60
                             # === v40.10: ESCALERA MILIMÉTRICA (MURO SEGUIDOR PARA SCALPING) ===
                             # Se elimina la escalera fija. Se asegura un porcentaje continuo del PICO.
-                            locked_steps = -25.0 # SL de -$25 para volatilidad inicial
-                            
+                            # v42.9.7: ESCALERA DINÁMICA DE AMBICIÓN (Dejar correr el profit)
                             pico_actual = PNL_MEMORIA.get(f"PIK_{p.ticket}", profit)
                             if profit > pico_actual: 
                                 PNL_MEMORIA[f"PIK_{p.ticket}"] = profit
                                 pico_actual = profit
                             
-                            if pico_actual >= 3.50:
-                                # A partir de $3.50, asegura el 80% del PICO para que no haya retrocesos
-                                # Si llega a $10, va a guardar $8.0.
-                                locked_steps = pico_actual * 0.80
-                            elif pico_actual >= 2.00:
-                                # Entre $2.0 y $3.5, aseguramos un Breakeven sólido de $1.00
-                                locked_steps = 1.00
+                            locked_steps = -25.0 # SL inicial de protección
+                            
+                            if pico_actual >= 2.50:
+                                # A partir de $2.50, asegura el 60% (v42.9.7: bajado de 80% para dar aire)
+                                # Si llega a $3.00, guarda $1.80. Si llega a $4.00, guarda $2.40.
+                                # Esto evita que un pico de $3.40 te cierre en $1.00.
+                                locked_steps = pico_actual * 0.60
+                            elif pico_actual >= 1.50:
+                                # Entre $1.50 y $2.50, aseguramos un Breakeven de $0.50 para no perder.
+                                locked_steps = 0.50
                             
                             # v37.7: AIRE DINÁMICO POR VELOCIDAD
                             if is_fast and locked_steps > 0:
