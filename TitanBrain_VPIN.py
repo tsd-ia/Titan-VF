@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v43.3 | SNIPER BLINDADO (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v43.5 | SNIPER QUIRÚRGICO (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -2611,13 +2611,11 @@ def process_symbol_task(sym, active, mission_state):
                 if target_sig == "SELL":
                     block_action = True; block_reason = f"BLOQUEO: NO VENDER CONTRA TSUNAMI (+{last_3_move:.0f})"
                     # Si el bot está activamente buscando entrada, le sugerimos cambiar de bando
-                    if n_balas_reales == 0: 
-                        log(f"🌊 MOMENTUM RIDER: Detectada fuerza alcista brutal. Sugiriendo CAMBIO A BUY.")
+                    if now % 60 < 1: log(f"🌊 MOMENTUM RIDER: Detectada fuerza alcista brutal. Sugiriendo CAMBIO A BUY.")
             elif last_3_move < -1000: # Tsunami Bajista
                 if target_sig == "BUY":
                     block_action = True; block_reason = f"BLOQUEO: NO COMPRAR EN CAÍDA LIBRE ({last_3_move:.0f})"
-                    if n_balas_reales == 0:
-                        log(f"🌊 MOMENTUM RIDER: Detectado desplome nuclear. Sugiriendo CAMBIO A SELL.")
+                    if now % 60 < 1: log(f"🌊 MOMENTUM RIDER: Detectado desplome nuclear. Sugiriendo CAMBIO A SELL.")
 
         # 7. ANTI-WHIPLASH COOLDOWN (90s v15.6)
 
