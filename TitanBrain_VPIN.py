@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v46.0 | OPERATIVA ABIERTA TOTAL | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v46.2 | LIBERTAD UNIVERSAL | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1780,45 +1780,12 @@ def process_symbol_task(sym, active, mission_state):
              STATE["peak_equity_day"] = equity # Resetear pico para evitar bucle inmediato
              return None
 
-        # Verificar si estamos en enfriamiento del Guardián
-        until = STATE.get("guardian_cooldown_until", 0)
-        if now < until:
-             if now % 300 < 1: log(f"⏳ ENFRIAMIENTO GUARDIÁN: Reabriendo en {int((until-now)/60)} min para Bala de Prueba.")
-             return None
-        elif until > 0: # Si ya pasó el tiempo, reseteamos PnL de sesión para permitir operar
-             log("🔓 REAPERTURA: Reset de PnL de Sesión tras Enfriamiento Guardián.")
-             mission_state['pnl'] = 0.0
-             STATE["guardian_cooldown_until"] = 0
-
-        # --- [PRIORIDAD 2] CIRCUITO DE PROTECCIÓN (CIRCUIT BREAKER) ---
-        session_pnl = mission_state.get('pnl', 0.0)
-        if session_pnl <= -40.0: 
-            log(f"🛑 CIRCUIT BREAKER ACTIVADO: Pérdida ${session_pnl:.2f}. Protegiendo capital por 30 min.")
-            STATE["is_test_bullet_mode"] = True 
-            STATE["cb_cooldown_until"] = now + 1800 # 30 min
-            mission_state['pnl'] = 0.0 # Placeholder reset para evitar bucle interno
-            return None
+        # v46.2: COOLDOWNS Y RESTRICCIONES DE HORARIO ELIMINADAS (Libertad Universal)
+        # El bot operará 24/7 por orden del Comandante.
+        pass
         
-        # Verificar enfriamiento de Circuit Breaker
-        cb_until = STATE.get("cb_cooldown_until", 0)
-        if now < cb_until:
-             return None
-        elif cb_until > 0:
-             log("🔓 REAPERTURA: Cooldown Circuit Breaker finalizado.")
-             STATE["cb_cooldown_until"] = 0
-        
-        # Bloqueos de horario para Oro (XAU) — v41.7 ORDEN DEL JEFE 02/03/2026
-        # PERMITIDO: 06:00 → 17:00 Y 21:00 → 23:00 (Hora Chile)
-        # BLOQUEADO: 17:00 → 21:00 (Gap NY/Spread) y 23:00 → 06:00 (Cierre)
-        if "XAU" in sym:
-            en_horario_permitido = (6 <= hora_chile < 17) or (21 <= hora_chile < 23)
-            if not en_horario_permitido:
-                last_log_block = STATE.get(f"last_log_block_{sym}", 0)
-                if now - last_log_block > 300:
-                    log(f"⏸️ FUERA DE HORARIO ({hora_chile:02d}:{minuto_chile:02d} Chile). Solo gestión de posiciones abiertas. Ventanas: 06-17h | 21-23h.")
-                    STATE[f"last_log_block_{sym}"] = now
-                # NO forzamos el cierre. Las posiciones siguen su trailing normal.
-                return None
+        # v46.2: HORARIO XAU ELIMINADO - Operativa 24/7 habilitada.
+        pass
 
         # v39.2: ESCUDO DE MARGEN DESACTIVADO POR ORDEN DEL COMANDANTE
         # v39.1: FRENO PROACTIVO POR MARGEN (Eliminado a petición del JEFE)
@@ -2403,13 +2370,13 @@ def process_symbol_task(sym, active, mission_state):
             bypass_vol = 15000 if "XAU" in sym else 50000
             bypass_tecnico = is_oracle_signal and oracle_volume >= bypass_vol
             
-            # Si el Oráculo dice Sell pero el precio subió > 500 pts (5 pips) en 3m, bloqueamos.
             if bypass_tecnico:
                 # v45.8: SENSOR DE COLOR (Bypass condonado por momentum)
-                contra_color = (target_sig == "SELL" and ultima_vela_verde) or (target_sig == "BUY" and ultima_vela_roja)
+                # v46.1: FIX - Usar 'sig' en lugar de 'target_sig' (target_sig es HOLD aquí)
+                contra_color = (sig == "SELL" and ultima_vela_verde) or (sig == "BUY" and ultima_vela_roja)
                 
-                tsunami_venda = (target_sig == "SELL" and last_3_m > 350) # v45.8: bajado de 500 a 350
-                tsunami_buy   = (target_sig == "BUY" and last_3_m < -350)
+                tsunami_venda = (sig == "SELL" and last_3_m > 350) 
+                tsunami_buy   = (sig == "BUY" and last_3_m < -350)
                 
                 if tsunami_venda or tsunami_buy or contra_color:
                     bypass_tecnico = False # El tsunami o el color de la vela ganan
@@ -4263,7 +4230,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v46.0", version="46.0.0")
+app = FastAPI(title="TITAN BRIDGE AI v46.2", version="46.2.0")
 
 app.add_middleware(
     CORSMiddleware,
