@@ -2707,9 +2707,10 @@ def process_symbol_task(sym, active, mission_state):
             target_sig = "HOLD"
         else:
             # v42.6: Requisito Híbrido (Confianza 72% para más acción)
-            if not is_oracle_signal and conf < 0.72:
+            # v43.3: Sniper Real (85% para no comprar basura)
+            if not is_oracle_signal and conf < 0.85:
                  target_sig = "HOLD"
-                 if now % 10 < 1: block_reason = f"MODO ACCIÓN: Confianza {conf*100:.1f}% < 72%"
+                 if now % 10 < 1: block_reason = f"MODO SNIPER: Confianza {conf*100:.1f}% < 85%"
             else:
                  if block_action and (super_conf or (is_oracle_signal and not is_hard_blocked)):
                      log(f"🧠 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por {'ORÁCULO' if is_oracle_signal else 'Confianza'}.")
@@ -3539,9 +3540,9 @@ def metralleta_loop():
                         # El stop ya no es un número frío, se adapta al ruido del mercado.
                         current_atr = STATE.get(f"atr_{p_sym}", 1.5)
                         is_gold_hs = ("XAU" in p_sym or "Gold" in p_sym)
-                        # v42.2: Reducción de riesgo real del Comandante de $25 a $15.
-                        sl_dist_usd = 15.0 
-                        limit_hs = -sl_dist_usd if is_gold_hs else -13.5 
+                        # v43.3: Restauración de SL a $25.00 (Orden del Comandante)
+                        sl_dist_usd = 25.0 
+                        limit_hs = -sl_dist_usd if is_gold_hs else -23.5 
                         
                         if profit <= limit_hs:
                             log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
@@ -3626,7 +3627,7 @@ def metralleta_loop():
                     # v21.1: SALIDA POR AGOTAMIENTO (Análisis Madrugada 24/02)
                     # Probabilidad de retorno < 20% después de -$13.5 en BTC (0.1 lot).
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
-                    limit_hs = -15.00 if is_gold_hs else -13.5 
+                    limit_hs = -25.00 if is_gold_hs else -23.5 
                     if profit <= limit_hs:
                         log(f"🚨 CORTE POR AGOTAMIENTO: {sym} (${profit:.2f}). No vale la pena esperar retorno.")
                         close_ticket(p, "EXHAUSTION_CUT_v21"); continue
