@@ -2594,18 +2594,12 @@ def process_symbol_task(sym, active, mission_state):
         # if "SOL" in sym:
         #     block_action = False
         
-        # 4. FILTRO DE TENDENCIA MAYOR (M5 ALIGNMENT v15.35 BLINDADO)
-        # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
+        # v43.4: VETO TENDENCIA INVIOLABLE (Sniper 100%)
         if not contragolpe_active and not is_exploring and target_sig != "HOLD":
             if (target_sig == "BUY" and m5_trend_dir == "SELL") or (target_sig == "SELL" and m5_trend_dir == "BUY"):
-                # v42.3: Umbral subido de 0.60 a 0.85 para evitar operar contra la tendencia M5
-                if conf < 0.85: 
-                    block_action = True; block_reason = f"VETO TENDENCIA M5: Sniper requiere 85% para contratendencia ({m5_trend_dir})"
-                else:
-                    # v18.11.800: FILTRO DE AGOTAMIENTO (PRECISIÓN COMANDANTE) RESTAURADO
-                    if not block_action:
-                        if now % 300 < 1: log(f"🧠 IA-OVERRIDE: M5 en contra pero IA 80%+ confident. ¡ENTRANDO!")
-                        block_action = False 
+                # No importa la confianza, si la tendencia mayor va en contra, NO SE ENTRA.
+                block_action = True
+                block_reason = f"VETO TENDENCIA M5: Sniper Prohíbe ir contra {m5_trend_dir}"
         
         # --- SUELO DE CRISTAL Y MOMENTUM M1 (VETO RIGUROSO ORO) ---
         if target_sig != "HOLD" and ("XAU" in sym or "Gold" in sym):
@@ -2698,8 +2692,12 @@ def process_symbol_task(sym, active, mission_state):
         if sig == "BUY" and df.iloc[-1]['close'] < df.iloc[-2]['close']:
             block_action = True; block_reason = "PRECIO CAYENDO (Veto M1)"
 
-        # v18.9.138: (BORRADO) Prohibición de Hedge removida a petición del Jefe.
-        pass
+        # v43.4: PROHIBICIÓN TOTAL DE HEDGE (Orden del Comandante)
+        opp_type = mt5.POSITION_TYPE_SELL if sig == "BUY" else mt5.POSITION_TYPE_BUY
+        opp_positions = [p for p in pos_list if p.type == opp_type]
+        if len(opp_positions) > 0:
+            block_action = True
+            block_reason = f"VETO HEDGE: Ya hay {len(opp_positions)} posiciones contrarias."
 
         is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "DIP", "REBOTE", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA", "ZONA MUERTA", "ZONA ALTA", "ZONA BAJA"])
         
