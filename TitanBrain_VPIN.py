@@ -2570,10 +2570,11 @@ def process_symbol_task(sym, active, mission_state):
                 if rsi_extremo or m1_contrario or m5_contrario:
                     if now % 10 < 1: 
                         log(f"🧘 GATILLO VETADO: Oráculo quiere {target_sig} pero: RSI={rsi:.1f} | M1_Delta={delta_m1:+.2f} | M5={m5_trend_label}")
-                    # No reseteamos block_action, dejamos que el veto técnico gane.
+                    block_action = True # v42.8: Bloqueo MANDATORIO
+                    is_hard_blocked = True
                 else:
-                    block_action = False 
-                is_hard_blocked = False
+                    # v42.8: Validar que el precio ya esté rebotando (Pullback) antes de entrar
+                    pass
         else:
             STATE[f"oracle_active_{sym}"] = False
 
@@ -2751,9 +2752,11 @@ def process_symbol_task(sym, active, mission_state):
                             is_oracle_signal = True
                             oracle_sig = osig.get("signal", "HOLD")
                             if oracle_sig != "HOLD":
-                                log(f"🔱 GOD MODE ACTIVADO [ORO]: Ignorando vetos por volumen.")
-                                sig = oracle_sig
-                                conf = 1.0 # Confianza ciega en el Oráculo
+                                # v42.8: Fin de la Confianza Ciega. El Oráculo es un SUGERIDOR, no un DICTADOR.
+                                log(f"🔱 ORÁCULO ORO: Detectada ballena. Sopesando señal {oracle_sig}...")
+                                # No sobreescribimos sig/conf directamente aquí.
+                                # Dejamos que el bloque de evaluación posterior maneje la lógica.
+                                pass
             except: pass
 
         # 2. ORÁCULO CRYPTO (ETH/SOL via Crypto Oracle)
