@@ -1462,7 +1462,11 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     # --- v15.25: CALENDARIO SIEMPRE VISIBLE ---
     m_warn = get_market_warning()
     market_line = m_warn if m_warn else "🟢 MERCADO ABIERTO (Sesión Normal)"
-    lines.append(f" MARKET:  {market_line}")
+    regime = STATE.get("active_regime", "SNIPER")
+    regime_icon = "🚀" if regime == "WAR" else "🛡️"
+    regime_label = "METRALLETA" if regime == "WAR" else "SNIPER"
+    
+    lines.append(f" {Fore.YELLOW}RACHA: {Fore.WHITE}🔥 {wins_today} | {Fore.CYAN}MODO: {Fore.WHITE}{regime_icon} {regime_label}")
 
     lines.append("-" * 75)
     lines.append(f" {'ACTIVO':<10} | {'SGN':<4} | {'CONF':<5} | {'SPREAD':<6} | {'RSI':<3} | {'LOTE':<5} | {'ESTADO'}")
@@ -3480,6 +3484,27 @@ def metralleta_loop():
                     market_inestable = True
                     pausa_reason = f"SPREAD PROHIBITIVO ({s_pts:.0f} pts)"
 
+            # === v43.7: GESTOR DE REGÍMENES ADAPTATIVO (Cerebro Dinámico) ===
+            # Detectamos si el mercado es "Snack" (Viernes) o "Tiburón" (Hoy)
+            current_mode = STATE.get("active_regime", "SNIPER")
+            
+            # Umbrales para cambio dinámico (Basados en Oro benchmark)
+            s_pts = (tick_gold.ask - tick_gold.bid) / 0.01 if tick_gold else 99
+            
+            # Lógica de Cambio de Piel (Skin-Shift)
+            is_stable = m_speed < 30.0 and s_pts < 42
+            is_unstable = m_speed > 65.0 or s_pts > 48 or LAST_LATENCY > 1200
+            
+            if is_stable and current_mode == "SNIPER":
+                STATE["active_regime"] = "WAR"
+                STATE["WAR_MODE"] = True
+                log("🚀 CAMBIO DE RÉGIMEN: Mercado estable detectado. Activando Modo METRALLETA (Escalping Viernes).")
+            elif is_unstable and current_mode == "WAR":
+                STATE["active_regime"] = "SNIPER"
+                STATE["WAR_MODE"] = False
+                log("🛡️ CAMBIO DE RÉGIMEN: Inestabilidad detectada. Activando Modo SNIPER (Protección Búnker).")
+            
+            # El Watchdog de Estabilidad v43.6 sigue actuando sobre market_inestable
             if market_inestable:
                 last_pausa_log = STATE.get("last_pausa_log", 0)
                 if now - last_pausa_log > 45.0: # Cada 45s para no spamear

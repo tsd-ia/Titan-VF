@@ -19,7 +19,10 @@ El bot utiliza el sistema de **Enjambre Blindado**:
 - **VETO DE RSI**: Prohibido BUY con RSI > 80. Prohibido SELL con RSI < 20.
 - **CERO CIERRES POR MARGEN**: El bot jamás debe cerrar operaciones en pérdida asumiendo riesgo por nivel bajo de margen.
 - **MURO SEGUIDOR (TRAILING 80%)**: Las escaleras de trailing fijas están prohibidas. Se debe usar ratchet dinámico continuo: si profit > $3.5, se asegura el 80% del PICO Máximo. Un Paracaídas secundario asegura el 85% a partir de $1.50 ("No respira más").
-## 3. Lógica de Inteligencia Artificial
+## 3. Lógica de Inteligencia Artificial y Regímenes (v43.7)
+- **Inteligencia Adaptativa**: El bot detecta automáticamente la "personalidad" del mercado:
+    *   **MODO METRALLETA (🚀)**: Se activa en mercados estables (Baja velocidad, spread bajo, tendencia clara). Prioriza el scalping rápido ($1.50 profit) y gatillo a 72% confianza (ADN Viernes).
+    *   **MODO SNIPER (🛡️)**: Se activa en mercados salvajes (Latigazos, spread alto, latencia). Endurece filtros, exige 85% confianza y usa un SL de $25.0 (ADN Búnker).
 - **Ollama Throttling**: No pedir confirmación a la IA si los indicadores técnicos (RSI/BB) no han cambiado más de un 3% (Caché Cognitivo).
 - **Veto IA**: Si la IA local dice "BUY" pero Ollama dice "NO", se descarta el trade o se reduce la confianza al 50%.
 - **CONSULTA DE UMBRALES (REGLA DE ORO)**: PROHIBIDO bajar o cambiar umbrales de ballena (Oracle) sin preguntar antes al Comandante. El ruido de mercado bajo mata la cuenta en comisiones.
