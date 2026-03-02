@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v45.9 | ESCUDO DE VANGUARDIA | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v46.0 | OPERATIVA ABIERTA TOTAL | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1877,11 +1877,9 @@ def process_symbol_task(sym, active, mission_state):
         surf_tp = None
         target_sig = "HOLD"
         contragolpe_active = False
-        # v45.9: DETECCIÓN DE MOMENTUM PREMATURA Y ESCUDO DE EQUIDAD
+        # v46.0: ESCUDO DE EQUIDAD ELIMINADO POR ORDEN DEL COMANDANTE.
+        # Operativa abierta sin importar el balance. Riesgo total asumido.
         ceq = get_equity()
-        if ceq < 75.0:
-            if now % 60 < 1: log(f"🛑 BÚNKER DE EMERGENCIA: Equidad (${ceq:.2f}) bajo umbral de seguridad. Operativa suspendida.")
-            return None
 
         tick = mt5.symbol_info_tick(sym)
         if not tick: return None
@@ -4265,7 +4263,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v45.9", version="45.9.0")
+app = FastAPI(title="TITAN BRIDGE AI v46.0", version="46.0.0")
 
 app.add_middleware(
     CORSMiddleware,

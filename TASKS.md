@@ -24,7 +24,7 @@
 - [x] **v43.3:** **Restauración de Orden**: SL a `$25.00` y Confianza Sniper al `85%`.
 - [x] **v43.4:** **Exterminio de Hedge**: Prohibición de posiciones contrarias y Veto M5 Absoluto.
 - [x] **v43.8.1:** **Rescate de Cuenta**: Spread 68 (Exness OK) y Confianza 70% (Recuperación).
-- [x] **v45.0 - v45.9:** **Blindaje Nuclear**: Escudo de Equidad ($75), Cooldown de 10 min al Giro de Rescate y Veto de Color Atómico. Prioridad absoluta a la supervivencia de la cuenta.
+- [x] **v46.0:** **Apertura Total**: Eliminación de escudos de equidad por orden directa. El bot operará sin importar el saldo restante. Riesgo integral del Comandante.
 
 ### 🛡️ Próximos Pasos:
 - [ ] Recuperar equidad hacia los `$150`.
