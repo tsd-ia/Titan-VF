@@ -434,7 +434,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 300, "tp": 2000, "max_bullets": 8},
+    "XAUUSDm": {"lot": 0.01, "sl": 25000, "tp": 20000, "max_bullets": 10},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -2531,12 +2531,25 @@ def process_symbol_task(sym, active, mission_state):
                 if now - last_god_log > 30.0:
                     log(f"🔱 IA-OVERRIDE SUPREMO: Ignorando {block_reason} por ORÁCULO (${oracle_volume/1000:.0f}k).")
                     STATE[f"last_god_log_{sym}"] = now
-                # v33.4: MANDO ABSOLUTO del Oráculo (Fuego Veloz)
-                # Solo bloqueamos si M5 es TOTALMENTE contrario (Doble Rojo/Verde)
-                is_extreme_contrarian = (target_sig == "BUY" and m5_trend_label == "🔴🔴") or (target_sig == "SELL" and m5_trend_label == "🟢🟢")
+                # v41.8: MURO DE CONTENCIÓN (FILTRO ANTI-SUICIDIO POR VOLUMEN)
+                # El Oráculo no es Dios si el precio está agotado técnicamente.
+                rsi_extremo = (target_sig == "BUY" and rsi > 78) or (target_sig == "SELL" and rsi < 22)
                 
-                if is_extreme_contrarian:
-                    if now % 15 < 1: log(f"🧘 VETO TENDENCIA M5: Oráculo quiere {target_sig} pero M5 es {m5_trend_label} extremo.")
+                # Confirmación M1: No comprar si la vela M1 actual es roja (momentum a la baja)
+                delta_m1 = 0.0
+                r_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 1)
+                if r_m1 is not None and len(r_m1) > 0:
+                    delta_m1 = price - r_m1[0]['open']
+                
+                m1_contrario = (target_sig == "BUY" and delta_m1 < -0.10) or (target_sig == "SELL" and delta_m1 > 0.10)
+                
+                # M5 Contrario (Relajado de DOBLE a SIMPLE para mayor seguridad)
+                m5_contrario = (target_sig == "BUY" and "🔴" in m5_trend_label) or (target_sig == "SELL" and "🟢" in m5_trend_label)
+
+                if rsi_extremo or m1_contrario or m5_contrario:
+                    if now % 10 < 1: 
+                        log(f"🧘 GATILLO VETADO: Oráculo quiere {target_sig} pero: RSI={rsi:.1f} | M1_Delta={delta_m1:+.2f} | M5={m5_trend_label}")
+                    # No reseteamos block_action, dejamos que el veto técnico gane.
                 else:
                     block_action = False 
                 is_hard_blocked = False
