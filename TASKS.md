@@ -11,9 +11,9 @@
 - [x] **v40.11:** **Entorno Matrix**: Simulador v5.0 (Puro) 100% fiel a MT5 (Sin tocar el bot).
 - [x] **v40.12:** **Extracción BigData**: 1.1 millones de ticks (7 días) para combate real.
 - [x] **v40.13:** **Protocolo Fénix**: Cooldown 30 min + Bala de Prueba (0.01) tras el Guardián.
-# 🚩 ROADMAP DE TAREAS - TITAN vF (v43.4)
-- **Balance Real:** `$118.41` (Meta: `$300.00`)
-- **Estado Actual:** `v43.4` (Sniper Quirúrgico - Cero Hedge)
+# 🚩 ROADMAP DE TAREAS - TITAN vF (v43.8.1)
+- **Balance Real:** `$99.66` (Meta: `$300.00`)
+- **Estado Actual:** `v43.8.1` (Rescate de Cuenta - Gatillo 70% / Spread 68)
 
 ### 🗡️ Misiones Realizadas (Supervivencia):
 - [x] **v42.8 - v42.9:** Blindaje técnico total y corrección de indentación.
@@ -22,10 +22,11 @@
 - [x] **v43.2:** **Blindaje de Zonas**: Inclusión de ZONA ALTA/MUERTA en bloques duros (Inviolables).
 - [x] **v43.3:** **Restauración de Orden**: SL a `$25.00` y Confianza Sniper al `85%`.
 - [x] **v43.4:** **Exterminio de Hedge**: Prohibición de posiciones contrarias y Veto M5 Absoluto.
+- [x] **v43.8.1:** **Rescate de Cuenta**: Spread 68 (Exness OK) y Confianza 70% (Recuperación).
 
 ### 🛡️ Próximos Pasos:
-- [ ] Monitoreo de Sniper v43.4 para recuperación de los `$200`.
-- [ ] Auditoría de "Cosecha de Raíz" para asegurar que no interfiera con el Trailing.
+- [ ] Recuperar equidad hacia los `$150`.
+- [ ] Cazar tendencia M5 con el nuevo gatillo adaptativo.
 1. **Lote Fijo:** 0.01 lot siempre.
 2. **Capacidad:** Hasta 10 posiciones simultáneas para $200 de balance.
 3. **Escudo Anti-Techos:** Veto estricto si el Momentum M1 es contrario a la señal de la IA o si el RSI está sobrecomprado/sobrevendido.
