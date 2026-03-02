@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v41.9.6 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v41.9.7 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3479,12 +3479,13 @@ def metralleta_loop():
                     max_b = current_open_pnl
                 
                 secure_b = -999.0
-                if max_b >= 5.0:
-                    # v41.9.6: Trailing de Canasta Escalado (Base $5, paso $3)
+                if max_b >= 8.0:
+                    # v41.9.7: Trailing de Canasta Escalado (Secuencia: 5, 8, 11, 14, 17)
                     # El Comandante pide: 5, 8, 11, 14, 17... asegurando el escalón anterior.
-                    num_pasos = (max_b - 5.0) // 3.0
-                    secure_b = 2.0 + (num_pasos * 3.0) 
-                    # Ejemplo: Pico 5 -> asegura 2 | Pico 8 -> asegura 5 | Pico 11 -> asegura 8
+                    # El primer cierre ocurre en $5 si el precio toca $8 y retrocede.
+                    num_pasos = (max_b - 8.0) // 3.0
+                    secure_b = 5.0 + (num_pasos * 3.0) 
+                    # Ejemplo: Pico 8 -> asegura 5 | Pico 11 -> asegura 8 | Pico 14 -> asegura 11
                 
                 if current_open_pnl <= secure_b and len(open_positions) > 0:
                     log(f"🧺 ESCUDO DE CANASTA: Asegurando ${current_open_pnl:.2f} (Pico: ${max_b:.2f})")
