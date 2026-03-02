@@ -11,21 +11,21 @@
 - [x] **v40.11:** **Entorno Matrix**: Simulador v5.0 (Puro) 100% fiel a MT5 (Sin tocar el bot).
 - [x] **v40.12:** **Extracción BigData**: 1.1 millones de ticks (7 días) para combate real.
 - [x] **v40.13:** **Protocolo Fénix**: Cooldown 30 min + Bala de Prueba (0.01) tras el Guardián.
-- [x] **v40.14:** **Parche de Prioridad**: El Guardián ahora tiene mando absoluto sobre bloqueos.
-- [x] **v41.6:** **Re-entrada Táctica**: Disparo de 1 bala de prueba post-cierre exitoso (confirmación M1).
-- [x] **v41.7:** **Horarios y Logs**: Refinamiento 6-17h / 21-23h y eliminación de spam de consola.
-- [x] **v42.1:** **Fix Crítico + Smart Pullback**: Normalización de variables y entradas en retroceso.
-- [x] **v42.2:** **Blindaje Real $15**: Reducción de SL y cortes de pánico de $25 a $15 por orden del Comandante.
-- [x] **v42.3:** **Protocolo Sniper**: Entrada 85% Conf | Pullback 15pts | Veto M5 Hard (Precisión Real).
-- [x] **v42.4:** **Protocolo de Hierro**: Oráculo sin Bypass (Pullback obligatorio) | RSI Sniper (32-68) | Bloqueo Zona Muerta.
-- [x] **v42.5:** **Espaciado Sniper**: Grid de 100pts ($1.00 USD) para evitar amontonamiento de balas.
-- [x] **v42.6:** **Modo Híbrido**: Relajación de filtros 72% Conf | Pullback 10pts | Grid 50pts.
-- [x] **v42.7:** **Blindaje Anti-Stuck**: Fix crítico 'return' destructivo | Umbral Latigazo 150 | Versión Visual.
-- [x] **v42.8:** **Fin del Modo Dios**: Oráculo bajo control técnico. RSI/M1 son ahora bloqueos obligatorios.
-- [x] **v42.9:** **Blindaje Total**: Eliminación del bypass institucional final. Oráculo subordinado 100%.
-- [ ] **Auditoría:** Ejecutando Auditoría Semanal de Febrero 2026 en la Matrix v5.0 (En proceso...).
+# 🚩 ROADMAP DE TAREAS - TITAN vF (v43.4)
+- **Balance Real:** `$118.41` (Meta: `$300.00`)
+- **Estado Actual:** `v43.4` (Sniper Quirúrgico - Cero Hedge)
 
-## 🐝 Reglas de Enjambre (v41.7)
+### 🗡️ Misiones Realizadas (Supervivencia):
+- [x] **v42.8 - v42.9:** Blindaje técnico total y corrección de indentación.
+- [x] **v42.9.8:** **Watchdog de Beneficio**: Cierre por software si el profit retrocede de $3 a <$1.
+- [x] **v43.1:** **Saneamiento Total**: Eliminación de indultos a Solana y fin del Modo Dios en Oráculos.
+- [x] **v43.2:** **Blindaje de Zonas**: Inclusión de ZONA ALTA/MUERTA en bloques duros (Inviolables).
+- [x] **v43.3:** **Restauración de Orden**: SL a `$25.00` y Confianza Sniper al `85%`.
+- [x] **v43.4:** **Exterminio de Hedge**: Prohibición de posiciones contrarias y Veto M5 Absoluto.
+
+### 🛡️ Próximos Pasos:
+- [ ] Monitoreo de Sniper v43.4 para recuperación de los `$200`.
+- [ ] Auditoría de "Cosecha de Raíz" para asegurar que no interfiera con el Trailing.
 1. **Lote Fijo:** 0.01 lot siempre.
 2. **Capacidad:** Hasta 10 posiciones simultáneas para $200 de balance.
 3. **Escudo Anti-Techos:** Veto estricto si el Momentum M1 es contrario a la señal de la IA o si el RSI está sobrecomprado/sobrevendido.
