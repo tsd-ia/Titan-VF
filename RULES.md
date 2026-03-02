@@ -32,5 +32,10 @@ El bot utiliza el sistema de **Enjambre Blindado**:
 - **ORO (XAUUSD)**: Cerrado desde el viernes 19:00 hasta el domingo 20:00 (Chile). El bot debe detectar esto automáticamente para no generar errores de conexión.
 - **BTC**: Operación 24/7 sin restricciones de mercado.
 
+## 6. Reglas de Simulación y Backtesting (Matrix)
+- **OBLIGATORIO PROCESAR EN TICKS:** Para bots HFT (Alta Frecuencia) y Scalping como Titan, jamás se debe hacer backtesting usando velas M1 de cierre. El M1 oculta el drawdown interno (latigazos) y genera "Espejismos de Winrate 100%". Siempre usar la tabla real de Ticks.
+- **ANULAR SLEEPS Y REDES:** Al ejecutar el Backtester de purísimo Python, hay que secuestrar temporalmente las funciones de retraso como `time.sleep()`, `call_ollama()` y `push_firebase()` para que la CPU procese sin trabas de reloj en tiempo real.
+- **DESACTIVAR FILTROS DE SALTO:** Los filtros que asumen "RSI Neutro = No hacer nada" amputan la agresividad del Scalping. Las IAs (LSTM) deben evaluar cada punto de decisión (Tick/Vela Híbrida) aunque procesar lleve horas. Priorizar la exactitud sobre la velocidad.
+
 ---
 *Cualquier sesión futura de Antigravity debe leer este archivo antes de realizar modificaciones estructurales.*
