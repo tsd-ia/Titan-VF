@@ -3457,11 +3457,38 @@ def metralleta_loop():
             is_fast = m_speed > 35.0 # Definición v18.9.20
             
             # v39.3: PROTECCIÓN ANTI-LATIGAZO (Latencia Emocional)
-            # v43.0: PROTECCIÓN ANTI-LATIGAZO EXTREMA (Freno de mano a 80)
-            if m_speed > 80.0: 
-                if now % 10 < 1: log(f"🛡️ PROTECTOR: Latigazo Detectado ({m_speed:.1f}$). Entrando en Modo Búnker...")
+            # v43.6: WATCHDOG DE ESTABILIDAD (Explicador de Pausa)
+            market_inestable = False
+            pausa_reason = ""
+            
+            if m_speed > 80.0:
+                market_inestable = True
+                pausa_reason = f"LATIGAZO VIOLENTO (${m_speed:.1f}/m)"
+            elif LAST_LATENCY > 1500:
+                market_inestable = True
+                pausa_reason = f"LATENCIA CRÍTICA ({LAST_LATENCY:.0f}ms)"
+            
+            # Verificación de Spread en Oro
+            tick_gold = mt5.symbol_info_tick("XAUUSDm")
+            if tick_gold:
+                s_pts = (tick_gold.ask - tick_gold.bid) / 0.01 # Puntos Oro
+                if s_pts > 48:
+                    market_inestable = True
+                    pausa_reason = f"SPREAD PROHIBITIVO ({s_pts:.0f} pts)"
+
+            if market_inestable:
+                last_pausa_log = STATE.get("last_pausa_log", 0)
+                if now - last_pausa_log > 45.0: # Cada 45s para no spamear
+                    log(f"🛑 MODO VIGILANCIA: Sniper pausado por {pausa_reason}. Protegiendo capital...")
+                    STATE["last_pausa_log"] = now
+                STATE["market_was_unstable"] = True
                 time.sleep(2)
-                continue 
+                continue
+            
+            # Mensaje de Reanudación
+            if STATE.get("market_was_unstable", False):
+                log(f"✅ REANUDANDO: Mercado estabilizado. Sniper de vuelta al combate.")
+                STATE["market_was_unstable"] = False
             with state_lock: STATE["market_speed_val"] = m_speed
 
             # --- GESTOR DE RIESGO HIPER-VELOCIDD (PACMAN) ---
