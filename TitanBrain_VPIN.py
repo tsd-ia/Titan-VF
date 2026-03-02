@@ -3701,12 +3701,12 @@ def metralleta_loop():
 
                     # v42.9.8: WATCHDOG DE BENEFICIO (Cierre Mandatorio por Software)
                     # No confiamos solo en el SL de MT5. Si el bot ve que el profit se escapa, cierra a mercado.
-                    if pico_pnl >= 3.0 and profit < 1.0:
-                        log(f"🚨 WATCHDOG: {sym} salvando profit. Cayó de ${pico_pnl:.2f} a ${profit:.2f}. Cierre forzado.")
-                        close_ticket(p, "WATCHDOG_PROFIT_3"); continue
-                    elif pico_pnl >= 1.5 and profit < 0.2:
+                    elif pico_pnl >= 3.5 and profit < 1.0:
+                        log(f"🚨 WATCHDOG: {sym} salvando profit real. Cayó de ${pico_pnl:.2f} a ${profit:.2f}. Cierre forzado.")
+                        close_ticket(p, "WATCHDOG_PROFIT_3.5"); continue
+                    elif pico_pnl >= 2.0 and profit < 0.2:
                         log(f"🚨 WATCHDOG: {sym} salvando BreakEven. Cayó de ${pico_pnl:.2f} a ${profit:.2f}. Cierre forzado.")
-                        close_ticket(p, "WATCHDOG_BE_1.5"); continue
+                        close_ticket(p, "WATCHDOG_BE_2.0"); continue
 
                     if profit >= 0.30: 
                         symbol_info = mt5.symbol_info(sym)
@@ -3742,8 +3742,8 @@ def metralleta_loop():
                                 # Esto evita que un pico de $3.40 te cierre en $1.00.
                                 locked_steps = pico_actual * 0.60
                             elif pico_actual >= 1.50:
-                                # Entre $1.50 y $2.50, aseguramos un Breakeven de $0.50 para no perder.
-                                locked_steps = 0.50
+                                # v44.6: Aseguramos solo un pequeño respiro de $0.20 para dar aire real
+                                locked_steps = 0.20
                             
                             # v37.7: AIRE DINÁMICO POR VELOCIDAD
                             if is_fast and locked_steps > 0:
