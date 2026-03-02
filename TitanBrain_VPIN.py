@@ -387,7 +387,7 @@ def firebase_command_poller():
                                     if flag == "auto_mode": 
                                         STATE["auto_pilot"] = val
                                         save_settings()
-                                    log(f"🧠 MANDO WEB (JSON): {flag} -> {'ACTIVADO' if val else 'DESACTIVADO'}")
+                                    # log(f"🧠 MANDO WEB (JSON): {flag} -> {'ACTIVADO' if val else 'DESACTIVADO'}")
             
             # v18.9.280: Poll directo de flags raíz para evitar desincronización con el Dashboard
             for flag in ["oro_brain_on", "btc_brain_on", "crypto_brain_on", "auto_mode"]:
@@ -399,7 +399,7 @@ def firebase_command_poller():
                         if val != STATE.get(flag):
                             STATE[flag] = val
                             if flag == "auto_mode": STATE["auto_pilot"] = val
-                            log(f"📡 SYNC-ROOT [{flag}]: {'ON' if val else 'OFF'}")
+                            # log(f"📡 SYNC-ROOT [{flag}]: {'ON' if val else 'OFF'}")
 
             # Continuar con comandos JSON
             if cmds:
@@ -1803,15 +1803,15 @@ def process_symbol_task(sym, active, mission_state):
              log("🔓 REAPERTURA: Cooldown Circuit Breaker finalizado.")
              STATE["cb_cooldown_until"] = 0
         
-        # Bloqueos de horario para Oro (XAU) — v41.6 ORDEN DEL JEFE 02/03/2026
-        # PERMITIDO: 17:00 → 23:00 (Hora Chile)
-        # BLOQUEADO: 23:00 → 17:00 (resto del día, cierre inteligente sin liquidar)
+        # Bloqueos de horario para Oro (XAU) — v41.7 ORDEN DEL JEFE 02/03/2026
+        # PERMITIDO: 06:00 → 17:00 Y 21:00 → 23:00 (Hora Chile)
+        # BLOQUEADO: 17:00 → 21:00 (Gap NY/Spread) y 23:00 → 06:00 (Cierre)
         if "XAU" in sym:
-            en_horario_permitido = (17 <= hora_chile < 23)
+            en_horario_permitido = (6 <= hora_chile < 17) or (21 <= hora_chile < 23)
             if not en_horario_permitido:
                 last_log_block = STATE.get(f"last_log_block_{sym}", 0)
                 if now - last_log_block > 300:
-                    log(f"⏸️ FUERA DE HORARIO ({hora_chile:02d}:{minuto_chile:02d} Chile). Solo gestión de posiciones abiertas. Ventana: 17-23h.")
+                    log(f"⏸️ FUERA DE HORARIO ({hora_chile:02d}:{minuto_chile:02d} Chile). Solo gestión de posiciones abiertas. Ventanas: 06-17h | 21-23h.")
                     STATE[f"last_log_block_{sym}"] = now
                 # NO forzamos el cierre. Las posiciones siguen su trailing normal.
                 return None
