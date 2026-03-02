@@ -2702,7 +2702,7 @@ def process_symbol_task(sym, active, mission_state):
         # v18.9.138: (BORRADO) Prohibición de Hedge removida a petición del Jefe.
         pass
 
-        is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA"])
+        is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "DIP", "REBOTE", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA"])
         
         if block_action and (not is_oracle_signal or is_hard_blocked):
             target_sig = "HOLD"
