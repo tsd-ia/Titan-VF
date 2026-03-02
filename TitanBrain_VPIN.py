@@ -1994,6 +1994,11 @@ def process_symbol_task(sym, active, mission_state):
         
         # v14.0: Pre-calcular is_contrarian para filtros de seguridad
         # (Se actualizará después de la decisión final de la IA)
+        
+        # v44.8: INICIALIZACIÓN DE SEGURIDAD (ANTI-AMNESIA)
+        is_oracle_signal = False
+        oracle_sig = "HOLD"
+        oracle_volume = 0
 
         # --- CONSEJO DE GUERRA v7.68 ---
         if not is_sniper:
