@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v46.4 | BLOQUEOS ESTRATÉGICOS RESTAURADOS | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v46.5 | CRONOGRAMA MAESTRO RESTAURADO | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -1713,13 +1713,11 @@ def stop_mission():
     
 # --- VARIABLES CONFIGURABLES POR EL COMANDANTE O LA MATRIX ---
 COMANDANTE_CONFIG = {
-    "GUARDIAN_PEAK_TRIGGER": 350.0,
-    "GUARDIAN_DROP_ALLOWANCE": 50.0,
-    "HORAS_SUICIDAS": [10, 13, 14, 23],
+    "HORAS_PROHIBIDAS": [10, 13, 14, 23], # v46.5: Horas vetadas por el Jefe
+    "BLOQUEO_NOCTURNO_INICIO": 23,
+    "BLOQUEO_NOCTURNO_FIN": 6,
     "TOQUE_DE_QUEDA_HORA": 16,
-    "TOQUE_DE_QUEDA_MINUTO": 30,
-    "REAPERTURA_HORA_INICIO": 17,
-    "REAPERTURA_HORA_FIN": 19
+    "TOQUE_DE_QUEDA_MINUTO": 30
 }
 
 def process_symbol_task(sym, active, mission_state):
@@ -1745,24 +1743,26 @@ def process_symbol_task(sym, active, mission_state):
         # NADA detendrá la operativa por caídas de equidad o picos.
         pass
 
-        # v46.4: RESTAURACIÓN DE BLOQUEOS HORARIOS (Toque de Queda y Horas Suicidas)
+        # v46.5: RESTAURACIÓN DE CRONOGRAMA MAESTRO (Nocturno + Prohibidas)
         tq_ch = COMANDANTE_CONFIG["TOQUE_DE_QUEDA_HORA"]
         tq_min = COMANDANTE_CONFIG["TOQUE_DE_QUEDA_MINUTO"]
         
+        is_nocturnal = (hora_chile >= 23 or hora_chile < 6)
+        is_forbidden = hora_chile in COMANDANTE_CONFIG["HORAS_PROHIBIDAS"]
         is_toque_queda = (hora_chile == tq_ch and minuto_chile >= tq_min)
-        is_suicide_hour = hora_chile in COMANDANTE_CONFIG["HORAS_SUICIDAS"]
         
-        if is_toque_queda or is_suicide_hour:
-             last_log_tq = STATE.get(f"last_log_tq_{sym}", 0)
-             if now - last_log_tq > 300:
-                  razon = "TOQUE DE QUEDA (16:30)" if is_toque_queda else f"HORA SUICIDA ({hora_chile}h)"
-                  log(f"⏸️ BLOQUEO ESTRATÉGICO: {razon} activa. Solo vigilancia.")
-                  STATE[f"last_log_tq_{sym}"] = now
+        if is_nocturnal or is_forbidden or is_toque_queda:
+             last_log_sch = STATE.get(f"last_log_sch_{sym}", 0)
+             if now - last_log_sch > 300:
+                  razon = "NOCTURNO (23-06)" if is_nocturnal else (f"HORA PROHIBIDA ({hora_chile}h)" if is_forbidden else "TOQUE DE QUEDA (16:30)")
+                  log(f"⏸️ VETO HORARIO: {razon} activo. Operativa suspendida.")
+                  STATE[f"last_log_sch_{sym}"] = now
              return None
 
         # v46.4: Gap NY/Spread para ORO (XAU) 
         if "XAU" in sym:
             en_horario_permitido = (6 <= hora_chile < 17) or (21 <= hora_chile < 23)
+            # v46.5: El gap ya está parcialmente cubierto por el nocturno/ forbidden pero lo mantenemos por precisión.
             if not en_horario_permitido:
                  last_log_gap = STATE.get(f"last_log_gap_{sym}", 0)
                  if now - last_log_gap > 300:
@@ -4213,7 +4213,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v46.4", version="46.4.0")
+app = FastAPI(title="TITAN BRIDGE AI v46.5", version="46.5.0")
 
 app.add_middleware(
     CORSMiddleware,
