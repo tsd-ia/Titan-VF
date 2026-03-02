@@ -3225,9 +3225,8 @@ def process_symbol_task(sym, active, mission_state):
             if is_vigilancia_blocked and not is_oracle_signal:
                 should_send = False
             elif target_sig in ["BUY", "SELL"]: 
-                # v18.9.245: Si es Oráculo, ignorar bloqueos suaves (Veto M1, etc)
-                # v18.9.410: GATILLO REAL - Solana y Oráculos tienen vía libre absoluta
-                can_pass_block = not block_action or super_conf or is_oracle_signal or ("SOL" in sym)
+                # v42.9: BLINDAJE TOTAL - El Oráculo ya no es Dios. Debe respetar el block_action.
+                can_pass_block = not block_action
                 
                 if can_pass_block:
                     should_send = False
@@ -3240,19 +3239,19 @@ def process_symbol_task(sym, active, mission_state):
                         opp_positions = [p for p in pos_list if p.type == opp_type]
                         
                         if opp_positions:
-                            # Si es Oráculo, ignoramos cualquier bloqueo de proximidad.
+                            # v42.9: Si es Oráculo, ignoramos cualquier bloqueo de proximidad.
                             if is_oracle_signal:
                                 log(f"🔱 ORÁCULO HEDGE: Cobertura agresiva por volumen institucional.")
                             else:
-                                tick = mt5.symbol_info_tick(sym)
-                                if tick:
-                                    cp = tick.ask if target_sig == "BUY" else tick.bid
-                                    s_info = mt5.symbol_info(sym)
-                                    # Para manual/IA normal, mantenemos $1.5 de distancia.
-                                    min_dist_h = 1.5 if ("XAU" in sym or "Gold" in sym) else (s_info.point * 100)
-                                    if any(abs(cp - p.price_open) < min_dist_h for p in opp_positions):
-                                        if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE: {sym} muy cerca. No abriendo (Manual/IA).")
-                                        return
+                                # v42.9: Sincronización atómica de precio
+                                cp = tick.ask if target_sig == "BUY" else tick.bid
+                                price = cp
+                                s_info = mt5.symbol_info(sym)
+                                # Para manual/IA normal, mantenemos $1.5 de distancia.
+                                min_dist_h = 1.5 if ("XAU" in sym or "Gold" in sym) else (s_info.point * 100)
+                                if any(abs(cp - p.price_open) < min_dist_h for p in opp_positions):
+                                    if now % 10 < 1: log(f"🛡️ BLOQUEO HEDGE: {sym} muy cerca. No abriendo (Manual/IA).")
+                                    return
                         # v18.9.600: OPTIMIZACIÓN DE LATENCIA (Cache Tick)
                         tick = mt5.symbol_info_tick(sym)
                         if not tick: return

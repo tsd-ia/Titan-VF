@@ -21,6 +21,8 @@
 - [x] **v42.5:** **Espaciado Sniper**: Grid de 100pts ($1.00 USD) para evitar amontonamiento de balas.
 - [x] **v42.6:** **Modo Híbrido**: Relajación de filtros 72% Conf | Pullback 10pts | Grid 50pts.
 - [x] **v42.7:** **Blindaje Anti-Stuck**: Fix crítico 'return' destructivo | Umbral Latigazo 150 | Versión Visual.
+- [x] **v42.8:** **Fin del Modo Dios**: Oráculo bajo control técnico. RSI/M1 son ahora bloqueos obligatorios.
+- [x] **v42.9:** **Blindaje Total**: Eliminación del bypass institucional final. Oráculo subordinado 100%.
 - [ ] **Auditoría:** Ejecutando Auditoría Semanal de Febrero 2026 en la Matrix v5.0 (En proceso...).
 
 ## 🐝 Reglas de Enjambre (v41.7)
