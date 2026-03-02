@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v46.5 | CRONOGRAMA MAESTRO RESTAURADO | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v46.6 | TELÉGRAFO ESTRATÉGICO ACTIVO | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3373,6 +3373,29 @@ def metralleta_loop():
             # --- SENSOR DE VELOCIDAD DEL MERCADO (v18.9.20) ---
             now_loop = time.time() # v31.14.1: Definición global de tiempo
             now = now_loop
+            
+            # --- v46.6: NOTIFICACIONES DE CRONOGRAMA MAESTRO (TELEGRAM) ---
+            # Detectar cambios de estado en el horario para alertar una vez por evento
+            now_dt_tg = datetime.now()
+            h_tg = now_dt_tg.hour
+            m_tg = now_dt_tg.minute
+            
+            # Definición de banderas de régimen (Espejo de process_symbol_task)
+            is_nocturnal_tg = (h_tg >= 23 or h_tg < 6)
+            is_forbidden_tg = h_tg in COMANDANTE_CONFIG["HORAS_PROHIBIDAS"]
+            is_toque_queda_tg = (h_tg == 16 and m_tg >= 30)
+            is_xau_gap_tg = (h_tg >= 17 and h_tg < 21)
+            
+            if is_nocturnal_tg: cur_regime_tg = "BLOQUEO NOCTURNO 🌑 (23:00-06:00)"
+            elif is_forbidden_tg: cur_regime_tg = f"HORA PROHIBIDA ❌ ({h_tg}:00)"
+            elif is_toque_queda_tg: cur_regime_tg = "TOQUE DE QUEDA ⏸️ (16:30-17:00)"
+            elif is_xau_gap_tg: cur_regime_tg = "GAP NY/SPREAD ORO 📊 (17:00-21:00)"
+            else: cur_regime_tg = "REAPERTURA / OPERATIVA ABIERTA ✅ (Cazando)"
+            
+            last_reg_tg = STATE.get("last_regime_alert", "")
+            if cur_regime_tg != last_reg_tg:
+                send_telegram(f"🔔 *ESTADO ESTRATÉGICO*: {cur_regime_tg}")
+                STATE["last_regime_alert"] = cur_regime_tg
             ph_v = STATE.get("price_history", [])
             m_speed = 20.0 # Default
             if len(ph_v) > 10:
@@ -4213,7 +4236,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v46.5", version="46.5.0")
+app = FastAPI(title="TITAN BRIDGE AI v46.6", version="46.6.0")
 
 app.add_middleware(
     CORSMiddleware,

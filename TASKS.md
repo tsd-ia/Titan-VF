@@ -24,7 +24,7 @@
 - [x] **v43.3:** **Restauración de Orden**: SL a `$25.00` y Confianza Sniper al `85%`.
 - [x] **v43.4:** **Exterminio de Hedge**: Prohibición de posiciones contrarias y Veto M5 Absoluto.
 - [x] **v43.8.1:** **Rescate de Cuenta**: Spread 68 (Exness OK) y Confianza 70% (Recuperación).
-- [x] **v46.0 - v46.2:** **Libertad Universal**: Eliminación de escudos de equidad, enfriamientos de seguridad (Guardian/CB) y restricciones de horario (24/7). Riesgo integral del Comandante.
+- [x] **v46.0 - v46.6:** **Telégrafo Estratégico**: Avisos automáticos a Telegram por cambios de régimen (Nocturno, Forbidden, Gap NY, Reapertura).
 
 ### 🛡️ Próximos Pasos:
 - [ ] Recuperar equidad hacia los `$150`.
