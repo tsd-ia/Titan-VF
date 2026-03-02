@@ -1,7 +1,7 @@
 # 🗺️ TITAN ROADMAP - MODO ENJAMBRE BLINDADO (v41.7)
-**Estado:** PROTOCOLO SNIPER ACTIVADO 🎯🔥
-**Balance Inicial (Reinicio):** $200.00 USD
-**Misión:** Scalping Agresivo pero Seguro ($500/semana).
+**Estado:** RECUPERACIÓN EN MARCHA 🟢🔥
+**Equidad Actual:** $154.27 USD (Recuperando desde $121)
+**Misión:** Recuperar base $200 y alcanzar +$100 de profit neto ($300 total).
 
 ## 🎯 Tareas Críticas
 - [x] **v40.5:** Restauración de Veto M5 (Prohibido operar contra tendencia mayor).
