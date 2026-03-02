@@ -2532,9 +2532,9 @@ def process_symbol_task(sym, active, mission_state):
              if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5. No ir contra el tren.")
              return None
         
-        # v42.3: PULLBACK TÁCTICO SNIPER (REQUERIMIENTO DEL COMANDANTE)
-        # No comprar en el techo de la vela, esperar un pequeño respiro de ticks.
-        if not is_oracle_signal and n_balas_reales == 0:
+        # v42.4: PROTOCOLO DE HIERRO (Pullback Obligatorio incluso para Oráculos)
+        # No perseguir el precio. Si hay una ballena, esperamos el respiro igual.
+        if n_balas_reales == 0:
              if target_sig == "BUY":
                   high_m1 = df['high'].iloc[-1]
                   # v42.3: Exigimos al menos 15 puntos de retroceso (1.5 pips) para entrar mejor
@@ -2615,13 +2615,17 @@ def process_symbol_task(sym, active, mission_state):
         if target_sig != "HOLD" and ("XAU" in sym or "Gold" in sym):
             curr_candle = df['close'].iloc[-1] - df['open'].iloc[-1]
             
-            # Filtros de agotamiento de RSI
-            if target_sig == "BUY" and rsi_val > 70:
+            # v42.4: Filtros de agotamiento de RSI (Niveles Reales de Peligro)
+            if target_sig == "BUY" and rsi_val > 68:
                 block_action = True; block_reason = f"RSI AGOTADO-BUY ({rsi_val:.1f})"
                 is_hard_blocked = True
-            elif target_sig == "SELL" and rsi_val > 45:
-                block_action = True; block_reason = f"SUELO DE CRISTAL: RSI ALTO PARA SELL ({rsi_val:.1f})"
+            elif target_sig == "SELL" and rsi_val < 32:
+                block_action = True; block_reason = f"RSI AGOTADO-SELL ({rsi_val:.1f})"
                 is_hard_blocked = True
+            
+            # Bloqueo de Zona Neutra Sucia (Evitar pérdida por spread en RSI 45-55)
+            if 46 < rsi_val < 54 and not is_oracle_signal:
+                block_action = True; block_reason = f"ZONA MUERTA (RSI:{rsi_val:.1f})"
             
             # Filtro de Momentum M1 Inmediato
             if target_sig == "BUY" and curr_candle < -50:
