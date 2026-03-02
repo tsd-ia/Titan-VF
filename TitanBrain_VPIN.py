@@ -2521,16 +2521,17 @@ def process_symbol_task(sym, active, mission_state):
         if not is_god_entry and oracle_volume < 1000 and "BTC" in sym:
             is_oracle_signal = False # Es solo un latido de vida
         
-        # v39.3: FILTRO PROTECTOR "ANTI-CUCHILLO" (Veto por M5)
-        # Si las velas de M5 son puras caídas, prohibido comprar por más que el Oráculo grite.
-        # v44.1: El Oráculo Gigante (>100k) puede ignorar incluso esto si hay pánico comprador.
-        if not (bypass_tecnico and oracle_volume > 100000):
+        # v44.5: FILTRO PROTECTOR "ANTI-CUCHILLO" (RELAJADO PARA RESCATE)
+        # Si hay señal de Oráculo real (>10k), ignoramos la tendencia M5 para no perder el tren.
+        if not (bypass_tecnico and oracle_volume >= 10000):
             if target_sig == "BUY" and m5_trend_dir == "SELL" and price < ema20:
-                 if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Compra. El Oro está cayendo fuerte en M5.")
-                 return None 
+                 block_action = True
+                 block_reason = "VETO M5 (Onda Bajista)"
+                 if now % 60 < 1: log("🛡️ PROTECTOR: Advertencia de tendencia bajista en M5. Sniper evaluando entrada...")
             elif target_sig == "SELL" and m5_trend_dir == "BUY" and price > ema20:
-                 if now % 60 < 1: log("🛡️ PROTECTOR: Veto de Venta. El Oro está subiendo fuerte en M5.")
-                 return None
+                 block_action = True
+                 block_reason = "VETO M5 (Onda Alcista)"
+                 if now % 60 < 1: log("🛡️ PROTECTOR: Advertencia de tendencia alcista en M5. Sniper evaluando entrada...")
         
         # v42.6: PULLBACK HÍBRIDO (Acción Rápida)
         # Bajamos a 10 puntos para no perder el tren, pero evitar el techo absoluto.
