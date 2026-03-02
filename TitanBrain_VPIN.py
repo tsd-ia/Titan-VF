@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v41.9.4 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v41.9.6 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3140,7 +3140,7 @@ def process_symbol_task(sym, active, mission_state):
                         # v12.1: Ignorar delay si es un HEDGE (Rescate urgente)
                         if trigger_type == "CAMBIO" and time_val < 15.0 and not is_contrarian:
                             should_fire = False
-                            if now % 5 < 1: log(f"⏳ PROTECCIÓN: Esperando estabilidad (15s) para {sym}")
+                            if now % 60 < 1: log(f"⏳ PROTECCIÓN: Esperando estabilidad (15s) para {sym}")
                         else:
                              if dist_val < min_dist or time_val < req_delay:
                                  should_fire = False
@@ -3260,7 +3260,7 @@ def process_symbol_task(sym, active, mission_state):
                                 return
                             
                             if is_rebound_hunt and not is_aligned:
-                                if now % 5 < 1: log(f"🏹 CAZA EN REBOTE: {sym} detectado Dip/Peak. Entrando contra momentum por Oráculo.")
+                                if now % 60 < 1: log(f"🏹 CAZA EN REBOTE: {sym} detectado Dip/Peak. Entrando contra momentum por Oráculo.")
 
                         # v18.9.45: VALIDACIÓN DE EXCLUSIÓN DE PRECIO (Anti-Metralleta)
                         tick = mt5.symbol_info_tick(sym)
@@ -3479,15 +3479,12 @@ def metralleta_loop():
                     max_b = current_open_pnl
                 
                 secure_b = -999.0
-                if max_b >= 50.0:
-                    # Trailing Stop Piramidal (50, 100, 150, 200...)
-                    escalon = max_b // 50.0
-                    if escalon == 1:
-                        secure_b = 25.0 # En $50, aseguramos $25 (aire de $25)
-                    else:
-                        secure_b = (escalon - 1) * 50.0 # En 100 asegura 50 | En 150 asegura 100 | En 200 asegura 150
-                elif max_b >= 30.0:
-                    secure_b = 15.0 # v41.9.3: Elevamos el piso de rescate a $15 para no asfixiar el enjambre de pérdidas.
+                if max_b >= 5.0:
+                    # v41.9.6: Trailing de Canasta Escalado (Base $5, paso $3)
+                    # El Comandante pide: 5, 8, 11, 14, 17... asegurando el escalón anterior.
+                    num_pasos = (max_b - 5.0) // 3.0
+                    secure_b = 2.0 + (num_pasos * 3.0) 
+                    # Ejemplo: Pico 5 -> asegura 2 | Pico 8 -> asegura 5 | Pico 11 -> asegura 8
                 
                 if current_open_pnl <= secure_b and len(open_positions) > 0:
                     log(f"🧺 ESCUDO DE CANASTA: Asegurando ${current_open_pnl:.2f} (Pico: ${max_b:.2f})")
@@ -3532,9 +3529,9 @@ def metralleta_loop():
                                 is_whale = True
                                 target_pico = max(5.00, current_atr * 3.5)
                         
-                        # v41.9.4: Veto por Latencia RELAJADO (Asegurar solo si hay lag real > 1.5s)
-                        if LAST_LATENCY > 1500 and profit > 5.00:
-                            log(f"🐌 VETO LATENCIA: Asegurando {profit:.2f} por broker colapsado ({LAST_LATENCY:.0f}ms)")
+                        # v41.9.5: Veto por Latencia Inteligente (Asegurar $1.50 si el lag > 800ms)
+                        if LAST_LATENCY > 800 and profit > 1.50:
+                            log(f"🐌 VETO LATENCIA: Asegurando {profit:.2f} por broker lento ({LAST_LATENCY:.0f}ms)")
                             close_ticket(p, "LATENCY_VETO_v32"); continue
 
                         if pico_pnl >= target_pico and profit <= (pico_pnl * 0.75):
