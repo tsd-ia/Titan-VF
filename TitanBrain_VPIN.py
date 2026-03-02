@@ -434,7 +434,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.01, "sl": 25000, "tp": 20000, "max_bullets": 10},
+    "XAUUSDm": {"lot": 0.01, "sl": 15000, "tp": 20000, "max_bullets": 10},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -781,7 +781,7 @@ def perform_ai_health_audit():
         if "BTC" in p.symbol:
             p_pánico = -35.0
         elif "XAU" in p.symbol or "Gold" in p.symbol:
-            p_pánico = -25.0
+            p_pánico = -15.0 # v42.2: Reducido de $25 a $15 por orden del Comandante
         else:
             p_pánico = -15.0 # ETH/SOL/Otros
 
@@ -866,7 +866,7 @@ def get_adaptive_risk_params(balance, conf, rsi_val, sym):
 
 
 def get_bunker_sl_price(sym, lot, side, price):
-    """ v18.9.115: REGLA DE ORO DEL JEFE - SL FIJO A $25 USD """
+    """ v18.9.115: REGLA DE ORO DEL JEFE - SL FIJO A $15 USD """
     try:
         s_info = mt5.symbol_info(sym)
         if not s_info: return 0.0
@@ -881,7 +881,7 @@ def get_bunker_sl_price(sym, lot, side, price):
         if atr_val > 2.0: vol_multiplier = 2.5
         elif atr_val > 1.2: vol_multiplier = 1.5
 
-        target_loss = 25.0 # v37.4: REGLA DE ORO DEL JEFE - AIRE REAL PARA ESCALAR
+        target_loss = 15.0 # v37.4: REGLA DE ORO DEL JEFE - AIRE REAL PARA ESCALAR
 
         # Formula: PriceDelta = Loss / (Lot * ContractSize)
         cs = s_info.trade_contract_size
@@ -2310,7 +2310,7 @@ def process_symbol_task(sym, active, mission_state):
         if active and not MIRROR_MODE:
             # Veto Dinámico por bandas (ADX aware)
             corridor = upper_band - lower_band
-            if adx_val > 25: # Tendencia: Más libertad
+            if adx_val > 25: # Alta tendencia/volatilidad
                 margin = corridor * 0.12
             else: # Rango: Más rigor
                 margin = corridor * 0.22
@@ -3528,7 +3528,10 @@ def metralleta_loop():
                         # 1. HARD STOP ADAPTATIVO (v32.0: Basado en ATR)
                         # El stop ya no es un número frío, se adapta al ruido del mercado.
                         current_atr = STATE.get(f"atr_{p_sym}", 1.5)
-                        limit_hs = -25.00 # v38.0: Blindaje total. Prohibido cerrar a -$10.
+                        is_gold_hs = ("XAU" in p_sym or "Gold" in p_sym)
+                        # v42.2: Reducción de riesgo real del Comandante de $25 a $15.
+                        sl_dist_usd = 15.0 
+                        limit_hs = -sl_dist_usd if is_gold_hs else -13.5 
                         
                         if profit <= limit_hs:
                             log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
@@ -3613,7 +3616,7 @@ def metralleta_loop():
                     # v21.1: SALIDA POR AGOTAMIENTO (Análisis Madrugada 24/02)
                     # Probabilidad de retorno < 20% después de -$13.5 en BTC (0.1 lot).
                     is_gold_hs = ("XAU" in sym or "Gold" in sym)
-                    limit_hs = -25.00 if is_gold_hs else -13.5 
+                    limit_hs = -15.00 if is_gold_hs else -13.5 
                     if profit <= limit_hs:
                         log(f"🚨 CORTE POR AGOTAMIENTO: {sym} (${profit:.2f}). No vale la pena esperar retorno.")
                         close_ticket(p, "EXHAUSTION_CUT_v21"); continue
