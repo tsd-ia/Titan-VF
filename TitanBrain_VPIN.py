@@ -3788,6 +3788,7 @@ def metralleta_loop():
                             # Si tenemos una posición en pérdida (> $2) y entra una señal 
                             # CONTRARIA de alta confianza (>90% o ballena), cerramos la perdedora.
                             is_loser = profit < -2.0
+                            sig_actual = "BUY" if p.type == mt5.POSITION_TYPE_BUY else "SELL"
                             is_god_signal = (t_sig != "HOLD" and t_sig != sig_actual and (t_conf > 0.90 or t_bypass))
                             
                             if is_loser and is_god_signal:
