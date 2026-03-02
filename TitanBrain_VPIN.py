@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v43.5 | SNIPER QUIRÚRGICO (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v43.8 | RESCATE DE CUENTA (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -2684,10 +2684,10 @@ def process_symbol_task(sym, active, mission_state):
 
         is_hard_blocked = any(kw in block_reason for kw in ["MARGEN", "MAX BALAS", "SPREAD BALLENA", "SPREAD PROHIBITIVO", "ANTI-WHIPSAW", "MERCADO CERRADO", "PRE-CIERRE", "RETROCESO", "DIP", "REBOTE", "CAOS", "PRECIO CAYENDO", "PRECIO SUBIENDO", "VETO: TENDENCIA", "ZONA MUERTA", "ZONA ALTA", "ZONA BAJA"])
         
-        # v43.6: DECISIÓN DINÁMICA (WAR_MODE vs SNIPER)
-        # Modo Guerra (Viernes): Confianza 72% para ametralladora.
-        # Modo Sniper (Hoy): Confianza 85% para precisión quirúrgica.
-        target_conf_limit = 0.72 if STATE.get("WAR_MODE", False) else 0.85
+        # v43.8: DECISIÓN DINÁMICA (WAR_MODE vs SNIPER)
+        # Modo Guerra/Recuperación: Confianza 70% para volver al ruedo.
+        # Modo Sniper: Confianza 85% (Solo si el mercado es extremadamente peligroso).
+        target_conf_limit = 0.70 if (STATE.get("WAR_MODE", False) or current_equity < 150) else 0.85
 
         if block_action:
             target_sig = "HOLD"
@@ -3488,7 +3488,7 @@ def metralleta_loop():
             tick_gold = mt5.symbol_info_tick("XAUUSDm")
             if tick_gold:
                 s_pts = (tick_gold.ask - tick_gold.bid) / 0.01 # Puntos Oro
-                if s_pts > 48:
+                if s_pts > 68: # v43.8: Ajustado para Exness (Spreads de 50-60 son normales)
                     market_inestable = True
                     pausa_reason = f"SPREAD PROHIBITIVO ({s_pts:.0f} pts)"
 
