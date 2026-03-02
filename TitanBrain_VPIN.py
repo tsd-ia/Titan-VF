@@ -2590,12 +2590,9 @@ def process_symbol_task(sym, active, mission_state):
         if adx_val > 25: # Alta tendencia/volatilidad
             atr_factor = 1.5 if adx_val < 40 else 2.5
         
-        # v18.9.410: INDULTO SOLANA (Reducido log para evitar spam)
-        if "SOL" in sym:
-            block_action = False
-            block_reason = ""
-            is_hard_blocked = False
-            if now % 30 < 1: log(f"🔓 MODO GATILLO: SOLANA liberada de bloqueos.")
+        # v43.1: INDULTO SOLANA ELIMINADO. Ahora debe respetar las leyes técnicas.
+        # if "SOL" in sym:
+        #     block_action = False
         
         # 4. FILTRO DE TENDENCIA MAYOR (M5 ALIGNMENT v15.35 BLINDADO)
         # EXCEPCIÓN: El Contragolpe tiene permiso para ir contra la tendencia M5.
@@ -2623,8 +2620,10 @@ def process_symbol_task(sym, active, mission_state):
                 is_hard_blocked = True
             
             # Bloqueo de Zona Neutra Sucia (Evitar pérdida por spread en RSI 45-55)
-            if 46 < rsi_val < 54 and not is_oracle_signal:
+            # Bloqueo de Zona Neutra Sucia (Evitar pérdida por spread en RSI 45-55)
+            if 46 < rsi_val < 54: # v43.1: Nadie opera en zona muerta, ni el Oráculo.
                 block_action = True; block_reason = f"ZONA MUERTA (RSI:{rsi_val:.1f})"
+                is_hard_blocked = True
             
             # Filtro de Momentum M1 Inmediato
             if target_sig == "BUY" and curr_candle < -50:
@@ -2772,9 +2771,9 @@ def process_symbol_task(sym, active, mission_state):
                                 is_oracle_signal = True
                                 oracle_sig = csig.get("signal", "HOLD")
                                 if oracle_sig != "HOLD":
-                                    log(f"🔱 GOD MODE ACTIVADO [{sym}]: Señal de Oráculo Detectada.")
-                                    sig = oracle_sig
-                                    conf = 1.0
+                                    log(f"🔱 ORÁCULO CRYPTO [{sym}]: Detectada ballena. Evaluando...")
+                                    # v43.1: Fin de confianza ciega 1.0
+                                    pass
             except: pass
         
         # 3. ORÁCULO BINANCE (BTC via Binance Oracle)
@@ -2787,9 +2786,9 @@ def process_symbol_task(sym, active, mission_state):
                             is_oracle_signal = True
                             oracle_sig = osig.get("signal", "HOLD")
                             if oracle_sig != "HOLD":
-                                log(f"🔱 GOD MODE ACTIVADO [BTC]: Ballena Binance Detectada.")
-                                sig = oracle_sig
-                                conf = 1.0
+                                log(f"🔱 ORÁCULO BINANCE [BTC]: Ballena Detectada. Evaluando...")
+                                # v43.1: Fin de confianza ciega 1.0
+                                pass
             except: pass
 
         if is_oracle_signal and oracle_sig != "HOLD":
