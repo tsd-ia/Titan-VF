@@ -3493,25 +3493,29 @@ def metralleta_loop():
                     market_inestable = True
                     pausa_reason = f"SPREAD PROHIBITIVO ({s_pts:.0f} pts)"
 
-            # === v43.7: GESTOR DE REGÍMENES ADAPTATIVO (Cerebro Dinámico) ===
-            # Detectamos si el mercado es "Snack" (Viernes) o "Tiburón" (Hoy)
+            # === v43.9: CEREBRO DE ACERO (Regímenes Sólidos) ===
+            # Evitamos el "Jitter" (oscilación idiota) con un candado de 2 minutos.
             current_mode = STATE.get("active_regime", "SNIPER")
+            last_shift = STATE.get("last_regime_shift", 0)
             
-            # Umbrales para cambio dinámico (Basados en Oro benchmark)
+            # Umbrales con Hysteresis (Margen de separación amplio)
             s_pts = (tick_gold.ask - tick_gold.bid) / 0.01 if tick_gold else 99
             
-            # Lógica de Cambio de Piel (Skin-Shift)
-            is_stable = m_speed < 30.0 and s_pts < 42
-            is_unstable = m_speed > 65.0 or s_pts > 48 or LAST_LATENCY > 1200
-            
-            if is_stable and current_mode == "SNIPER":
-                STATE["active_regime"] = "WAR"
-                STATE["WAR_MODE"] = True
-                log("🚀 CAMBIO DE RÉGIMEN: Mercado estable detectado. Activando Modo METRALLETA (Escalping Viernes).")
-            elif is_unstable and current_mode == "WAR":
-                STATE["active_regime"] = "SNIPER"
-                STATE["WAR_MODE"] = False
-                log("🛡️ CAMBIO DE RÉGIMEN: Inestabilidad detectada. Activando Modo SNIPER (Protección Búnker).")
+            # Solo evaluamos cambio si han pasado 120 segundos (Estabilidad)
+            if now - last_shift > 120.0:
+                is_stable = m_speed < 25.0 and s_pts < 40
+                is_unstable = m_speed > 60.0 or s_pts > 45 or LAST_LATENCY > 1200
+                
+                if is_stable and current_mode == "SNIPER":
+                    STATE["active_regime"] = "WAR"
+                    STATE["WAR_MODE"] = True
+                    STATE["last_regime_shift"] = now
+                    log("🚀 RÉGIMEN ESTABLE: Modo METRALLETA anclado por 2 min.")
+                elif is_unstable and current_mode == "WAR":
+                    STATE["active_regime"] = "SNIPER"
+                    STATE["WAR_MODE"] = False
+                    STATE["last_regime_shift"] = now
+                    log("🛡️ RÉGIMEN INESTABLE: Modo SNIPER anclado por 2 min.")
             
             # El Watchdog de Estabilidad v43.6 sigue actuando sobre market_inestable
             if market_inestable:
