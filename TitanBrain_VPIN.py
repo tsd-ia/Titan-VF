@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🐝 TITAN v39.8 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
+    lines.append(f" 🐝 TITAN v41.9.3 | SUPER-METRALLETA ENJAMBRE (HFT) | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3486,8 +3486,8 @@ def metralleta_loop():
                         secure_b = 25.0 # En $50, aseguramos $25 (aire de $25)
                     else:
                         secure_b = (escalon - 1) * 50.0 # En 100 asegura 50 | En 150 asegura 100 | En 200 asegura 150
-                elif max_b >= 20.0:
-                    secure_b = 5.0 # Si no llega a 50, rescatamos algo de ganancias.
+                elif max_b >= 30.0:
+                    secure_b = 15.0 # v41.9.3: Elevamos el piso de rescate a $15 para no asfixiar el enjambre de pérdidas.
                 
                 if current_open_pnl <= secure_b and len(open_positions) > 0:
                     log(f"🧺 ESCUDO DE CANASTA: Asegurando ${current_open_pnl:.2f} (Pico: ${max_b:.2f})")
