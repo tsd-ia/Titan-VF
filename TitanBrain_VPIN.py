@@ -1,4 +1,4 @@
-import sys, io
+﻿import sys, io
 try:
     if hasattr(sys.stdout, 'reconfigure'):
         sys.stdout.reconfigure(encoding='utf-8')
@@ -183,6 +183,9 @@ MAX_BULLETS = 20
 MAX_DAILY_LOSS = 0.85 
 MAX_SESSION_LOSS = -200.0  
 MIN_EQUITY_TO_TRADE = 10.0  
+
+# 🔥 MODO GUERRA PERFECTO (PROTOCOLOS BÉLICOS 2026) 🔥
+WAR_MODE_BUY_ONLY = False # Regreso a Análisis Técnico e IA normal.
 
 # v32.5: NÚCLEO LIBERADO (Bypass de Restricciones)
 MIN_BALLENA_VOL = 12000 # Volumen reducido para disparos rápidos
@@ -431,7 +434,7 @@ mission_state = {
 
 # Configuración Dinámica (Lote) - v18.9.115: REGLA DE ORO SL $25
 ASSET_CONFIG = {
-    "XAUUSDm": {"lot": 0.02, "sl": 300, "tp": 2000, "max_bullets": 8},
+    "XAUUSDm": {"lot": 0.01, "sl": 300, "tp": 2000, "max_bullets": 8},
     "MSTRm": {"lot": 0.1, "sl": 5000, "tp": 8000, "max_bullets": 2}, # Volatilidad Extrema
     "OPNm": {"lot": 0.5, "sl": 3000, "tp": 5000, "max_bullets": 2},  # Movimientos Rápidos
     "BTCUSDm": {"lot": 0.01, "tp": 999999, "sl": 25000, "step": 35000, "max_bullets": 3},
@@ -514,8 +517,17 @@ def is_market_closed(symbol):
     # Domingo antes de las 20:00 (Chile)
     if weekday == 6 and now.hour < 20: return True
     # Pausa Diaria 19:00 - 20:00 (Solo afecta a Oro/Forex)
-    if now.hour == 19 and not any(c in symbol.upper() for c in crypto_patterns): return True
+    is_crypto = any(c in symbol.upper() for c in crypto_patterns)
+    if now.hour == 19 and not is_crypto: return True
     
+    # 🛡️ TOQUE DE QUEDA HFT (Restricciones del Comandante contra Spreads/Baja Volatilidad)
+    if not is_crypto:
+        h = now.hour
+        # 1. Prohibido operar desde la medianoche hasta las 3 AM (Horas muertas previas a Londres)
+        if 0 <= h < 3: return True
+        # 2. Prohibido operar desde las 16:00 hasta las 20:59 (Cierre NY y Spread Asesino)
+        if 16 <= h < 21: return True
+        
     return False
     
 
@@ -1716,7 +1728,7 @@ def process_symbol_task(sym, active, mission_state):
     """ Tarea individual para cada activo en paralelo [v18.9.380] """
     global LAST_LATENCY_UPDATE
     try:
-        now = time.time()
+        now = mission_state.get("sim_time", time.time())
         # print(f"DEBUG: Procesando {sym} en {now}") # Silenciado para no spam, pero verificado
         # 🛡️ FRENO DE EMERGENCIA: CARGADOR DINÁMICO (v38.3: SINCRO METRALLETA)
         acc = mt5.account_info()
@@ -1725,8 +1737,9 @@ def process_symbol_task(sym, active, mission_state):
         balance = acc.balance if acc else 0.0
         margin_level = acc.margin_level if (acc and hasattr(acc, 'margin_level')) else 0.0
         
-        # v38.7: CONTROL PREVENTIVO DE HORARIO (Ubicación Proactiva)
-        now_chile = datetime.now()
+        # v38.7: CONTROL PREVENTIVO DE HORARIO (Ubicación Proactiva) / MÁQUINA DEL TIEMPO SIMULADOR
+        sim_dt = mission_state.get("sim_datetime")
+        now_chile = sim_dt if sim_dt else datetime.now()
         hora_chile = now_chile.hour
         minuto_chile = now_chile.minute
         
@@ -1744,8 +1757,18 @@ def process_symbol_task(sym, active, mission_state):
              STATE["peak_equity_day"] = equity
              current_peak = equity
              
-        if current_peak >= COMANDANTE_CONFIG["GUARDIAN_PEAK_TRIGGER"] and equity <= (current_peak - COMANDANTE_CONFIG["GUARDIAN_DROP_ALLOWANCE"]):
-             log(f"🚨 GUARDIAN INSTITUCIONAL: El Pico del día fue ${current_peak:.2f}, el Mercado lo bajó a ${equity:.2f}. CERRANDO Y ENFRIANDO 30 MIN.")
+        # v42.0: GUARDIÁN DINÁMICO E INSTITUCIONAL (Trailing Stop Diario)
+        start_eq = mission_state.get("start_equity", balance if balance > 0 else 200.0)
+        
+        # Meta estricta del Comandante: Al menos $300 a $500 USD diarios.
+        guardian_peak_target = start_eq + 300.0 
+        
+        # Tolerancia dinámica apretada: Solo dejamos respirar el 15% de la ganancia masiva (o $50 por defecto).
+        ganancia_diaria = current_peak - start_eq
+        drop_allowance = max(50.0, ganancia_diaria * 0.15) if ganancia_diaria > 0 else 50.0
+
+        if current_peak >= guardian_peak_target and equity <= (current_peak - drop_allowance):
+             log(f"🚨 GUARDIAN INSTITUCIONAL: El Pico del día fue ${current_peak:.2f} (+${ganancia_diaria:.2f}). Mercado intentó quitarlo, cayendo a ${equity:.2f}. CERRANDO Y ASEGURANDO GANANCIA.")
              for p in positions: close_ticket(p, "GUARDIAN_PROTECTOR")
              # En lugar de stop_mission(), solo bloqueamos temporalmente y marcamos para 'Bala de Prueba'
              STATE["guardian_cooldown_until"] = now + 1800 # 30 min
@@ -1780,47 +1803,27 @@ def process_symbol_task(sym, active, mission_state):
              log("🔓 REAPERTURA: Cooldown Circuit Breaker finalizado.")
              STATE["cb_cooldown_until"] = 0
         
-        # Bloqueos para Oro (XAU) en el Gap Diario y Horas Suicidas (Transiciones/Noticias)
+        # Bloqueos de horario para Oro (XAU) — v41.6 ORDEN DEL JEFE 02/03/2026
+        # PERMITIDO: 17:00 → 23:00 (Hora Chile)
+        # BLOQUEADO: 23:00 → 17:00 (resto del día, cierre inteligente sin liquidar)
         if "XAU" in sym:
-            # Horas Suicidas Validadas por Auditoría v40.10: 10, 13, 14, 16, 17, 18, 23 (Hrs Chile)
-            horas_suicidas = COMANDANTE_CONFIG["HORAS_SUICIDAS"]
-            if hora_chile in horas_suicidas:
-                 last_log_toxic = STATE.get(f"last_log_toxic_{sym}", 0)
-                 if now - last_log_toxic > 300: # Log cada 5 min para no hacer spam
-                     log(f"💤 HORARIOS TÓXICOS: Escudos arriba en {sym} ({hora_chile:02d}:00 Hrs). Spread y Latigazos muy altos.")
-                     STATE[f"last_log_toxic_{sym}"] = now
-                 return None # 🛡️ BLOQUEO TOTAL DE GATILLO. Las órdenes abiertas siguen su curso.
-                 
-            # CIERRE TOTAL INSTITUCIONAL (16:30 Hrs Chile - Cierre de Cortina para Scalpers)
-            if hora_chile == COMANDANTE_CONFIG["TOQUE_DE_QUEDA_HORA"] and minuto_chile >= COMANDANTE_CONFIG["TOQUE_DE_QUEDA_MINUTO"]:
-                if len(pos_list) > 0:
-                    log(f"🔒 TOQUE DE QUEDA ({COMANDANTE_CONFIG['TOQUE_DE_QUEDA_HORA']}:{COMANDANTE_CONFIG['TOQUE_DE_QUEDA_MINUTO']:02d}): Liquidando {sym} para evitar la trampa de liquidez de la tarde.")
-                    for p in pos_list: close_ticket(p, "TOQUE_DE_QUEDA")
-                    stop_mission()
-                return None 
-            # Si se inicia durante horario tóxico inoperable, mantenerlo durmiendo
-            elif hora_chile >= COMANDANTE_CONFIG["REAPERTURA_HORA_INICIO"] and hora_chile <= COMANDANTE_CONFIG["REAPERTURA_HORA_FIN"]:
-                if now % 60 < 1: log(f"🧘 FILTRO HORARIO: Descansando. Mercado de la tarde está altamente manipulado ({COMANDANTE_CONFIG['REAPERTURA_HORA_INICIO']}h-{COMANDANTE_CONFIG['REAPERTURA_HORA_FIN']}h).")
+            en_horario_permitido = (17 <= hora_chile < 23)
+            if not en_horario_permitido:
+                last_log_block = STATE.get(f"last_log_block_{sym}", 0)
+                if now - last_log_block > 300:
+                    log(f"⏸️ FUERA DE HORARIO ({hora_chile:02d}:{minuto_chile:02d} Chile). Solo gestión de posiciones abiertas. Ventana: 17-23h.")
+                    STATE[f"last_log_block_{sym}"] = now
+                # NO forzamos el cierre. Las posiciones siguen su trailing normal.
                 return None
-        
-        # v39.2: ESCUDO DE MARGEN DESACTIVADO POR ORDEN DEL COMANDANTE
-        # if acc and hasattr(acc, 'margin_level') and 0.0 < acc.margin_level < 120.0:
-        #      pos_list_all = mt5.positions_get()
-        #      if pos_list_all:
-        #          pos_df = pd.DataFrame(list(pos_list_all), columns=pos_list_all[0]._asdict().keys())
-        #          peor_p = pos_df.sort_values(by='profit').iloc[0]['ticket']
-        #          log(f"🆘 ESCUDO DE MARGEN: Liquidando #{peor_p} para liberar aire. Margen: {acc.margin_level:.1f}%")
-        #          close_ticket(peor_p, "MARGIN_RESCUE")
-        #          return None 
-        
-        # v39.1: FRENO PROACTIVO POR MARGEN (Eliminado a petición del JEFE)
-        # El bot ya NO dejará de disparar por margen bajo. 
 
-        # v39.4: LIMITADOR DE CARGADOR ENJAMBRE (ORDEN DEL JEFE)
-        limit = 10 # Limite estricto de 10 abejas para capital de $200
-        
-        if len(pos_list) >= limit:
-            if now % 60 < 1: log(f"🐝 ENJAMBRE LLENO: {len(pos_list)}/{limit} abejas activas.")
+        # v39.2: ESCUDO DE MARGEN DESACTIVADO POR ORDEN DEL COMANDANTE
+        # v39.1: FRENO PROACTIVO POR MARGEN (Eliminado a petición del JEFE)
+        # El bot ya NO dejará de disparar por margen bajo.
+
+        # v39.4: LIMITADOR DE CARGADOR ENJAMBRE — Gestionado por effective_max más abajo.
+        # (Doble bloqueo eliminado v41.6)
+        if len(pos_list) >= 10: # Techo de seguridad absoluto (nunca más de 10 en ningún caso)
+            if now % 60 < 1: log(f"🐝 TECHO ABSOLUTO: {len(pos_list)}/10 balas. Esperando cierre.")
             return None
             
         now_dt = datetime.fromtimestamp(now)
@@ -1940,10 +1943,11 @@ def process_symbol_task(sym, active, mission_state):
         # --- GESTIÓN DE RIESGO ADAPTATIVA v18.9.103 (Ubicación Proactiva) ---
         balance = acc.balance if acc else 0
         current_max_bullets, smart_lot = get_adaptive_risk_params(balance, conf, rsi_val, sym)
-        # v18.11.995: RÁFAGA HFT HABILITADA (Comandante Mode)
-        # Bajamos de 3s a 0.2s para permitir entradas tipo 'metralleta' en ballenas.
+        # v39.5: SISTEMA DE DESPLIEGUE TÁCTICO (GRID)
+        # Eliminada la metralleta ridícula de 0.2s. En cambio usamos espaciado de Puntos/Pips.
         last_fire_ts = STATE.get(f"firing_{sym}", 0)
-        if (now - last_fire_ts) < 0.2: 
+        # Reducimos el spam de log limitando el bloqueo por tiempo a solo 1s para procesado seguro
+        if (now - last_fire_ts) < 1.0: 
             return None 
 
 
@@ -2014,6 +2018,13 @@ def process_symbol_task(sym, active, mission_state):
                 razones.append(f"IA:SELL({conf_pred*100:.0f}%)")
                 ia_dir = "SELL"
             
+            # --- ANÁLISIS TÉCNICO VANGUARDIA (Híbrido v21.0) ---
+            # Extraer tendencias macro para ponderación
+            rates_h1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 10)
+            h1_trend = "NONE" # Default fallback
+            if rates_h1 is not None and len(rates_h1) > 0:
+                h1_trend = "BUY" if rates_h1['close'][-1] > pd.Series(rates_h1['close']).ewm(span=20).mean().iloc[-1] else "SELL"
+
             # VOTO 2: Momentum 1 min (delta corto)
             rates_1m = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
             if rates_1m is not None and len(rates_1m) >= 2:
@@ -2096,41 +2107,41 @@ def process_symbol_task(sym, active, mission_state):
 
             # === NÚCLEO DE CÁLCULO TITAN v7.91 ===
             # Extraer tendencias macro para ponderación
-            rates_h1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 10)
-            h1_trend = "NONE"
-            if rates_h1 is not None and len(rates_h1) > 0:
-                h1_trend = "BUY" if rates_h1['close'][-1] > pd.Series(rates_h1['close']).ewm(span=20).mean().iloc[-1] else "SELL"
+            if 'h1_trend' not in locals(): # Por si no se definió arriba
+                rates_h1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 0, 10)
+                h1_trend = "NONE"
+                if rates_h1 is not None and len(rates_h1) > 0:
+                    h1_trend = "BUY" if rates_h1['close'][-1] > pd.Series(rates_h1['close']).ewm(span=20).mean().iloc[-1] else "SELL"
             
-            # v17.6: REGLA DE ORO - PROHIBIDO IR CONTRA LA CORRIENTE
-            # v18.9.85: EXCEPCIÓN IA (Alta Confianza > 80% Bypassea Tendencia)
-            conf_ia = conf # de predecir()
-            skip_current_veto = conf_ia >= 0.80
-            
-            if not skip_current_veto:
-                if m5_trend_dir == "SELL": 
-                    votos_buy = 0; razones.append("VETO:M5_BAJISTA")
-                elif m5_trend_dir == "BUY": 
-                    votos_sell = 0; razones.append("VETO:M5_ALCISTA")
+            # v41.6: SISTEMA DE VOTOS M5 RESTAURADO (Scalping puro, sin veto H1 absoluto)
+            # H1 solo es informativo. La decisión la toman los votos ponderados.
+            conf_ia = conf
+            skip_m5_weight = conf_ia >= 0.80 # Si la IA tiene >80%, anula el peso de M5
+
+            if not skip_m5_weight:
+                if m5_trend_dir == "SELL":
+                    votos_buy = max(0, votos_buy - 1.0); razones.append("M5W:BAJA")
+                elif m5_trend_dir == "BUY":
+                    votos_sell = max(0, votos_sell - 1.0); razones.append("M5W:SUBE")
             else:
                 razones.append("IA_OVERRIDE:⚡")
-            
+
             tot = votos_buy + votos_sell
             if not is_oracle_signal:
-                if tot > 0: 
+                if tot > 0:
                     s_buy = votos_buy / tot
                     s_sell = votos_sell / tot
-                    if s_buy > 0.58: # Umbral más alto para mayor rigor
-                        sig = "BUY"; conf = min(0.5 + s_buy*0.5, 0.98)
+                    if s_buy > 0.58:
+                        sig = "BUY"; conf = min(0.5 + s_buy * 0.5, 0.98)
                     elif s_sell > 0.58:
-                        sig = "SELL"; conf = min(0.5 + s_sell*0.5, 0.98)
-                    else: sig = "HOLD"; conf = 0.0
-                else: 
+                        sig = "SELL"; conf = min(0.5 + s_sell * 0.5, 0.98)
+                    else:
+                        sig = "HOLD"; conf = 0.0
+                else:
                     sig = "HOLD"; conf = 0.0
             else:
-                # v18.9.122: Si es señal de Oráculo, NO tocar 'sig' ni 'conf'
-                pass
+                pass  # Oráculo manda. No tocar sig ni conf.
 
-            
             # v15.6: Capturar señal pura de indicadores antes de influencia IA
             council_sig = sig
 
@@ -2254,12 +2265,22 @@ def process_symbol_task(sym, active, mission_state):
                 SMOOTH_CONF[sym] = conf
 
         # === PRE-PROCESAMIENTO DE SEÑAL VANGUARDIA ===
+        
+        # 🔥 MODO GUERRA: INTERCEPTACIÓN BÉLICA 🔥
+        if WAR_MODE_BUY_ONLY:
+            if sig == "SELL":
+                sig = "HOLD"
+            elif sig == "BUY":
+                is_oracle_signal = True # Bypass total al Oráculo
+                conf = 0.99             # Confianza Absoluta
+                
         # Capturamos la intención original antes de los filtros físicos
         intent_sig = sig
         intent_conf = conf
         
         # (Push notifications movidas al final para consistencia)
 
+        # v34.1: FILTRO DE CALIDAD INSTITUCIONAL (No Oracle = No Play sin consenso)
         # v34.1: FILTRO DE CALIDAD INSTITUCIONAL (No Oracle = No Play sin consenso)
         if not is_oracle_signal:
             m5_align = (sig == "BUY" and m5_trend_dir == "BUY") or (sig == "SELL" and m5_trend_dir == "SELL")
@@ -2376,7 +2397,7 @@ def process_symbol_task(sym, active, mission_state):
             
             # --- v15.36: FILTRO DE SEGURIDAD RSI (SENTINEL) ---
             # EXCEPCIÓN: Si es CONTRAGOLPE, ignoramos el Sentinel porque buscamos la reversión.
-            if not contragolpe_active:
+            if True: # MODO PERRO RABIOSO (ACTIVO EN DEMO): Cero veto por RSI para cazar todo el rebote.
                 if sig == "BUY" and rsi_val > 75:
                     block_action = True; block_reason = "RSI SOBRECOMPRADO (TECHO)"
                 elif sig == "SELL" and rsi_val < 25:
@@ -2402,14 +2423,16 @@ def process_symbol_task(sym, active, mission_state):
         # v18.8: Conteo físico preservado de la inicialización
         # n_balas_reales ya viene definido desde el inicio de la tarea
         
-        # v39.4: CARGADOR ENJAMBRE (CAPACIDAD HFT)
-        # 0.01 siempre, pero con volumen masivo de posiciones para sumar miles de puntos.
-        if balance > 300:
-            effective_max = 50 # Enjambre masivo
+        # v39.4: CARGADOR ENJAMBRE (CAPACIDAD HFT) - v41.3: SINCRO SEGURIDAD $200
+        # 0.01 siempre, pero con volumen táctico para sobrevivir a latigazos de 200 pips.
+        # v39.4: CARGADOR ENJAMBRE (CAPACIDAD HFT) - v41.4: MODO SOBREVIVIENTE $200
+        # 0.01 siempre. Límite de 8 balas para que el flotante no ahorque el balance.
+        if balance > 350:
+            effective_max = 15 # Enjambre controlado
         elif balance > 150:
-            effective_max = 25 # Enjambre táctico
+            effective_max = 8  # Límite estricto de 8 balas (0.08 lotes) - RECOMENDADO JEFE
         else:
-            effective_max = 12 # Enjambre de rescate
+            effective_max = 4  # Enjambre de rescate extremo
         
         # El balance define el límite maestro (Constitución v18.9.103)
         user_max_bullets = effective_max
@@ -2431,11 +2454,36 @@ def process_symbol_task(sym, active, mission_state):
         elif margin_level > 0 and margin_level < MIN_MARGIN_LEVEL:
             block_action = True
             block_reason = f"MARGEN CRÍTICO ({margin_level:.1f}%)"
+            
+        # === v39.5: MALLA DE SEGURIDAD (GRID SPACING) ===
+        # v41.6: 30 Puntos (3 Pips). Balance entre frecuencia y cobertura.
+        grid_spacing = 30 * mt5.symbol_info(sym).point
+            
+        if WAR_MODE_BUY_ONLY:
+            grid_spacing = 50 * mt5.symbol_info(sym).point # 50 puntos (5 pips) de margen de guerra
+
+        if not block_action and n_balas_reales > 0:
+            for p in pos_list:
+                # Si queremos comprar (reflotar), el precio tiene que haber CAYDO al menos el grid_spacing
+                if target_sig == "BUY" and p.type in [mt5.POSITION_TYPE_BUY, mt5.ORDER_TYPE_BUY]:
+                    if (p.price_open - curr_price) < grid_spacing:
+                        block_action = True
+                        block_reason = f"MALLA GRID: Muy cerca de Bala BUY ({p.price_open})"
+                        break
+                # Si queremos vender, el precio tiene que haber SUBIDO el grid_spacing respecto a otra venta
+                elif target_sig == "SELL" and p.type in [mt5.POSITION_TYPE_SELL, mt5.ORDER_TYPE_SELL]:
+                    if (curr_price - p.price_open) < grid_spacing:
+                        block_action = True
+                        block_reason = f"MALLA GRID: Muy cerca de Bala SELL ({p.price_open})"
+                        break
 
         # === v18.9.750: GATILLO DE DIOS (GOD MODE) - FILTRO ANTI-SUICIDIO ORO ===
         min_whale_vol = 18000 if "XAU" in sym else 50000 
         is_god_entry = is_oracle_signal and oracle_volume >= min_whale_vol
         
+        if WAR_MODE_BUY_ONLY and intent_sig == "BUY":
+            is_god_entry = True # MODO GUERRA ES MODO DIOS AUTOMÁTICO
+
         # v18.10.300: SILENCIAR RUIDO BTC
         if not is_god_entry and oracle_volume < 1000 and "BTC" in sym:
             is_oracle_signal = False # Es solo un latido de vida
@@ -3178,21 +3226,24 @@ def process_symbol_task(sym, active, mission_state):
                         if not tick: return
                         price = tick.ask if target_sig == "BUY" else tick.bid
                         
-                        # v39.4: MODO METRALLETA ENJAMBRE (0.15 dist)
-                        # Reducido para permitir la ráfaga de $1100/día que el Comandante conoce.
-                        base_dist = 0.15 if "XAU" in sym else (10.0 if "BTC" in sym else 0.10)
-                        # Stacking controlado: Si hay confianza > 85%, permitimos entrar más cerca
-                        dist_min = base_dist / 2 if conf > 0.85 else base_dist
+                        # v39.5: MALLA TÁCTICA HFT COMPROBADA (Grid Spacing Físico)
+                        # Hemos descubierto que distancias de 0.07 o 0.15 vomitan el cargador en un solo mini-latigazo.
+                        # Para Oro, la separación MÍNIMA entre balas ahora es un colchón de volatilidad real (50 puntos / 0.50 usd).
+                        base_dist = 0.50 if "XAU" in sym else (50.0 if "BTC" in sym else 0.20)
+                        dist_min = base_dist 
                         
                         too_close = False
                         for p in pos_list:
-                            dist_to_pos = abs(price - p.price_open)
-                            if dist_to_pos < dist_min: 
-                                too_close = True
-                                break
+                            # Solo medimos distancia contra balas de nuestra misma dirección
+                            if (target_sig == "BUY" and p.type in [mt5.POSITION_TYPE_BUY, mt5.ORDER_TYPE_BUY]) or \
+                               (target_sig == "SELL" and p.type in [mt5.POSITION_TYPE_SELL, mt5.ORDER_TYPE_SELL]):
+                                dist_to_pos = abs(price - p.price_open)
+                                if dist_to_pos < dist_min: 
+                                    too_close = True
+                                    break
                     
                         if too_close:
-                            if now % 10 < 1: log(f"⏳ ZONA PROHIBIDA: Precio demasiado cerca de bala existente. Esperando espacio...")
+                            if now % 10 < 1: log(f"⏳ MALLA PUESTA: Precio a {dist_to_pos:.2f} de una bala. Esperando {dist_min:.2f} mínimo dist...")
                             return
                     
                         # v39.4: REGLA DE ORO (0.01 SIEMPRE)
@@ -3387,10 +3438,15 @@ def metralleta_loop():
                     max_b = current_open_pnl
                 
                 secure_b = -999.0
-                if max_b >= 20.0:
-                    secure_b = (max_b // 10) * 10 - 10 # v38.1: Air de $10 USD para la canasta
-                elif max_b >= 10.0:
-                    secure_b = 2.0 # Primer escalón: a los $10 asegura solo $2 para dar mucho aire
+                if max_b >= 50.0:
+                    # Trailing Stop Piramidal (50, 100, 150, 200...)
+                    escalon = max_b // 50.0
+                    if escalon == 1:
+                        secure_b = 25.0 # En $50, aseguramos $25 (aire de $25)
+                    else:
+                        secure_b = (escalon - 1) * 50.0 # En 100 asegura 50 | En 150 asegura 100 | En 200 asegura 150
+                elif max_b >= 20.0:
+                    secure_b = 5.0 # Si no llega a 50, rescatamos algo de ganancias.
                 
                 if current_open_pnl <= secure_b and len(open_positions) > 0:
                     log(f"🧺 ESCUDO DE CANASTA: Asegurando ${current_open_pnl:.2f} (Pico: ${max_b:.2f})")
@@ -3413,6 +3469,22 @@ def metralleta_loop():
                         if profit <= limit_hs:
                             log(f"🚨 CORTE ADAPTATIVO: #{p.ticket} alcanzó límite {limit_hs:.2f} (ATR: {current_atr:.2f})")
                             close_ticket(p, "ADAPTIVE_EXIT_v32"); continue
+                            
+                        # === v41.0: EXTERMINIO POR TSUNAMI (Corte Rápido del Jinete) ===
+                        # No desangrarse hasta -$25 si el Jinete ve 1000 puntos de cascada en contra.
+                        if profit <= -5.00:
+                            rates_m1 = mt5.copy_rates_from_pos(p_sym, mt5.TIMEFRAME_M1, 0, 3)
+                            if rates_m1 is not None and len(rates_m1) >= 3:
+                                s_info = mt5.symbol_info(p_sym)
+                                if s_info:
+                                    move_pts = (rates_m1['close'][-1] - rates_m1['open'][0]) / s_info.point
+                                    is_against_buy = (p.type in [mt5.ORDER_TYPE_BUY, mt5.POSITION_TYPE_BUY]) and (move_pts < -800)
+                                    is_against_sell = (p.type in [mt5.ORDER_TYPE_SELL, mt5.POSITION_TYPE_SELL]) and (move_pts > 800)
+                                    
+                                    if is_against_buy or is_against_sell:
+                                        log(f"🌊 TSUNAMI PANIC: {p_sym} aplastando. Jinete cortando sangría en ${profit:.2f}")
+                                        close_ticket(p, "TSUNAMI_PANIC_v41")
+                                        continue
                             
                         # v31.10: Micro-Veto (Blindaje desde $1.10)
                         pico_pnl = PNL_MEMORIA.get(f"PIK_{p.ticket}", 0.0)
