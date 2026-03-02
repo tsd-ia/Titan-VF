@@ -2477,7 +2477,35 @@ def process_symbol_task(sym, active, mission_state):
                         block_reason = f"MALLA GRID: Muy cerca de Bala SELL ({p.price_open})"
                         break
 
-        # === v18.9.750: GATILLO DE DIOS (GOD MODE) - FILTRO ANTI-SUICIDIO ORO ===
+        # === v41.6: RE-ENTRADA TÁCTICA POST-CIERRE (IDEA DEL JEFE) ===
+        # Si acabamos de cerrar con ganancia y el Oráculo + M1 siguen empujando en la misma dirección,
+        # bypassear la malla y disparar 1 bala de prueba sin esperar los 3 pips de separación.
+        # Lógica: "Cerraste, ganaste, el tren sigue. Salta de nuevo. 1 bala. Si confirma, más."
+        if block_action and "MALLA" in block_reason:
+            ultima_razon_cierre = LAST_CLOSE_REASON.get(sym, "")
+            ultima_dir_cierre   = LAST_CLOSE_DIR.get(sym, "")
+            tiempo_desde_cierre = now - LAST_CLOSE_TIME.get(sym, 0)
+            
+            cierres_ganadores = ["PARACHUTE", "WHIPSAW", "BASKET_TRAIL", "GUARDIAN", "RATCHET"]
+            fue_cierre_ganador = any(r in ultima_razon_cierre for r in cierres_ganadores)
+            
+            if fue_cierre_ganador and ultima_dir_cierre == sig and 1 < tiempo_desde_cierre < 10:
+                # Confirmar con M1: el precio sigue moviéndose en esa dirección
+                delta_1m_local = 0.0
+                rates_1m_re = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
+                if rates_1m_re is not None and len(rates_1m_re) >= 2:
+                    delta_1m_local = rates_1m_re[-1]['close'] - rates_1m_re[-2]['close']
+                
+                m1_confirma = (sig == "BUY" and delta_1m_local > 0.05) or \
+                              (sig == "SELL" and delta_1m_local < -0.05)
+                
+                if m1_confirma and n_balas_reales <= 2: # Max 2 balas activas para la re-entrada
+                    block_action = False
+                    block_reason = ""
+                    razones.append(f"RE-ENTRADA:{ultima_razon_cierre[:8]}")
+                    log(f"🎯 RE-ENTRADA TÁCTICA: Post-{ultima_razon_cierre} ({tiempo_desde_cierre:.1f}s). M1={delta_1m_local:+.2f}. 1 Bala de Prueba.")
+
+
         min_whale_vol = 18000 if "XAU" in sym else 50000 
         is_god_entry = is_oracle_signal and oracle_volume >= min_whale_vol
         
