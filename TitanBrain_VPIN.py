@@ -2571,12 +2571,20 @@ def process_symbol_task(sym, active, mission_state):
         # if "SOL" in sym:
         #     block_action = False
         
-        # v43.4: VETO TENDENCIA INVIOLABLE (Sniper 100%)
+        # v43.7.3: AGRESIVIDAD TENDENCIAL (Para recuperar cuenta)
         if not contragolpe_active and not is_exploring and target_sig != "HOLD":
             if (target_sig == "BUY" and m5_trend_dir == "SELL") or (target_sig == "SELL" and m5_trend_dir == "BUY"):
-                # No importa la confianza, si la tendencia mayor va en contra, NO SE ENTRA.
-                block_action = True
-                block_reason = f"VETO TENDENCIA M5: Sniper Prohíbe ir contra {m5_trend_dir}"
+                # Si vamos EN CONTRA de la tendencia M5, exigimos el 90%
+                if conf < 0.90:
+                    block_action = True
+                    block_reason = f"VETO TENDENCIA M5: Sniper requiere 90% para ir contra {m5_trend_dir}"
+            else:
+                # Si vamos A FAVOR de la tendencia M5, bajamos a 75% para entrar ya!
+                if conf < 0.75:
+                    block_action = True
+                    block_reason = f"VETO TENDENCIA M5: A favor requiere 75% (Conf: {conf*100:.1f}%)"
+                else:
+                    block_action = False # LIBERADO PARA CAZAR
         
         # --- SUELO DE CRISTAL Y MOMENTUM M1 (VETO RIGUROSO ORO) ---
         if target_sig != "HOLD" and ("XAU" in sym or "Gold" in sym):
