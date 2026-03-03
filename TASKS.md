@@ -1,19 +1,18 @@
-# 🗺️ TITAN ROADMAP - COMMANDER RELOADED (v47.9.80)
-**Estado:** ESTRATEGIA ICT ACTIVADA - EL ADN DEL TRADER 🦅🎯
+# 🗺️ TITAN ROADMAP - COMMANDER RELOADED (v47.9.85)
+**Estado:** MODO METRALLETA ICT - FUEGO DE COBERTURA 🦅🔫
 **Equidad Actual:** $290.00 USD (Hito Histórico: $29 -> $290)
-**Misión:** Caza de liquidez H1 con ejecución M1 (Sweep + MSS + FVG).
+**Misión:** Saturación ICT con diferenciación FX/Gold y simulación Tick-a-Tick.
 
 ## 🏆 HITOS DE GUERRA
-- [x] **v40.x - v47.x:** Construcción de la arquitectura ICT. ✅
-- [x] **v47.9.77:** **RÁFAGA $290** - 582 operaciones en un día. ✅
-- [!] **v47.9.80:** **DEPURACIÓN TÁCTICA** - VPIN descartado por ruido. Transición total a ICT Prof. 🛡️
+- [x] **v47.9.80:** Transición total a ICT Prof. ✅
+- [!] **v47.9.85:** **AJUSTE METRALLETA** - Ráfagas Gold (x2) y FX (x3). Cosecha 1.50/0.50 activa. 🛡️
 
 ## 📋 TAREAS EN CURSO
-1. [ ] **Muelle de Liquidez (H1):** Implementar radar de máximos/mínimos de la vela H1 anterior. �
-2. [ ] **Gatillo ICT (M1):** Lógica triple: Barrido (Sweep) + Cambio de Estructura (MSS) + Entrada en FVG. ⚡
-3. [ ] **Killzones Tácticas:** Restringir operaciones a Londres (04-08) y NY (09:30-12:30 Chile). ⏰
-4. [ ] **Cosecha Boss:** Bloqueo de $1.00 real al llegar a $2.00 profit. 💰
-5. [ ] **Blindaje Exness:** Forzar `IOC` y `deviation=100` en todo el flujo ICT. �
+1. [ ] **Diferenciación FX/Gold:** Oro (0.01) vs FX (0.02 / Salidas rápidas). 💱
+2. [ ] **Cosecha & Trailing:** Lock $0.50 al llegar a $1.50 + Trailing Stop prudente. 💰
+3. [ ] **Modo Metralleta:** Aumentar frecuencia de disparos en alineación M1. 🔫
+4. [ ] **Simulación de Guerra:** Pruebas diarias Tick-a-Tick (Horas Trader vs 24h). 🧪
+5. [ ] **Dashboard Ultra HD:** Diferenciar rendimiento por tipo de activo. 🖥️
 
 ---
-*Reporte de Guerra: VPIN fuera de servicio por exceso de ruido. Iniciamos caza institucional basada en el ADN del Trader. Solo se opera donde hay liquidez real.* 🦅🔥
+*Reporte de Guerra: El Comandante exige volumen de fuego. Ajustamos el gatillo ICT para que sea una metralleta institucional. Oro para el botín, FX para el flujo constante.* 🦅🔥
