@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.99 (ANTIVENGANZA) ---
-VERSION = "v47.9.99"
-BRANDING = "🦅 TITAN ICT: BOZAL MECÁNICO (ANTIVENGANZA)"
+# --- CONFIGURACIÓN TITAN v47.9.100 (STORM PYRAMID) ---
+VERSION = "v47.9.100"
+BRANDING = "🦅 TITAN ICT: STORM PYRAMID (2+2+2)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -20,8 +20,9 @@ HARVEST_LOCK = 1.0         # Bloquear $1.00
 TRAILING_STEP = 0.2        # Mover SL cada $0.20 extra
 RR_RATIO = 1.0             # Ratio para Profit de $25 (con SL de 2500 pts)
 MAX_BULLETS = 6            # Límite STORM
-MAGIC = 47990              # Magic v47.9.99
-COOLDOWN_TIME = 1800       # 30 minutos en segundos
+MAGIC = 48100              # Magic v47.100
+COOLDOWN_TIME = 1800       # 30 minutos
+REINFORCE_PROFIT = 1.50    # Gatillo de refuerzo
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
@@ -119,7 +120,7 @@ def init_mt5():
             STATE["active_symbols"].append(found)
             STATE["symbols_data"][found] = {
                 "status":"VIGIL", "h1_high":0, "h1_low":0, "pnl": 0.0, "pos": 0, "spread": 0,
-                "sweep": False, "last_trade": 0, "type": get_asset_type(found)
+                "sweep": False, "last_trade": 0, "last_reinf": 0, "type": get_asset_type(found)
             }
     return len(STATE["active_symbols"]) > 0
 
@@ -167,27 +168,40 @@ def main_loop(mode_24h=False):
                         if sweep_buy and tick.bid > rates_m1[-2]['high']: mss_ok = True
                         elif sweep_sell and tick.ask < rates_m1[-2]['low']: mss_ok = True
                     
-                    # Disparo si hay giro (MSS) y no superamos balas
-                    if mss_ok and len(sym_pos) < MAX_BULLETS and (time.time() - s_d["last_trade"] > 3):
+                    # A. VANGUARDIA (Disparo Inicial)
+                    if mss_ok and len(sym_pos) == 0 and (time.time() - s_d["last_trade"] > 3):
                         side = "BUY" if sweep_buy else "SELL"
                         sl_pts = cfg["sl_points"] * s_i.point
-                        
                         sl = tick.bid - sl_pts if side=="BUY" else tick.ask + sl_pts
-                        # Ajuste de TP Dinámico (Más corto en FX)
                         tp_pts = sl_pts * (1.5 if asset_type=="FX" else RR_RATIO)
                         tp = tick.bid + tp_pts if side=="BUY" else tick.ask - tp_pts
                         
                         for _ in range(cfg['burst']):
-                            res = mt5.order_send({
+                            mt5.order_send({
                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
                                 "sl": float(round(sl, s_i.digits)), "tp": float(round(tp, s_i.digits)),
-                                "magic": MAGIC, "comment": f"TITAN_{asset_type}_MET",
+                                "magic": MAGIC, "comment": "STORM_VANG",
                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
                             })
-                            if res.retcode == mt5.TRADE_RETCODE_DONE: 
-                                add_log_dash(f"🔫 {sym} {side} ráfaga x{cfg['burst']} | {asset_type} | MSS OK")
-                                s_d["last_trade"] = time.time()
+                        add_log_dash(f"🏹 {sym} VANGUARDIA SOLTADA")
+                        s_d["last_trade"] = time.time()
+
+                    # B. REFUERZOS STORM (Pirámide 2+2)
+                    elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
+                        current_pnl = sum(p.profit for p in sym_pos)
+                        if current_pnl >= REINFORCE_PROFIT and (time.time() - s_d["last_reinf"] > 10):
+                            side = "BUY" if sym_pos[0].type == 0 else "SELL"
+                            for _ in range(2):
+                                mt5.order_send({
+                                    "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                                    "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                                    "sl": sym_pos[0].sl, "tp": sym_pos[0].tp,
+                                    "magic": MAGIC, "comment": "STORM_REINF",
+                                    "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
+                                })
+                            add_log_dash(f"🚀 {sym} REFUERZOS STORM (+2)")
+                            s_d["last_reinf"] = time.time()
                 else:
                     s_d["status"] = "HUNTER" if len(sym_pos) == 0 else "WAR"
 
