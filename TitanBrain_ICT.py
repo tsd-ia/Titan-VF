@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.100 (STORM PYRAMID) ---
-VERSION = "v47.9.100"
-BRANDING = "🦅 TITAN ICT: STORM PYRAMID (2+2+2)"
+# --- CONFIGURACIÓN TITAN v47.9.105 (ESCUDO SINCRONIZADO) ---
+VERSION = "v47.9.105"
+BRANDING = "🦅 TITAN ICT: ESCUDO SINCRONIZADO (ANTI-MUERTE)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -20,9 +20,9 @@ HARVEST_LOCK = 1.0         # Bloquear $1.00
 TRAILING_STEP = 0.2        # Mover SL cada $0.20 extra
 RR_RATIO = 1.0             # Ratio para Profit de $25 (con SL de 2500 pts)
 MAX_BULLETS = 6            # Límite STORM
-MAGIC = 48100              # Magic v47.100
+MAGIC = 48105              # Magic v47.105
 COOLDOWN_TIME = 1800       # 30 minutos
-REINFORCE_PROFIT = 1.50    # Gatillo de refuerzo
+REINFORCE_PROFIT = 3.0     # Profit para buscar refuerzos (agrupado)
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
@@ -187,10 +187,13 @@ def main_loop(mode_24h=False):
                         add_log_dash(f"🏹 {sym} VANGUARDIA SOLTADA")
                         s_d["last_trade"] = time.time()
 
-                    # B. REFUERZOS STORM (Pirámide 2+2)
+                    # B. REFUERZOS STORM (Sincronizados con BE)
                     elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
                         current_pnl = sum(p.profit for p in sym_pos)
-                        if current_pnl >= REINFORCE_PROFIT and (time.time() - s_d["last_reinf"] > 10):
+                        # SOLO REFORZAR SI: 1. Hay profit, 2. Ya pasaron 10s, 3. TODAS tienen SL (Están protegidas)
+                        all_protected = all(p.sl != 0 for p in sym_pos)
+                        
+                        if current_pnl >= REINFORCE_PROFIT and all_protected and (time.time() - s_d["last_reinf"] > 10):
                             side = "BUY" if sym_pos[0].type == 0 else "SELL"
                             for _ in range(2):
                                 mt5.order_send({
@@ -200,7 +203,7 @@ def main_loop(mode_24h=False):
                                     "magic": MAGIC, "comment": "STORM_REINF",
                                     "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
                                 })
-                            add_log_dash(f"🚀 {sym} REFUERZOS STORM (+2)")
+                            add_log_dash(f"🚀 {sym} REFUERZOS PROTEGIDOS (+2)")
                             s_d["last_reinf"] = time.time()
                 else:
                     s_d["status"] = "HUNTER" if len(sym_pos) == 0 else "WAR"
