@@ -1414,7 +1414,7 @@ def print_dashboard(report_list, elapsed_str="00:00:00"):
     
     limit_drop = abs(MAX_SESSION_LOSS)
 
-    lines.append(f" 🛡️ TITAN v46.6 | TELÉGRAFO ESTRATÉGICO ACTIVO | PORT: {PORT}")
+    lines.append(f" 🛡️ TITAN v46.7 | ATAQUE EN VOLATILIDAD EXTREMA | PORT: {PORT}")
     lines.append(st_line)
     # v18.9.113: FIX ATRIBUTO SYMBOL
     target_tick_sym = "XAUUSDm"
@@ -3408,9 +3408,9 @@ def metralleta_loop():
             market_inestable = False
             pausa_reason = ""
             
-            if m_speed > 80.0:
+            if m_speed > 250.0: # v46.7: Aumentado de 80 a 250 para libertad absoluta
                 market_inestable = True
-                pausa_reason = f"LATIGAZO VIOLENTO (${m_speed:.1f}/m)"
+                pausa_reason = f"LATIGAZO EXTREMO (${m_speed:.1f}/m)"
             elif LAST_LATENCY > 1500:
                 market_inestable = True
                 pausa_reason = f"LATENCIA CRÍTICA ({LAST_LATENCY:.0f}ms)"
@@ -3419,9 +3419,9 @@ def metralleta_loop():
             tick_gold = mt5.symbol_info_tick("XAUUSDm")
             if tick_gold:
                 s_pts = (tick_gold.ask - tick_gold.bid) / 0.01 # Puntos Oro
-                if s_pts > 68: # v43.8: Ajustado para Exness (Spreads de 50-60 son normales)
+                if s_pts > 150: # v46.7: Aumentado de 68 a 150 para Exness en caos
                     market_inestable = True
-                    pausa_reason = f"SPREAD PROHIBITIVO ({s_pts:.0f} pts)"
+                    pausa_reason = f"SPREAD CRÍTICO ({s_pts:.0f} pts)"
 
             # === v43.9: CEREBRO DE ACERO (Regímenes Sólidos) ===
             # Evitamos el "Jitter" (oscilación idiota) con un candado de 2 minutos.
@@ -3447,15 +3447,14 @@ def metralleta_loop():
                     STATE["last_regime_shift"] = now
                     log("🛡️ RÉGIMEN INESTABLE: Modo SNIPER anclado por 2 min.")
             
-            # El Watchdog de Estabilidad v43.6 sigue actuando sobre market_inestable
+            # El Watchdog de Estabilidad v43.6 reporta pero NO bloquea (v46.7)
             if market_inestable:
                 last_pausa_log = STATE.get("last_pausa_log", 0)
                 if now - last_pausa_log > 45.0: # Cada 45s para no spamear
-                    log(f"🛑 MODO VIGILANCIA: Sniper pausado por {pausa_reason}. Protegiendo capital...")
+                    log(f"⚠️ MERCADO AGITADO: Operando bajo {pausa_reason}. Riesgo de slippage.")
                     STATE["last_pausa_log"] = now
                 STATE["market_was_unstable"] = True
-                time.sleep(2)
-                continue
+                # Eliminado el 'continue' para permitir disparar en caos
             
             # Mensaje de Reanudación
             if STATE.get("market_was_unstable", False):
@@ -4236,7 +4235,7 @@ import uvicorn
 # For example:
 # NOTIFICATION_QUEUE = [] 
 
-app = FastAPI(title="TITAN BRIDGE AI v46.6", version="46.6.0")
+app = FastAPI(title="TITAN BRIDGE AI v46.7", version="46.7.0")
 
 app.add_middleware(
     CORSMiddleware,
