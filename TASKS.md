@@ -5,7 +5,8 @@
 
 ## 🏆 HITOS DE GUERRA
 - [x] **v47.9.80:** Transición total a ICT Prof. ✅
-- [!] **v47.9.85:** **AJUSTE METRALLETA** - Ráfagas Gold (x2) y FX (x3). Cosecha 1.50/0.50 activa. 🛡️
+- [x] **v47.9.90:** **SIMULACIÓN GANADORA** - Balance +$28 con SL $10.00 en Oro. ✅
+- [!] **v47.9.90:** **BLINDAJE TOTAL** - Desplegado SL $10 (Gold) y $5 (FX). 🛡️
 
 ## 📋 TAREAS EN CURSO
 1. [ ] **Diferenciación FX/Gold:** Oro (0.01) vs FX (0.02 / Salidas rápidas). 💱
