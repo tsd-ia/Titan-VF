@@ -25,9 +25,12 @@
 - [x] **v43.4:** **Exterminio de Hedge**: Prohibición de posiciones contrarias y Veto M5 Absoluto.
 - [x] **v43.8.1:** **Rescate de Cuenta**: Spread 68 (Exness OK) y Confianza 70% (Recuperación).
 - [x] **v46.0 - v46.7:** **Ataque en Caos**: Eliminación de bloqueos por "Latigazo" y Spread. El bot disparará incluso en máxima volatilidad por orden directa.
+- [/] **v47.0 (Siguiente):** **Cerebro Institucional (ICT)**: Implementación de detección de FVG (Fair Value Gaps) y barrido de liquidez H1.
 
 ### 🛡️ Próximos Pasos:
-- [ ] Recuperar equidad hacia los `$150`.
+- [ ] Implementar detector de niveles H1 (Liquidity Sweeps).
+- [ ] Programar lógica de Fair Value Gap (FVG) en M1.
+- [ ] Refinar gatillo de entrada basado en desequilibrios institucionales.
 - [ ] Cazar tendencia M5 con el nuevo gatillo adaptativo.
 1. **Lote Fijo:** 0.01 lot siempre.
 2. **Capacidad:** Hasta 10 posiciones simultáneas para $200 de balance.
