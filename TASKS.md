@@ -27,6 +27,7 @@
 - [x] **v46.0 - v46.7:** **Ataque en Caos**: Eliminación de bloqueos por "Latigazo".
 - [x] **v47.0:** **Cerebro Institucional (ICT)**: Nueva arquitectura `TitanBrain_ICT.py`.
 - [x] **v47.0.1:** **Escudo 2+2+2**: Sistema de entrada escalada para proteger cuentas de bajo saldo.
+- [x] **v47.3.1:** **Ojo de Halcón Quirúrgico**: Breakeven al 30% y radar GBP/EUR/XAU integrado.
 
 ### 🛡️ Próximos Pasos (Caza de Ballenas):
 - [ ] Ejecución en vivo de `TitanBrain_ICT.py` (04:00 AM Chile).
