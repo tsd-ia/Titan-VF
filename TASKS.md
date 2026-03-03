@@ -4,8 +4,9 @@
 **Misión:** Saturación ICT con SL de $25.00 (Breathing Room) y Cosecha Boss.
 
 ## 🏆 HITOS DE GUERRA
-- [x] **v47.9.77:** **RÁFAGA $290** - Alcanzado pico histórico desde $29. ✅
-- [!] **v47.9.90:** **DRAWDOWN CRÍTICO** - Caída a $90 por falta de blindaje. ⚠️
+- [x] **v47.9.95:** **TEST DE SUPERVIVENCIA** - $290 -> $402 (+38%) con SL $25. ✅
+- [x] **v47.9.97:** **OPTIMIZACIÓN BOSS** - Variante Agresiva gana con BALANCE $610 (+110%). ✅
+- [!] **v47.9.97:** **DESPLIEGUE AGRESIVO** - Aplicando Cosecha $2.5/$1.0 y TP $25. 🛡️
 - [x] **v47.9.95:** **RECUPERACIÓN $132** - Iniciando contraataque con SL de respiro. 🏹
 
 ## 📋 TAREAS EN CURSO
