@@ -1,7 +1,7 @@
-# 🗺️ TITAN ROADMAP - MODO ENJAMBRE BLINDADO (v41.7)
-**Estado:** RECUPERACIÓN EN MARCHA 🟢🔥
-**Equidad Actual:** $154.27 USD (Recuperando desde $121)
-**Misión:** Recuperar base $200 y alcanzar +$100 de profit neto ($300 total).
+# 🗺️ TITAN ROADMAP - OPERACIÓN RESCATE (v47.0)
+**Estado:** MODO INSTITUCIONAL ACTIVADO 🦅🛡️
+**Equidad Actual:** $37.00 USD (Zona Crítica - Inicio de Recuperación)
+**Misión:** Recuperar base $100 y escalar a $1,000 mediante estrategia ICT.
 
 ## 🎯 Tareas Críticas
 - [x] **v40.5:** Restauración de Veto M5 (Prohibido operar contra tendencia mayor).
@@ -24,19 +24,18 @@
 - [x] **v43.3:** **Restauración de Orden**: SL a `$25.00` y Confianza Sniper al `85%`.
 - [x] **v43.4:** **Exterminio de Hedge**: Prohibición de posiciones contrarias y Veto M5 Absoluto.
 - [x] **v43.8.1:** **Rescate de Cuenta**: Spread 68 (Exness OK) y Confianza 70% (Recuperación).
-- [x] **v46.0 - v46.7:** **Ataque en Caos**: Eliminación de bloqueos por "Latigazo" y Spread. El bot disparará incluso en máxima volatilidad por orden directa.
-- [/] **v47.0 (Siguiente):** **Cerebro Institucional (ICT)**: Implementación de detección de FVG (Fair Value Gaps) y barrido de liquidez H1.
+- [x] **v46.0 - v46.7:** **Ataque en Caos**: Eliminación de bloqueos por "Latigazo".
+- [x] **v47.0:** **Cerebro Institucional (ICT)**: Nueva arquitectura `TitanBrain_ICT.py`.
+- [x] **v47.0.1:** **Escudo 2+2+2**: Sistema de entrada escalada para proteger cuentas de bajo saldo.
 
-### 🛡️ Próximos Pasos:
-- [ ] Implementar detector de niveles H1 (Liquidity Sweeps).
-- [ ] Programar lógica de Fair Value Gap (FVG) en M1.
-- [ ] Refinar gatillo de entrada basado en desequilibrios institucionales.
-- [ ] Cazar tendencia M5 con el nuevo gatillo adaptativo.
-1. **Lote Fijo:** 0.01 lot siempre.
-2. **Capacidad:** Hasta 10 posiciones simultáneas para $200 de balance.
-3. **Escudo Anti-Techos:** Veto estricto si el Momentum M1 es contrario a la señal de la IA o si el RSI está sobrecomprado/sobrevendido.
-4. **Resguardo Python:** Trailing Muro Dinámico. A partir de $3.50 de ganancia, asegura el 80% de todo recorrido extra. No devuelve beneficios.
-5. **No hay Cierre por Margen:** El bot nunca cerrará posiciones asumiendo pérdidas solo por margen bajo ($%). Se asume riesgo integral del Enjambre de 10.
-6. **Horario XAU:** Habilitado 06-17h y 21-23h (Chile). Bloqueo total el resto de horas.
+### 🛡️ Próximos Pasos (Caza de Ballenas):
+- [ ] Ejecución en vivo de `TitanBrain_ICT.py` (04:00 AM Chile).
+- [ ] Monitoreo de la primera "Sorpresa Agradable" (+$30 USD).
+- [ ] Auditoría de la primera semana de recuperación institucional.
 
-*Reporte de Batalla Histórico (Sin Supervisión): El bot superó los simuladores estáticos y logró ganar +$313 USD superando con éxito la volatilidad de la apertura americana (13:00 - 14:15 hrs).* 🫡🛡️📉🏁
+1. **Lote Fijo:** 0.01 lot inicial (Escalado 2+2+2).
+2. **Capacidad:** 6 posiciones simultáneas (Agotando el plan ganador).
+3. **Escudo ICT:** Solo entra si hay Sweep H1 + FVG M1.
+4. **Horario Militar:** 04:00 - 16:30 (Chile). Bloqueo total el resto de horas.
+
+*Reporte de Guerra: Se abandona el sistema de "Metralleta de Momentum" por el de "Cuchillo Institucional". Los $37 USD son el suelo desde el cual construiremos los $7,000 auditados.* 🫡🛡️📉🏁
