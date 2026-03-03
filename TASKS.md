@@ -5,8 +5,8 @@
 
 ## 🏆 HITOS DE GUERRA
 - [x] **v47.9.95:** **TEST DE SUPERVIVENCIA** - $290 -> $402 (+38%) con SL $25. ✅
-- [x] **v47.9.97:** **OPTIMIZACIÓN BOSS** - Variante Agresiva gana con BALANCE $610 (+110%). ✅
-- [!] **v47.9.97:** **DESPLIEGUE AGRESIVO** - Aplicando Cosecha $2.5/$1.0 y TP $25. 🛡️
+- [x] **v47.9.99:** **PROTOCOLO ANTIVENGANZA** - Enfriamiento de 30 min tras SL confirmado (+ $552). ✅
+- [!] **v47.9.99:** **BLOQUEO MECÁNICO** - Implementado cese de fuego automático post-pérdida. 🛡️
 - [x] **v47.9.95:** **RECUPERACIÓN $132** - Iniciando contraataque con SL de respiro. 🏹
 
 ## 📋 TAREAS EN CURSO
