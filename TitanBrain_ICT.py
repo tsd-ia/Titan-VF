@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.190 (MODO SUPERVIVENCIA) ---
-VERSION = "v47.9.190"
-BRANDING = "🛡️ ESCUDO VITAL ACTIVADO (MARGEN 500%)"
+# --- CONFIGURACIÓN TITAN v47.9.195 (COSECHA BLINDADA) ---
+VERSION = "v47.9.195"
+BRANDING = "🦅 TITAN ICT: SEPARACIÓN BE/TRAILING"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -138,15 +138,20 @@ def manage_positions(positions):
         # Detectar si el SL actual está en zona de riesgo (pérdida)
         is_risky = (p.type == 0 and p.sl < p.price_open) or (p.type == 1 and (p.sl == 0 or p.sl > p.price_open))
         
-        # 1. COSECHA INICIAL (Mover SL a terreno positivo una vez superado el trigger)
+        # 1. COSECHA INICIAL (PRIORIDAD ABSOLUTA)
         if profit_usd >= cfg["h_trigger"] and is_risky:
              # Calcular precio necesario para el lock inicial
              points_needed = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
              target_sl = p.price_open + points_needed if p.type == 0 else p.price_open - points_needed
-             mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
-             add_log_dash(f"💰 {p.symbol} BE PROTEGIDO ${cfg['h_lock']}")
+             
+             # Envío de orden de protección (BE)
+             res = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
+             if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                 add_log_dash(f"💰 {p.symbol} BE PROTEGIDO ${cfg['h_lock']}")
+             else:
+                 add_log_dash(f"⚠️ ERR BE {p.symbol}: {res.comment if res else 'Fail'}")
         
-        # 2. TRAILING STOP DINÁMICO (Solo si ya estamos en profit lock)
+        # 2. TRAILING STOP DINÁMICO (Solo si ya NO es arriesgado/BE activo)
         elif profit_usd >= (cfg["h_trigger"] + cfg["t_step"]) and not is_risky:
              current_sl_profit = (p.sl - p.price_open) * (s_i.trade_tick_value / s_i.point) * p.volume if p.type==0 else (p.price_open - p.sl) * (s_i.trade_tick_value / s_i.point) * p.volume
              if profit_usd - current_sl_profit > cfg["t_step"]:
