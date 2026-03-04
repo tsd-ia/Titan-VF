@@ -1,18 +1,17 @@
-# 🗺️ TITAN ROADMAP - COMMANDER RELOADED (v47.9.175)
-**Estado:** MODO H1-M1 UNIFICADO - PRECISIÓN TÁCTICA 🦅🛡️
-**Equidad Actual:** Recargando...
-**Misión:** Sesgo H1 + Gatillo M1 Sniper. SL Oro $10.00 / SL FX $15.00.
+# 🗺️ TITAN ROADMAP - MODO FÉNIX (v47.9.360)
+**Estado:** MODO BREAKOUT + ARTILLERÍA PESADA 🦅🛡️🔥
+**Equidad Actual:** Recuperando...
 
 ## 🏆 HITOS DE GUERRA
-- [x] **v47.9.130:** **ORO SNIPER** - SL fijo a $10.00 y ráfaga de 1. ✅
-- [x] **v47.9.160:** **VISIÓN H1** - Unificación de Sesgo macro H1 para todo el bot. ✅
-- [x] **v47.9.175:** **DASHBOARD DASH** - Sincronización completa de datos H1-M1 corregida. ✅
+- [x] **v47.9.350**: Implementar Estrategia Espejo (Breakout Trend). ✅
+- [x] **v47.9.360**: Liberar Artillería (6 Balas) y Modo Storm (10 Símbolos). ✅
+- [ ] **OBJETIVO**: Superar los $130 USD de balance inicial. 🎯
+- [ ] **MONITOREO**: Vigilancia de la "Lluvia de Balas" en breakouts de Oro. 🔎
 
-## 📋 TAREAS EN CURSO
-1. [x] **H1-M1 Sniper:** Sesgo H1 (EMA 21 + Estructura) para guiar M1. ✅
-2. [x] **FX Guerrilla:** Ráfagas de 3 posiciones sin asfixia de filtros. ✅
-3. [x] **Reparación Dash:** Eliminación de ceros y visualización de Bias. ✅
-4. [ ] **Fuego Selectivo:** Monitorear ráfagas de Oro con triple filtro (EMA+RSI). 🔫
+## 📋 PROTOCOLO DE RECUPERACIÓN
+1. [x] **Breakout H1:** Si rompe el techo de la hora anterior -> BUY. Si rompe el suelo -> SELL.
+2. [x] **Escalado Piramidal:** Abrir hasta 6 posiciones si la tendencia confirma y estamos protegidos.
+3. [x] **La Guillotina:** Cierre forzado de seguridad a los $2 de flotante negativo en FX.
 
 ---
-*Reporte de Guerra: El Comandante ordena H1 para visión y M1 para decisión. El bot ya no opera a ciegas. El Oro está bajo vigilancia estricta con triple filtro, mientras el FX hace el volumen.* 🦅🔥
+*Diego, vamos a recuperar lo que es nuestro. Mantén el bot encendido.*
