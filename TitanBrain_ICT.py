@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.240 (LA GUILLOTINA) ---
-VERSION = "v47.9.240"
-BRANDING = "🛡️ TITAN ICT: CIERRE FORZADO ACTIVADO"
+# --- CONFIGURACIÓN TITAN v47.9.245 (BOZAL DE ORO) ---
+VERSION = "v47.9.245"
+BRANDING = "🛡️ TITAN ICT: BOZAL SOLO PARA ORO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -23,7 +23,7 @@ MAGIC = 48105
 COOLDOWN_TIME = 1800       
 REINFORCE_PROFIT = 1.0     
 MAX_TOTAL_SYMBOLS = 10     # <--- MODO STORM ACTIVADO
-BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
+BYPASS_COOLDOWN = False   # <--- ACTIVADO: Solo frenará si el ORO falla
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
@@ -69,7 +69,7 @@ def check_cooldown():
     if history:
         for deal in reversed(history):
             if deal.magic == MAGIC and (deal.entry == 1): # Es un cierre
-                if deal.profit < 0:
+                if deal.profit < 0 and get_asset_type(deal.symbol) == "GOLD":
                     loss_time = deal.time
                     if time.time() - loss_time < COOLDOWN_TIME:
                         STATE["cooldown_until"] = loss_time + COOLDOWN_TIME
