@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.155 (H1 BIAS / M1 SNIPER) ---
-VERSION = "v47.9.155"
-BRANDING = "🦅 TITAN ICT: VISIÓN H1 + PRECISIÓN M1"
+# --- CONFIGURACIÓN TITAN v47.9.160 (UNIFICADO H1-M1) ---
+VERSION = "v47.9.160"
+BRANDING = "🦅 TITAN ICT: RADAR H1 + EJECUCIÓN M1"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -108,11 +108,19 @@ def get_atr(symbol, tf, period=14):
     return float(tr.rolling(period).mean().iloc[-1])
 
 def get_h1_bias(symbol):
-    """Determina la visión/sesgo macro en H1 (1: Buy, -1: Sell, 0: Neutro)."""
-    ema_fast = get_ema(symbol, mt5.TIMEFRAME_H1, 10)
-    ema_slow = get_ema(symbol, mt5.TIMEFRAME_H1, 30)
-    if not ema_fast or not ema_slow: return 0
-    return 1 if ema_fast > ema_slow else -1
+    """Radar de Visión H1: Combina EMA y Estructura (High/Low anterior)."""
+    ema_bias = get_ema(symbol, mt5.TIMEFRAME_H1, 21)
+    rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_H1, 1, 1)
+    tick = mt5.symbol_info_tick(symbol)
+    if not ema_bias or not rates or not tick: return 0
+    
+    h1_high, h1_low = rates[0]['high'], rates[0]['low']
+    
+    # Alcista: Precio > EMA y rompiendo/cerca del Alto H1
+    if tick.bid > ema_bias and tick.bid > h1_low: return 1
+    # Bajista: Precio < EMA y rompiendo/cerca del Bajo H1
+    if tick.ask < ema_bias and tick.ask < h1_high: return -1
+    return 0
 
 def get_m15_liquidity(sym):
     """Obtiene la liquidez de la vela M15 anterior (más señales)."""
