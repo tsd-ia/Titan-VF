@@ -8,21 +8,22 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.185 (CERO SANGRÍA) ---
-VERSION = "v47.9.185"
-BRANDING = "🦅 TITAN ICT: ESCUDO DE MARGEN ACTIVADO"
+# --- CONFIGURACIÓN TITAN v47.9.190 (MODO SUPERVIVENCIA) ---
+VERSION = "v47.9.190"
+BRANDING = "🛡️ ESCUDO VITAL ACTIVADO (MARGEN 500%)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
 # GESTIÓN DE RIESGO
 HARVEST_TRIGGER = 2.5      # Gatillo de Cosecha Agresiva
 HARVEST_LOCK = 1.0         # Bloquear $1.00
-TRAILING_STEP = 2.0        # Mover SL cada $2.00 extra (Más aire)
-RR_RATIO = 1.0             # Ratio para Profit de $25 (con SL de 2500 pts)
-MAX_BULLETS = 6            # Límite STORM
-MAGIC = 48105              # Magic v47.105
-COOLDOWN_TIME = 1800       # 30 minutos
-REINFORCE_PROFIT = 3.0     # Profit para buscar refuerzos (agrupado)
+TRAILING_STEP = 1.0        # Mover SL cada $1.00 extra
+RR_RATIO = 1.5             # Mayor ratio
+MAX_BULLETS = 2            # Solo 1 refuerzo máximo
+MAGIC = 48105              
+COOLDOWN_TIME = 1800       
+REINFORCE_PROFIT = 1.5     
+MAX_TOTAL_SYMBOLS = 3      # <--- NO MÁS DE 3 PARES A LA VEZ
 BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 
 # CONFIGURACIÓN POR ACTIVO
@@ -33,7 +34,7 @@ ASSET_CONFIG = {
         "calculate_be": True, "strict_filter": True, "r_trigger": 5.0
     },
     "FX":   {
-        "lot": 0.02, "sl_usd": 5.0, "trail": True, "burst": 1,
+        "lot": 0.01, "sl_usd": 5.0, "trail": True, "burst": 1,
         "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.2,
         "calculate_be": True, "strict_filter": True, "r_trigger": 2.0
     }
@@ -108,19 +109,11 @@ def get_atr(symbol, tf, period=14):
     return float(tr.rolling(period).mean().iloc[-1])
 
 def get_h1_bias(symbol):
-    """Radar de Visión H1: Combina EMA y Estructura (High/Low anterior)."""
-    ema_bias = get_ema(symbol, mt5.TIMEFRAME_H1, 21)
-    rates = mt5.copy_rates_from_pos(symbol, mt5.TIMEFRAME_H1, 1, 1)
+    """Radar de Visión H1: Basado en EMA 50 para Tendencia Fuerte."""
+    ema_trend = get_ema(symbol, mt5.TIMEFRAME_H1, 50)
     tick = mt5.symbol_info_tick(symbol)
-    if not ema_bias or not rates or not tick: return 0
-    
-    h1_high, h1_low = rates[0]['high'], rates[0]['low']
-    
-    # Alcista: Precio > EMA y rompiendo/cerca del Alto H1
-    if tick.bid > ema_bias and tick.bid > h1_low: return 1
-    # Bajista: Precio < EMA y rompiendo/cerca del Bajo H1
-    if tick.ask < ema_bias and tick.ask < h1_high: return -1
-    return 0
+    if not ema_trend or not tick: return 0
+    return 1 if tick.bid > ema_trend else -1
 
 def get_m15_liquidity(sym):
     """Obtiene la liquidez de la vela M15 anterior (más señales)."""
@@ -248,9 +241,15 @@ def main_loop(mode_24h=False):
                         rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
                         momentum_ok = (m1_mss_buy and rsi > 50) or (m1_mss_sell and rsi < 50)
                     
-                    # CONTROL DE MARGEN DE SEGURIDAD
-                    if acc.margin_level < 250:
+                    # CONTROL DE MARGEN Y SATURACIÓN
+                    active_pairs = len([s for s in STATE["symbols_data"] if STATE["symbols_data"][s]["pos"] > 0])
+                    
+                    if acc.margin_level < 500:
                         s_d["status"] = "⚠️ MARGEN BAJO"
+                        continue
+                    
+                    if active_pairs >= MAX_TOTAL_SYMBOLS and len(sym_pos) == 0:
+                        s_d["status"] = "⚠️ SATURADO (MAX 3)"
                         continue
 
                     if trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
