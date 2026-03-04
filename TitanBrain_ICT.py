@@ -8,14 +8,14 @@ from datetime import datetime
 from colorama import Fore, Style, init as colorama_init
 import requests
 
-# --- CONFIGURACIÓN TITAN v47.9.560 (MODO AMETRALLADORA) ---
-VERSION = "v47.9.560"
-BRANDING = "🦅 TITAN ICT: MACHINE GUN MODE"
+# --- CONFIGURACIÓN TITAN v47.9.561 (AJUSTE DE SALDO) ---
+VERSION = "v47.9.561"
+BRANDING = "🦅 TITAN ICT: PRECISION 3-SHOT"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
 # GESTIÓN DE COMBATE (ÓXIDO NIVEL JEFE)
-MAX_BULLETS = 6            
+MAX_BULLETS = 3            
 MAGIC = 48105              
 
 ASSET_CONFIG = {
