@@ -21,6 +21,10 @@ MAX_BULLETS = 6            # Comandante: Volvemos a las 6, pero con precisión q
 MAGIC = 700700              
 MIN_PROFIT_TRIGGER = 1.00  # Volvemos a $1.00 para pagar el riesgo de 6 balas
 
+# --- CONFIGURACIÓN DE COMBATE v48.7 ---
+MODO_DIRECCION = "AUTO"  # Opciones: "AUTO", "BUY", "SELL" (Usted manda aquí)
+MAX_TRADE_TIME = 120    # Segundos máximos para una jugada (Scalping puro)
+
 
 
 STATE = {
@@ -70,42 +74,45 @@ def _execute_parallel_close(p):
 
 def manage_flash_trailing(positions):
     """
-    Gestión 'Cuchillo Pro': 
-    - SL Individual: -$2.00 por bala (No cierra la ráfaga completa).
-    - Trailing Cesta: Sigue funcionando para las que queden vivas.
+    Gestión 'Cuchillo Pro' + Kill Switch por Tiempo.
     """
-    # 1. ESCUDO INDIVIDUAL: Si una bala llega a -$2.00, se liquida sola
-    for p in positions:
-        if p.profit <= -2.00:
-            add_log_dash(f"🛡️ SL INDIVIDUAL: Cerrando {p.symbol} ticket {p.ticket} | Loss: ${p.profit:.2f}")
-            _execute_parallel_close(p)
-            return True # Retornamos para que el ciclo principal refresque la lista de posiciones
-
-    # 2. GESTIÓN DE CESTA (Solo con las que quedan)
+    if not positions: return False
+    
     total_pnl = sum(p.profit for p in positions)
     
-    # HOLGURA ADAPTATIVA
-    if total_pnl < 3.00:
-        current_gap = 0.40 
-    elif total_pnl < 10.00:
-        current_gap = 1.00 
-    else:
-        current_gap = total_pnl * 0.20 
+    # 0. KILL SWITCH POR TIEMPO: Scalping es rápido o no es.
+    entry_time = min(p.time_update for p in positions) # Usamos actualización para ver vida real
+    elapsed = (time.time() - entry_time)
+    
+    if elapsed > MAX_TRADE_TIME:
+        add_log_dash(f"⏱️ TIEMPO AGOTADO ({elapsed:.0f}s): Liquidando ráfaga.")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=len(positions)) as executor:
+            executor.map(_execute_parallel_close, positions)
+        return True
 
-    # 3. ACTIVACIÓN: Modo Cazador
+    # 1. ESCUDO INDIVIDUAL: -$2.00 por bala
+    for p in positions:
+        if p.profit <= -2.00:
+            add_log_dash(f"🛡️ SL INDIVIDUAL: {p.symbol} | ${p.profit:.2f}")
+            _execute_parallel_close(p)
+            return True
+
+    # 2. GESTIÓN DE CESTA (Cazador)
+    if total_pnl < 3.00: current_gap = 0.40 
+    elif total_pnl < 10.00: current_gap = 1.00 
+    else: current_gap = total_pnl * 0.20 
+
     if not FLASH_TRAIL["active"] and total_pnl >= MIN_PROFIT_TRIGGER:
         FLASH_TRAIL["active"] = True
         FLASH_TRAIL["high_water_mark"] = total_pnl
         FLASH_TRAIL["lock_profit"] = total_pnl - current_gap
-        add_log_dash(f"🎯 CAZADOR ACTIVADO: ${total_pnl:.2f} | GAP: ${current_gap:.2f}")
+        add_log_dash(f"🎯 CAZADOR ACTIVADO: ${total_pnl:.2f}")
 
-    # 4. SEGUIMIENTO
     if FLASH_TRAIL["active"]:
         if total_pnl > FLASH_TRAIL["high_water_mark"]:
             FLASH_TRAIL["high_water_mark"] = total_pnl
             FLASH_TRAIL["lock_profit"] = total_pnl - current_gap
         
-        # 5. CIERRE CESTA: Si el PnL cae por debajo del Lock, liquidamos lo que quede
         if total_pnl <= FLASH_TRAIL["lock_profit"]:
             add_log_dash(f"🔪 CUCHILLO ASEGURADO: ${total_pnl:.2f}")
             with concurrent.futures.ThreadPoolExecutor(max_workers=len(positions)) as executor:
@@ -144,64 +151,41 @@ def calculate_velocity(sym, current_price):
 
 def check_flash_signal(sym):
     """
-    SISTEMA DE PRECISIÓN QUIRÚRGICA:
-    1. Filtro Maestro M15: Solo operamos a favor de la tendencia macro (EMA 20 - M15).
-    2. Filtro Local M1: Precio debe estar del lado correcto de la EMA 50 (Confirmación de giro).
-    3. Sweep Real: Debemos romper el nivel y RE-INGRESAR con fuerza (Vela envolvente).
+    LÓGICA BREAKOUT HUNTER (v48.7):
+    Si rompe el techo con fuerza -> COMPRAMOS.
+    Si rompe el suelo con fuerza -> VENDEMOS.
     """
-    # 0. TENDENCIA MAESTRA (M15) - Nuestra brújula
-    rates_m15 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 0, 20)
-    if rates_m15 is None or len(rates_m15) < 20: return None
-    df_m15 = pd.DataFrame(rates_m15)
-    ema_m15 = df_m15['close'].ewm(span=20, adjust=False).mean().iloc[-1]
-    last_close_m15 = df_m15['close'].iloc[-1]
-    trend_m15 = "UP" if last_close_m15 > ema_m15 else "DOWN"
-
-    # 1. TENDENCIA LOCAL (M1)
-    rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 60)
-    if rates_m1 is None or len(rates_m1) < 60: return None
-    df_m1 = pd.DataFrame(rates_m1)
-    ema_m1 = df_m1['close'].ewm(span=50, adjust=False).mean().iloc[-1]
-    last_close_m1 = df_m1['close'].iloc[-1]
+    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 5)
+    if rates is None or len(rates) < 5: return None
     
-    current_candle = rates_m1[-1]
-    last_candle = rates_m1[-2]
+    current_candle = rates[-1]
+    last_candle = rates[-2]
     candle_id = current_candle['time']
     if STATE["processed_candles"].get(sym) == candle_id: return None
 
-    # Datos básicos
     high_last = last_candle['high']
     low_last = last_candle['low']
     close_now = current_candle['close']
-    open_now = current_candle['open']
-    
-    # 2. LÓGICA DE GIRO (Sweep + Confirmación)
-    swept_low = current_candle['low'] < low_last
-    swept_high = current_candle['high'] > high_last
-    
-    # Cuerpo de vela mínimo para evitar "dojis" o trampas sin volumen
-    c_range = abs(current_candle['high'] - current_candle['low'])
-    body_size = abs(close_now - open_now)
-    body_ratio = (body_size / c_range * 100) if c_range > 0 else 0
     
     velocity = calculate_velocity(sym, close_now)
-    v_trigger = 0.05 if "XAU" in sym.upper() else 10.0 
+    # v_trigger mayor para BTC para filtrar ruido
+    v_trigger = 0.05 if "XAU" in sym.upper() else 25.0 
 
-    # --- DISPARO COMPRA ---
-    # Debe ser tendencia ALCISTA en M15 Y barrer el mínimo anterior en M1 Y cerrar arriba
-    if trend_m15 == "UP" and last_close_m1 > ema_m1:
-        if swept_low and close_now > low_last and body_ratio > 65 and velocity > v_trigger:
+    if MODO_DIRECCION in ["AUTO", "BUY"]:
+        if close_now > high_last and velocity > v_trigger:
+            add_log_dash(f"🚀 BREAKOUT ALCISTA: {sym} | Vel: {velocity:.2f}")
             STATE["processed_candles"][sym] = candle_id
             return mt5.ORDER_TYPE_BUY
-            
-    # --- DISPARO VENTA ---
-    # Debe ser tendencia BAJISTA en M15 Y barrer el máximo anterior en M1 Y cerrar abajo
-    if trend_m15 == "DOWN" and last_close_m1 < ema_m1:
-        if swept_high and close_now < high_last and body_ratio > 65 and velocity > v_trigger:
+
+    if MODO_DIRECCION in ["AUTO", "SELL"]:
+        if close_now < low_last and velocity > v_trigger:
+            add_log_dash(f"🩸 BREAKOUT BAJISTA: {sym} | Vel: {velocity:.2f}")
             STATE["processed_candles"][sym] = candle_id
             return mt5.ORDER_TYPE_SELL
         
     return None
+
+
 
         
     return None

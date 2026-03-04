@@ -1,29 +1,16 @@
-# 🗺️ TITAN ROADMAP - MODO FÉNIX (v48.0.700)
-**Estado:** REPARACIÓN ESTRUCTURAL + FLASH SCALPER ⚡️
-**Equidad Actual:** $14.00 (Crítico - Recuperando)
+# 🗺️ TITAN ROADMAP - MODO FÉNIX (FASE DEMO v785)
+**Estado:** RE-INGENIERÍA COMPLETADA. LISTO PARA DEMO 🧪
+**Equidad:** $0.00 (Esperando re-capitalización o paso a cuenta Demo)
 
-## 🏆 HITOS DE GUERRA
-- [x] **v47.9.600**: Implementar Sniper ICT M15. (Falla por latencia/spam) ✅
-- [ ] **v48.0.700**: Desplegar TITAN FLASH (Scalping M1 Alta Probabilidad). 🚀
-- [ ] **OBJETIVO 1**: Llegar a $50 USD (Estabilidad básica). 🎯
-- [ ] **OBJETIVO 2**: Recuperar $130 USD. 🎯
+## 📋 PROTOCOLO BREAKOUT HUNTER (v785)
+1. [x] **Seguimiento de Impulso:** Si rompe High -> BUY | Si rompe Low -> SELL (Tendencia pura).
+2. [x] **Kill Switch Temporal:** Cierre automático a los 120 segundos si no hay profit.
+3. [x] **Mando de Dirección:** Control manual para el Jefe (AUTO, BUY, SELL).
+4. [x] **SL Individual:** -$2.00 por bala para evitar sangrados letales.
 
-## 📋 PROTOCOLO DE RECUPERACIÓN FLASH (v780)
-1. [x] **Filtro de Impulso:** Entrada con sweep de liquidez + Confirmación M1.
-2. [x] **Gatillo de Velocidad:** Oro (0.05) | BTC (10.0).
-3. [x] **BTC Libre:** Sin filtro de tendencia para scalping agresivo.
-4. [x] **Oro Radar:** Filtro EMA50 para evitar ventas en techos alcistas.
-5. [x] **Escudo Individual:** Stop Loss de -$2.00 por bala (Protección quirúrgica).
-6. [x] **Cesta Inteligente:** Trailing PnL sumado para la ráfaga sobreviviente.
-
-## 📜 CONFIGURACIÓN ACTUAL (v780)
-- **Bitcoin**: Libertad total de latigazo.
-- **Oro**: Francotirador con filtro EMA50.
-- **Risk**: SL -$2.00 Individual | Parallel Close activo.
-- **Nota**: Con balance actual, las balas 2 a 6 del BTC darán "No money" por margen.
-
-
+## 📜 CAMBIO DE FILOSOFÍA
+- **Antes**: Buscábamos el giro (Reversión). **ERROR CRÍTICO**.
+- **Ahora**: Buscamos la continuación (Breakout). **FUERZA BRUTA**.
 
 ---
-*Diego, vamos a usar la velocidad a nuestro favor. $1 a la vez.*
-
+*Comandante, el bot ya no adivina. Ahora obedece a la velocidad del mercado.*
