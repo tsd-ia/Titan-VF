@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.130 (ORO SNIPER) ---
-VERSION = "v47.9.130"
-BRANDING = "🦅 TITAN ICT: SEGURIDAD MÁXIMA (SL $10)"
+# --- CONFIGURACIÓN TITAN v47.9.135 (TRIPLE SNIPER) ---
+VERSION = "v47.9.135"
+BRANDING = "🦅 TITAN ICT: TRIPLE FILTRO (EMA+RSI+ICT)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -29,11 +29,13 @@ BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
-        "h_trigger": 1.2, "h_lock": 0.5, "t_step": 0.5, "air": 0.8
+        "h_trigger": 1.2, "h_lock": 0.5, "t_step": 0.5, "air": 0.8,
+        "r_trigger": 1.5  # Refuerzo a partir de $1.50 profit
     },
     "FX":   {
         "lot": 0.02, "sl_usd": 15.0, "trail": True, "burst": 2,
-        "h_trigger": 1.0, "h_lock": 0.3, "t_step": 0.5, "air": 0.7
+        "h_trigger": 1.0, "h_lock": 0.3, "t_step": 0.5, "air": 0.7,
+        "r_trigger": 3.0  # Refuerzo a partir de $3.00 profit
     }
 }
 
@@ -75,6 +77,24 @@ def check_cooldown():
                         return True
                 break # Solo evaluamos el último cierre del magic
     return False
+
+def get_ema(symbol, tf, period):
+    """Calcula EMA simple para filtro de tendencia."""
+    rates = mt5.copy_rates_from_pos(symbol, tf, 0, period + 10)
+    if rates is None or len(rates) < period: return 0
+    closes = pd.Series([r['close'] for r in rates])
+    ema = closes.ewm(span=period, adjust=False).mean()
+    return float(ema.iloc[-1])
+
+def get_rsi(symbol, tf, period=14):
+    """Calcula RSI para medir fuerza de impulso."""
+    rates = mt5.copy_rates_from_pos(symbol, tf, 0, period + 20)
+    if rates is None or len(rates) < period: return 50
+    delta = pd.Series([r['close'] for r in rates]).diff()
+    gain = (delta.where(delta > 0, 0)).rolling(window=period).mean()
+    loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
+    rs = gain / loss.replace(0, 0.001) # Evitar división por cero
+    return float(100 - (100 / (1 + rs)).iloc[-1])
 
 def get_h1_liquidity(sym):
     rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 1, 1)
@@ -171,15 +191,25 @@ def main_loop(mode_24h=False):
                 sweep_sell = tick.bid > h_high
                 
                 if (sweep_buy or sweep_sell) and len(sym_pos) == 0:
-                    # VALIDACIÓN MSS (Ruptura de vela M1 anterior en dirección opuesta)
+                    # VALIDACIÓN TRIPLE FILTRO (M1)
                     rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
                     if rates_m1 is None or len(rates_m1) < 2: continue
                     
+                    # A. Filtro Estructura (MSS)
                     mss_ok = False
                     if sweep_buy and tick.bid > rates_m1[-2]['high']: mss_ok = True
                     elif sweep_sell and tick.ask < rates_m1[-2]['low']: mss_ok = True
                     
-                    if mss_ok and (time.time() - s_d["last_trade"] > 3):
+                    # B. Filtro Tendencia (EMA 9 vs 21)
+                    ema9 = get_ema(sym, mt5.TIMEFRAME_M1, 9)
+                    ema21 = get_ema(sym, mt5.TIMEFRAME_M1, 21)
+                    trend_ok = (sweep_buy and ema9 > ema21) or (sweep_sell and ema9 < ema21)
+                    
+                    # C. Filtro Impulso (RSI 14)
+                    rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
+                    momentum_ok = (sweep_buy and rsi > 50) or (sweep_sell and rsi < 50)
+                    
+                    if mss_ok and trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
                         side = "BUY" if sweep_buy else "SELL"
                         points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
                         sl = tick.bid - points_sl if side=="BUY" else tick.ask + points_sl
@@ -190,10 +220,10 @@ def main_loop(mode_24h=False):
                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
                                 "sl": float(round(sl, s_i.digits)), "tp": float(round(tp, s_i.digits)),
-                                "magic": MAGIC, "comment": "ICT_VANG",
+                                "magic": MAGIC, "comment": "TITAN_SNIPER",
                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
                             })
-                        add_log_dash(f"� {sym} {side} ICT MSS SOLTADO")
+                        add_log_dash(f"🎯 {sym} {side} TRIPLE FILTRO OK")
                         s_d["last_trade"] = time.time()
                 
                 # ESTATUS DE COMBATE
@@ -204,7 +234,7 @@ def main_loop(mode_24h=False):
                     # REFUERZOS SOLO SI ESTÁN EN PROFIT BE
                     all_in_profit = all((p.type == 0 and p.sl > p.price_open) or (p.type == 1 and p.sl < p.price_open and p.sl != 0) for p in sym_pos)
                     
-                    if len(sym_pos) < MAX_BULLETS and current_pnl >= REINFORCE_PROFIT and all_in_profit:
+                    if len(sym_pos) < MAX_BULLETS and current_pnl >= cfg["r_trigger"] and all_in_profit:
                          side = "BUY" if sym_pos[0].type == 0 else "SELL"
                          # Solo añadimos DE A UNA bala para mayor seguridad
                          mt5.order_send({
