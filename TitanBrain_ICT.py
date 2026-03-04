@@ -8,18 +8,18 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.280 (EL CAZADOR LEGENDARIO) ---
-VERSION = "v47.9.280"
-BRANDING = "🦅 TITAN ICT: CAZADOR H1 + ESCALADO ORO"
+# --- CONFIGURACIÓN TITAN v47.9.300 (MODO AGITADOR) ---
+VERSION = "v47.9.300"
+BRANDING = "🦅 TITAN ICT: CAZADOR CON TELEMETRÍA TOTAL"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
 # GESTIÓN DE RIESGO
 MAX_BULLETS = 2            
 MAGIC = 48105              
-COOLDOWN_TIME = 900        # 15 Minutos de Bozal ORO
+COOLDOWN_TIME = 900        
 MAX_TOTAL_SYMBOLS = 10     
-BYPASS_COOLDOWN = True    # <--- OPERATIVIDAD INMEDIATA
+BYPASS_COOLDOWN = True    
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
@@ -37,43 +37,16 @@ ASSET_CONFIG = {
 
 STATE = {
     "is_running": True, "active_symbols": [], "symbols_data": {}, 
-    "last_logs": ["🚀 MOTOR RESTAURADO AL 100%: MODO CAZADOR H1"],
-    "cooldown_until": 0
+    "last_logs": ["🚀 MOTOR AGITADOR ACTIVADO - ESCANEANDO..."],
+    "last_heartbeat": 0
 }
 
 def add_log_dash(msg):
     STATE["last_logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
     if len(STATE["last_logs"]) > 6: STATE["last_logs"].pop(0)
 
-def is_killzone(): return True
-
 def get_asset_type(sym):
     return "GOLD" if "XAU" in sym.upper() or "GOLD" in sym.upper() else "FX"
-
-def check_cooldown():
-    if BYPASS_COOLDOWN: return False
-    if time.time() < STATE["cooldown_until"]: return True
-    to_time = datetime.now()
-    from_time = to_time - timedelta(hours=1)
-    history = mt5.history_deals_get(from_time, to_time)
-    if history:
-        for deal in reversed(history):
-            if deal.magic == MAGIC and (deal.entry == 1):
-                if deal.profit < 0 and get_asset_type(deal.symbol) == "GOLD":
-                    loss_time = deal.time
-                    if time.time() - loss_time < COOLDOWN_TIME:
-                        STATE["cooldown_until"] = loss_time + COOLDOWN_TIME
-                        add_log_dash(f"🛡️ BOZAL ORO ACTIVADO")
-                        return True
-                break
-    return False
-
-def get_ema(symbol, tf, period):
-    rates = mt5.copy_rates_from_pos(symbol, tf, 0, period + 10)
-    if rates is None or len(rates) < period: return 0
-    closes = pd.Series([r['close'] for r in rates])
-    ema = closes.ewm(span=period, adjust=False).mean()
-    return float(ema.iloc[-1])
 
 def get_rsi(symbol, tf, period=14):
     rates = mt5.copy_rates_from_pos(symbol, tf, 0, period + 20)
@@ -83,16 +56,6 @@ def get_rsi(symbol, tf, period=14):
     loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
     rs = gain / loss.replace(0, 0.001)
     return float(100 - (100 / (1 + rs)).iloc[-1])
-
-def get_atr(symbol, tf, period=14):
-    rates = mt5.copy_rates_from_pos(symbol, tf, 0, period + 1)
-    if rates is None or len(rates) < period: return 1.0
-    df = pd.DataFrame(rates)
-    df['h-l'] = df['high'] - df['low']
-    df['h-pc'] = abs(df['high'] - df['close'].shift())
-    df['l-pc'] = abs(df['low'] - df['close'].shift())
-    tr = df[['h-l', 'h-pc', 'l-pc']].max(axis=1)
-    return float(tr.rolling(period).mean().iloc[-1])
 
 def get_h1_liquidity(sym):
     rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 1, 1)
@@ -107,7 +70,6 @@ def manage_positions(positions):
         profit_usd = p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0)
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         
-        # --- LA GUILLOTINA ---
         if profit_usd <= -(cfg["sl_usd"] + 0.5):
              mt5.Close(p.symbol, ticket=p.ticket)
              add_log_dash(f"💀 {p.symbol} GUILLOTINA (${profit_usd})")
@@ -115,35 +77,11 @@ def manage_positions(positions):
 
         is_risky = (p.type == 0 and p.sl < p.price_open) or (p.type == 1 and (p.sl == 0 or p.sl > p.price_open))
         
-        # 0. AJUSTE RETROACTIVO
-        max_points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / p.volume
-        dist_actual = abs(p.price_open - p.sl) / s_i.point if p.sl != 0 else 99999
-        if is_risky and dist_actual > (max_points_sl + 10):
-             new_tight_sl = p.price_open - (max_points_sl * s_i.point) if p.type == 0 else p.price_open + (max_points_sl * s_i.point)
-             mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_tight_sl, s_i.digits)), "tp": p.tp})
-             add_log_dash(f"🛡️ {p.symbol} PROTECCIÓN $2")
-
-        # 1. COSECHA INICIAL (PRIORIDAD BE)
         if profit_usd >= cfg["h_trigger"] and is_risky:
              pts = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
              target_sl = p.price_open + pts if p.type == 0 else p.price_open - pts
-             res = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
-             if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                 add_log_dash(f"✅ {p.symbol} BE OK")
-
-        # 2. TRAILING Dinámico con Candado v245
-        elif profit_usd >= (cfg["h_trigger"] + cfg["t_step"]) and not is_risky:
-             new_lock = profit_usd - cfg["air"]
-             pts_new = (new_lock / (s_i.trade_tick_value / s_i.point)) / p.volume
-             new_sl = p.price_open + pts_new if p.type == 0 else p.price_open - pts_new
-             
-             # Bloqueo de retroceso
-             is_better = (p.type==0 and new_sl > p.sl) or (p.type==1 and (p.sl==0 or new_sl < p.sl))
-             initial_be_pts = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
-             initial_be_price = p.price_open + initial_be_pts if p.type == 0 else p.price_open - initial_be_pts
-             
-             if is_better and ((p.type == 0 and new_sl >= initial_be_price) or (p.type == 1 and new_sl <= initial_be_price)):
-                 mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_sl, s_i.digits)), "tp": p.tp})
+             mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
+             add_log_dash(f"✅ {p.symbol} PROTEGIDO BE")
 
 def init_mt5():
     if not mt5.initialize(): return False
@@ -166,6 +104,11 @@ def main_loop():
     
     while STATE["is_running"]:
         try:
+            # Heartbeat cada 30 seg
+            if time.time() - STATE["last_heartbeat"] > 30:
+                add_log_dash("💓 CEREBRO OK - ESCANEANDO H1...")
+                STATE["last_heartbeat"] = time.time()
+
             pos = mt5.positions_get()
             cur = [p for p in pos if p.magic == MAGIC] if pos else []
             if cur: manage_positions(cur)
@@ -178,74 +121,64 @@ def main_loop():
                 sym_pos = [p for p in cur if p.symbol == sym]
                 cfg = ASSET_CONFIG[s_d["type"]]
                 
-                # RECARGA H1 Y SWEEP LOGIC
                 h_h, h_l = get_h1_liquidity(sym)
                 s_d.update({"h1_high": h_h if h_h else 0.0, "h1_low": h_l if h_l else 0.0, "pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
-                # Detectar Sweep (Persistente por 10 min)
+                # DETECCIÓN DE SWEEP (LOG DETALLADO)
+                dist_to_high = h_h - tick.bid if h_h else 999
+                dist_to_low = tick.bid - h_l if h_l else 999
+
                 if h_h and tick.bid > h_h:
-                    s_d["sweep_type"] = -1 # Ready for Sell
+                    if s_d["sweep_type"] != -1: add_log_dash(f"👀 {sym} TECHO H1 ROTO! BUSCANDO SELL")
+                    s_d["sweep_type"] = -1 # Se activa el Sniper de Venta
                     s_d["sweep_time"] = time.time()
                 elif h_l and tick.bid < h_l:
-                    s_d["sweep_type"] = 1 # Ready for Buy
+                    if s_d["sweep_type"] != 1: add_log_dash(f"👀 {sym} SUELO H1 ROTO! BUSCANDO BUY")
+                    s_d["sweep_type"] = 1 # Se activa el Sniper de Compra
                     s_d["sweep_time"] = time.time()
                 
-                # ¿Sigue vigente el sweep del H1?
-                is_sweep_active = (time.time() - s_d["sweep_time"] < 600) # 10 min de ventana
+                # ¿Está el sniper en espera? (20 min de persistencia)
+                is_sweep_active = (time.time() - s_d["sweep_time"] < 1200) 
                 bias = s_d["sweep_type"] if is_sweep_active else 0
                 
                 if bias == 0:
-                    s_d["status"] = "🔎 BUSCANDO SWEEP H1"
+                    s_d["status"] = f"🔎 SCAN ({min(dist_to_high, dist_to_low):.1f})"
                     continue
                 
-                s_d["status"] = f"🎯 {'BULL' if bias==1 else 'BEAR'} READY"
+                s_d["status"] = f"🎯 SNIPER {'BUY' if bias==1 else 'SELL'} ACTIVO"
                 
-                # Señal M1 con FILTROS COMPLETOS RESTAURADOS
+                # SEÑAL M1 (MSS)
                 rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
                 if not rates_m1 or len(rates_m1) < 2: continue
+                
                 m1_mss_buy = (tick.bid > rates_m1[-2]['high']) and bias == 1
                 m1_mss_sell = (tick.ask < rates_m1[-2]['low']) and bias == -1
                 
                 if (m1_mss_buy or m1_mss_sell) and len(sym_pos) == 0:
-                    # Restauración Filtros EMA + RSI
-                    ema9 = get_ema(sym, mt5.TIMEFRAME_M1, 9)
-                    ema21 = get_ema(sym, mt5.TIMEFRAME_M1, 21)
-                    rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
-                    
-                    trend_ok = (m1_mss_buy and ema9 > ema21) or (m1_mss_sell and ema9 < ema21)
-                    mom_ok = (m1_mss_buy and rsi > 50) or (m1_mss_sell and rsi < 50)
-                    
-                    if trend_ok and mom_ok and (time.time() - s_d["last_trade"] > 10):
-                        active_count = len([s for s in STATE["symbols_data"] if STATE["symbols_data"][s]["pos"] > 0])
-                        if active_count < MAX_TOTAL_SYMBOLS:
-                             side = "BUY" if m1_mss_buy else "SELL"
-                             pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
-                             sl = tick.bid - pts_sl if side=="BUY" else tick.ask + pts_sl
-                             mt5.order_send({
-                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                                 "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "SWEEP_M1"
-                             })
-                             s_d["last_trade"] = time.time()
-                             s_d["sweep_time"] = 0 # Consumir el sweep
-                             add_log_dash(f"🎯 {sym} {side} INICIAL")
-
-                # REFUERZOS (BALAS) CON ESCALADO ORO
-                elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
-                     pnl = sum(p.profit for p in sym_pos)
-                     # Solo si la bala 1 está protegida
-                     all_be = all((p.type==0 and p.sl >= p.price_open) or (p.type==1 and p.sl <= p.price_open and p.sl != 0) for p in sym_pos)
-                     if pnl >= cfg["r_trigger"] and all_be:
-                          side = "BUY" if sym_pos[0].type == 0 else "SELL"
-                          mt5.order_send({
-                              "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot_reinf"],
+                     rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
+                     mom_ok = (m1_mss_buy and rsi > 45) or (m1_mss_sell and rsi < 55) # Filtro más relajado
+                     
+                     if mom_ok:
+                          side = "BUY" if m1_mss_buy else "SELL"
+                          pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
+                          sl = tick.bid - pts_sl if side=="BUY" else tick.ask + pts_sl
+                          res = mt5.order_send({
+                              "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                               "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                              "sl": sym_pos[0].sl, "magic": MAGIC, "comment": "REINF_BALA_2"
+                              "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "SWEEP_M1",
+                              "type_filling": mt5.ORDER_FILLING_IOC
                           })
-                          add_log_dash(f"🚀 {sym} REFUERZO {cfg['lot_reinf']}")
+                          if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                               add_log_dash(f"🎯 {sym} DISPARO {side} EXITOSO")
+                               s_d["last_trade"] = time.time()
+                               s_d["sweep_time"] = 0 
+                          else:
+                               add_log_dash(f"⚠️ {sym} DISPARO FALLIDO: {res.comment if res else 'Error'}")
+                     else:
+                          s_d["status"] = f"⚠️ ESPERANDO MOMENTUM RSI ({rsi:.1f})"
 
             time.sleep(1)
-        except Exception:
+        except Exception as e:
             time.sleep(1)
 
 def draw_dashboard():
@@ -254,7 +187,7 @@ def draw_dashboard():
         acc = mt5.account_info()
         if not acc: continue
         print(f"{Fore.CYAN}{'═'*115}")
-        print(f"{Fore.GREEN}{Style.BRIGHT} 🦅 {BRANDING} | {VERSION} | ESTADO: ATAQUE RELÁMPAGO")
+        print(f"{Fore.GREEN}{Style.BRIGHT} 🦅 {BRANDING} | {VERSION} | ESTADO: ALFA SNIPER")
         print(f"{Fore.WHITE} BALANCE: ${Fore.GREEN}{acc.balance:.2f} {Fore.WHITE}| EQUITY: ${Fore.CYAN}{acc.equity:.2f} {Fore.WHITE}| PnL: {Fore.YELLOW}${acc.profit:.2f}")
         print(f"{Fore.CYAN}{'─'*115}")
         print(f"{Fore.WHITE} {'ACTIVO':<10} | {'TIPO':<5} | {'SPR':<4} | {'H1 HIGH':<10} | {'H1 LOW':<10} | {'BALS':<4} | {'PnL' :<10} | {'STATUS'}")
