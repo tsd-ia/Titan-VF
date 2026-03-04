@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.255 (PULIDO VISUAL) ---
-VERSION = "v47.9.255"
-BRANDING = "🦅 TITAN ICT: ESTRATEGIA SWEEP (YOUTUBER)"
+# --- CONFIGURACIÓN TITAN v47.9.260 (OPERACIÓN RELÁMPAGO) ---
+VERSION = "v47.9.260"
+BRANDING = "🦅 TITAN ICT: BYPASS SEGURIDAD ACTIVADO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -23,7 +23,7 @@ MAGIC = 48105
 COOLDOWN_TIME = 900        # <--- 15 MINUTOS SEGÚN MANDO
 REINFORCE_PROFIT = 1.0     
 MAX_TOTAL_SYMBOLS = 10     
-BYPASS_COOLDOWN = False   
+BYPASS_COOLDOWN = True    
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
