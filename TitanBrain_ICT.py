@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.360 (ARTILLERÍA PESADA) ---
-VERSION = "v47.9.360"
-BRANDING = "🦅 TITAN ICT: BREAKOUT + LLUVIA DE BALAS"
+# --- CONFIGURACIÓN TITAN v47.9.370 (VISIBILIDAD TOTAL) ---
+VERSION = "v47.9.370"
+BRANDING = "🦅 TITAN ICT: CAZADOR CON TELEMETRÍA"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -71,7 +71,7 @@ def manage_positions(positions):
              pts = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
              target_sl = p.price_open + pts if p.type == 0 else p.price_open - pts
              mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
-             add_log_dash(f"✅ {p.symbol} PROTEGIDO BE")
+             add_log_dash(f"✅ {p.symbol} PROTEGIDO (BE)")
 
 def init_mt5():
     if not mt5.initialize(): return False
@@ -92,6 +92,11 @@ def main_loop():
     
     while STATE["is_running"]:
         try:
+            # Heartbeat de Seguridad
+            if time.time() - STATE["last_heartbeat"] > 30:
+                add_log_dash("💓 CEREBRO OK - ESCANEANDO BREAKOUT H1...")
+                STATE["last_heartbeat"] = time.time()
+
             pos = mt5.positions_get()
             cur = [p for p in pos if p.magic == MAGIC] if pos else []
             if cur: manage_positions(cur)
@@ -144,7 +149,11 @@ def main_loop():
                              "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
                              "sl": sym_pos[0].sl, "magic": MAGIC, "comment": "RAIN_BULLET", "type_filling": mt5.ORDER_FILLING_IOC
                          })
-                         add_log_dash(f"🚀 {sym} REFUERZO +{cfg['lot_reinf']}")
+                         add_log_dash(f"🚀 {sym} REFUERZO +{cfg['lot_reinf']} (TOTAL: {len(sym_pos)+1})")
+                    elif not all_protected:
+                         s_d["status"] = "⏳ WAIT BE PROTECTION"
+                    elif pnl < cfg["r_trigger"]:
+                         s_d["status"] = f"⏳ WAIT PROFIT ${cfg['r_trigger']:.1f}"
 
                 if len(sym_pos) == 0:
                     dist_h = (h_h - tick.bid)/s_i.point if h_h else 999
