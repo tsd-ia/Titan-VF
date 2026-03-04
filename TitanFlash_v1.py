@@ -4,6 +4,7 @@ import numpy as np
 import time
 import os
 import threading
+import concurrent.futures
 from datetime import datetime
 from colorama import Fore, Style, init as colorama_init
 import requests
@@ -47,30 +48,79 @@ def add_log_dash(msg):
     STATE["last_logs"].append(f"[{datetime.now().strftime('%H:%M:%S')}] {msg}")
     if len(STATE["last_logs"]) > 6: STATE["last_logs"].pop(0)
 
+# Memoria de rastro para el Trailing Stop de PNL
+FLASH_TRAIL = {
+    "active": False,
+    "high_water_mark": 0.0,
+    "lock_profit": 0.0
+}
+
+def _execute_parallel_close(p):
+    """Auxiliar para cerrar posiciones en hilos paralelos"""
+    tick = mt5.symbol_info_tick(p.symbol)
+    if not tick: return
+    mt5.order_send({
+        "action": mt5.TRADE_ACTION_DEAL, "position": p.ticket, "symbol": p.symbol, "volume": p.volume,
+        "type": mt5.ORDER_TYPE_SELL if p.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY,
+        "price": tick.bid if p.type == mt5.ORDER_TYPE_BUY else tick.ask,
+        "magic": MAGIC, "comment": "FLASH_PARA_EXIT", "type_filling": mt5.ORDER_FILLING_IOC
+    })
+
 def manage_flash_trailing(positions):
     """
-    Gestiona el cierre relámpago de $1 USD neto.
-    Si el conjunto de posiciones suma > MIN_PROFIT_TRIGGER, cerramos todo.
+    Gestión 'Cuchillo Pro': 
+    - SL Individual: -$2.00 por bala (No cierra la ráfaga completa).
+    - Trailing Cesta: Sigue funcionando para las que queden vivas.
     """
+    # 1. ESCUDO INDIVIDUAL: Si una bala llega a -$2.00, se liquida sola
+    for p in positions:
+        if p.profit <= -2.00:
+            add_log_dash(f"🛡️ SL INDIVIDUAL: Cerrando {p.symbol} ticket {p.ticket} | Loss: ${p.profit:.2f}")
+            _execute_parallel_close(p)
+            return True # Retornamos para que el ciclo principal refresque la lista de posiciones
+
+    # 2. GESTIÓN DE CESTA (Solo con las que quedan)
     total_pnl = sum(p.profit for p in positions)
-    if total_pnl >= MIN_PROFIT_TRIGGER:
-        add_log_dash(f"💰 META ALCANZADA: ${total_pnl:.2f} | CERRANDO TODO")
-        for p in positions:
-            request = {
-                "action": mt5.TRADE_ACTION_DEAL,
-                "position": p.ticket,
-                "symbol": p.symbol,
-                "volume": p.volume,
-                "type": mt5.ORDER_TYPE_SELL if p.type == mt5.ORDER_TYPE_BUY else mt5.ORDER_TYPE_BUY,
-                "price": mt5.symbol_info_tick(p.symbol).bid if p.type == mt5.ORDER_TYPE_BUY else mt5.symbol_info_tick(p.symbol).ask,
-                "magic": MAGIC,
-                "comment": "FLASH_EXIT",
-                "type_time": mt5.ORDER_TIME_GTC,
-                "type_filling": mt5.ORDER_FILLING_IOC,
-            }
-            mt5.order_send(request)
-        return True
+    
+    # HOLGURA ADAPTATIVA
+    if total_pnl < 3.00:
+        current_gap = 0.40 
+    elif total_pnl < 10.00:
+        current_gap = 1.00 
+    else:
+        current_gap = total_pnl * 0.20 
+
+    # 3. ACTIVACIÓN: Modo Cazador
+    if not FLASH_TRAIL["active"] and total_pnl >= MIN_PROFIT_TRIGGER:
+        FLASH_TRAIL["active"] = True
+        FLASH_TRAIL["high_water_mark"] = total_pnl
+        FLASH_TRAIL["lock_profit"] = total_pnl - current_gap
+        add_log_dash(f"🎯 CAZADOR ACTIVADO: ${total_pnl:.2f} | GAP: ${current_gap:.2f}")
+
+    # 4. SEGUIMIENTO
+    if FLASH_TRAIL["active"]:
+        if total_pnl > FLASH_TRAIL["high_water_mark"]:
+            FLASH_TRAIL["high_water_mark"] = total_pnl
+            FLASH_TRAIL["lock_profit"] = total_pnl - current_gap
+        
+        # 5. CIERRE CESTA: Si el PnL cae por debajo del Lock, liquidamos lo que quede
+        if total_pnl <= FLASH_TRAIL["lock_profit"]:
+            add_log_dash(f"🔪 CUCHILLO ASEGURADO: ${total_pnl:.2f}")
+            with concurrent.futures.ThreadPoolExecutor(max_workers=len(positions)) as executor:
+                executor.map(_execute_parallel_close, positions)
+            
+            # Reset memoria
+            FLASH_TRAIL["active"] = False
+            FLASH_TRAIL["high_water_mark"] = 0.0
+            FLASH_TRAIL["lock_profit"] = 0.0
+            return True
     return False
+
+
+
+
+
+
 
 def calculate_velocity(sym, current_price):
     """
@@ -93,19 +143,23 @@ def calculate_velocity(sym, current_price):
 def check_flash_signal(sym):
     """
     Lógica de 95% Acertividad Sugerida: 
-    1. Sweep (Barrido) de la vela M1 anterior.
-    2. Regreso con Vela de Fuerza (Body Ratio > 80%).
+    1. Filtro Tendencia (EMA 50).
+    2. Sweep (Barrido) + Confirmación de Re-ingreso.
     3. Tick Velocity > Umbral.
     """
-    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 3)
-    if rates is None or len(rates) < 3: return None
+    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 60)
+    if rates is None or len(rates) < 60: return None
+    
+    # 0. FILTRO DE TENDENCIA (EMA 50)
+    df = pd.DataFrame(rates)
+    ema50 = df['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+    last_close = df['close'].iloc[-1]
     
     current_candle = rates[-1]
     last_candle = rates[-2]
-    prev_candle = rates[-3]
     
     candle_id = current_candle['time']
-    if STATE["processed_candles"].get(sym) == candle_id: return None # Ya procesado este minuto
+    if STATE["processed_candles"].get(sym) == candle_id: return None
 
     # Datos básicos
     high_last = last_candle['high']
@@ -117,25 +171,39 @@ def check_flash_signal(sym):
     swept_low = current_candle['low'] < low_last
     swept_high = current_candle['high'] > high_last
     
-    # 2. BODY RATIO (Fuerza del regreso)
+    # 2. VOLATILIDAD (¿Es una vela con cuerpo suficiente para valer la pena?)
     c_range = abs(current_candle['high'] - current_candle['low'])
     body_size = abs(close_now - open_now)
     body_ratio = (body_size / c_range * 100) if c_range > 0 else 0
     
     # 3. VELOCITY (Intensidad del impulso)
     velocity = calculate_velocity(sym, close_now)
-    
-    # GATILLO COMPRA: Barrió abajo y está cerrando arriba con fuerza
-    if swept_low and close_now > open_now and body_ratio > 80 and velocity > 0.05:
+    v_trigger = 0.05 if "XAU" in sym.upper() else 10.0 
+
+    # GATILLO COMPRA: Filtro Alcista (Solo Oro) + Sweep Low + Re-entry
+    trend_ok = True
+    if "XAU" in sym.upper():
+        trend_ok = (last_close > ema50) # Solo compramos ORO si es alcista
+        
+    if trend_ok and swept_low and close_now > low_last and close_now > open_now and body_ratio > 65 and velocity > v_trigger:
         STATE["processed_candles"][sym] = candle_id
         return mt5.ORDER_TYPE_BUY
         
-    # GATILLO VENTA: Barrió arriba y está cerrando abajo con fuerza
-    if swept_high and close_now < open_now and body_ratio > 80 and velocity > 0.05:
+    # GATILLO VENTA: Filtro Bajista (Solo Oro) + Sweep High + Re-entry
+    trend_ok_sell = True
+    if "XAU" in sym.upper():
+        trend_ok_sell = (last_close < ema50) # Solo vendemos ORO si es bajista
+        
+    if trend_ok_sell and swept_high and close_now < high_last and close_now < open_now and body_ratio > 65 and velocity > v_trigger:
         STATE["processed_candles"][sym] = candle_id
         return mt5.ORDER_TYPE_SELL
+
         
     return None
+
+
+
+
 
 def main_loop():
     if not mt5.initialize(): 
