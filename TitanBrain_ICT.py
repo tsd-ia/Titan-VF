@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.121 (NITRO BYPASS) ---
-VERSION = "v47.9.121"
-BRANDING = "🦅 TITAN ICT: NITRO BYPASS ACTIVADO"
+# --- CONFIGURACIÓN TITAN v47.9.125 (ICT REPARADO) ---
+VERSION = "v47.9.125"
+BRANDING = "🦅 TITAN ICT: ESCUDO REPARADO (USD)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -94,24 +94,26 @@ def manage_positions(positions):
         profit_usd = p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0)
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         
-        # 1. COSECHA INICIAL (Lock de terreno positivo)
-        if profit_usd >= cfg["h_trigger"] and p.sl == 0:
+        # Detectar si el SL actual está en zona de riesgo (pérdida)
+        is_risky = (p.type == 0 and p.sl < p.price_open) or (p.type == 1 and (p.sl == 0 or p.sl > p.price_open))
+        
+        # 1. COSECHA INICIAL (Mover SL a terreno positivo una vez superado el trigger)
+        if profit_usd >= cfg["h_trigger"] and is_risky:
              # Calcular precio necesario para el lock inicial
              points_needed = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
              target_sl = p.price_open + points_needed if p.type == 0 else p.price_open - points_needed
              mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
-             add_log_dash(f"💰 {p.symbol} COSECHA ${cfg['h_lock']} LOCK")
+             add_log_dash(f"💰 {p.symbol} BE PROTEGIDO ${cfg['h_lock']}")
         
-        # 2. TRAILING STOP DINÁMICO
-        elif profit_usd >= (cfg["h_trigger"] + cfg["t_step"]) and cfg["trail"]:
-             # Mover SL dinámico para seguir el precio con respiro
+        # 2. TRAILING STOP DINÁMICO (Solo si ya estamos en profit lock)
+        elif profit_usd >= (cfg["h_trigger"] + cfg["t_step"]) and not is_risky:
              current_sl_profit = (p.sl - p.price_open) * (s_i.trade_tick_value / s_i.point) * p.volume if p.type==0 else (p.price_open - p.sl) * (s_i.trade_tick_value / s_i.point) * p.volume
-             if profit_usd - current_sl_profit > (cfg["h_lock"] + cfg["t_step"]):
+             if profit_usd - current_sl_profit > cfg["t_step"]:
                  new_lock = profit_usd - cfg["air"] 
                  points_new = (new_lock / (s_i.trade_tick_value / s_i.point)) / p.volume
                  new_sl = p.price_open + points_new if p.type == 0 else p.price_open - points_new
                  
-                 is_better = (p.type==0 and new_sl > p.sl) or (p.type==1 and (p.sl==0 or new_sl < p.sl))
+                 is_better = (p.type==0 and new_sl > p.sl) or (p.type==1 and new_sl < p.sl)
                  if is_better:
                      mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_sl, s_i.digits)), "tp": p.tp})
 
@@ -160,72 +162,62 @@ def main_loop(mode_24h=False):
                     s_d["status"] = "COOLDOWN" if on_cooldown else "OUT_CLOCK"
                     continue
 
-                # --- MODO THUNDER STORM (RUPTURA M1) ---
-                rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
-                if rates_m1 is None or len(rates_m1) < 2: 
-                    s_d["status"] = "BUSCANDO M1..."
-                    continue
+                # --- MODO ICT REAL (SWEEP H1 + MSS M1) ---
+                h_high, h_low = get_h1_liquidity(sym)
+                if h_high is None: continue
+                s_d.update({"h1_high": h_high, "h1_low": h_low})
                 
-                m1_high = rates_m1[-2]['high']
-                m1_low = rates_m1[-2]['low']
-                s_d.update({"m1_h": m1_high, "m1_l": m1_low})
+                sweep_buy = tick.ask < h_low
+                sweep_sell = tick.bid > h_high
                 
-                thunder_buy = tick.ask > m1_high
-                thunder_sell = tick.bid < m1_low
-                
-                if (thunder_buy or thunder_sell) and len(sym_pos) == 0:
-                    mss_ok = True
-                    # A. VANGUARDIA (Calculando Riesgo en USD Reales)
+                if (sweep_buy or sweep_sell) and len(sym_pos) == 0:
+                    # VALIDACIÓN MSS (Ruptura de vela M1 anterior en dirección opuesta)
+                    rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
+                    if rates_m1 is None or len(rates_m1) < 2: continue
+                    
+                    mss_ok = False
+                    if sweep_buy and tick.bid > rates_m1[-2]['high']: mss_ok = True
+                    elif sweep_sell and tick.ask < rates_m1[-2]['low']: mss_ok = True
+                    
                     if mss_ok and (time.time() - s_d["last_trade"] > 3):
-                        side = "BUY" if thunder_buy else "SELL"
-                        
-                        # Cálculo de SL exacto para perder cfg["sl_usd"]
-                        # points = (usd_loss / (tick_value / point)) / volume
+                        side = "BUY" if sweep_buy else "SELL"
                         points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
                         sl = tick.bid - points_sl if side=="BUY" else tick.ask + points_sl
-                        
-                        # TP inicial optimizado (1.5x el riesgo)
-                        tp = tick.bid + (points_sl * 1.5) if side=="BUY" else tick.ask - (points_sl * 1.5)
+                        tp = tick.bid + (points_sl * 2) if side=="BUY" else tick.ask - (points_sl * 2)
                         
                         for _ in range(cfg['burst']):
                             mt5.order_send({
                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
                                 "sl": float(round(sl, s_i.digits)), "tp": float(round(tp, s_i.digits)),
-                                "magic": MAGIC, "comment": "THUNDER_VANG",
+                                "magic": MAGIC, "comment": "ICT_VANG",
                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
                             })
-                        add_log_dash(f"🏹 {sym} {side} RÁFAGA M1")
+                        add_log_dash(f"� {sym} {side} ICT MSS SOLTADO")
                         s_d["last_trade"] = time.time()
                 
-                # ACTUALIZACIÓN DE ESTATUS DETALLADO
+                # ESTATUS DE COMBATE
                 if len(sym_pos) == 0:
-                    if on_cooldown: s_d["status"] = "🛡️ BOZAL (30m)"
-                    else: s_d["status"] = f"🔎 SCAN M1: {m1_low:.5f}-{m1_high:.5f}"
+                    s_d["status"] = f"🔎 SCAN ICT: {h_low:.5f}-{h_high:.5f}"
                 else:
                     current_pnl = sum(p.profit for p in sym_pos)
-                    # B. REFUERZOS STORM (Sincronizados con BE)
-                    if len(sym_pos) < MAX_BULLETS:
-                        all_protected = all(p.sl != 0 for p in sym_pos)
-                        if current_pnl >= REINFORCE_PROFIT and all_protected:
-                             # Lógica de refuerzo...
-                             side = "BUY" if sym_pos[0].type == 0 else "SELL"
-                             for _ in range(2):
-                                 mt5.order_send({
-                                     "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                                     "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                                     "sl": sym_pos[0].sl, "tp": sym_pos[0].tp,
-                                     "magic": MAGIC, "comment": "STORM_REINF",
-                                     "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
-                                 })
-                             add_log_dash(f"🚀 {sym} REFUERZOS +2 (PNL ${current_pnl:.2f})")
-                             s_d["last_reinf"] = time.time()
-                        
-                        status_war = f"⚔️ WAR: {current_pnl:+.2f} | REINF: {current_pnl:.1f}/{REINFORCE_PROFIT}"
-                        if not all_protected: status_war += " (WAIT BE)"
-                        s_d["status"] = status_war
-                    else:
-                        s_d["status"] = f"🔥 MAX BATTLE: {current_pnl:+.2f}"
+                    # REFUERZOS SOLO SI ESTÁN EN PROFIT BE
+                    all_in_profit = all((p.type == 0 and p.sl > p.price_open) or (p.type == 1 and p.sl < p.price_open and p.sl != 0) for p in sym_pos)
+                    
+                    if len(sym_pos) < MAX_BULLETS and current_pnl >= REINFORCE_PROFIT and all_in_profit:
+                         side = "BUY" if sym_pos[0].type == 0 else "SELL"
+                         for _ in range(2):
+                             mt5.order_send({
+                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                                 "sl": sym_pos[0].sl, "tp": sym_pos[0].tp,
+                                 "magic": MAGIC, "comment": "ICT_REINF",
+                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
+                             })
+                         add_log_dash(f"🚀 {sym} REFUERZOS +2 (PNL ${current_pnl:.2f})")
+                         s_d["last_reinf"] = time.time()
+                    
+                    s_d["status"] = f"⚔️ WAR: {current_pnl:+.2f} | REINF: {'OK' if all_in_profit else 'WAIT BE'}"
 
             time.sleep(0.5) 
         except Exception as e:
