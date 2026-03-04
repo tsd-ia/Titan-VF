@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.235 (AJUSTE RETROACTIVO) ---
-VERSION = "v47.9.235"
-BRANDING = "🛡️ TITAN ICT: BLINDAJE INMEDIATO"
+# --- CONFIGURACIÓN TITAN v47.9.240 (LA GUILLOTINA) ---
+VERSION = "v47.9.240"
+BRANDING = "🛡️ TITAN ICT: CIERRE FORZADO ACTIVADO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -134,9 +134,13 @@ def manage_positions(positions):
         profit_usd = p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0)
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         
-        # Detectar si el SL actual está en zona de riesgo (pérdida)
-        is_risky = (p.type == 0 and p.sl < p.price_open) or (p.type == 1 and (p.sl == 0 or p.sl > p.price_open))
-        
+        # --- LA GUILLOTINA: CIERRE FORZADO DE EMERGENCIA ---
+        if profit_usd <= -(cfg["sl_usd"] + 0.5): # +0.5 de margen por spread
+             res = mt5.Close(p.symbol, ticket=p.ticket)
+             if res:
+                 add_log_dash(f"💀 {p.symbol} CERRADO POR RIESGO (${profit_usd})")
+                 continue
+
         # 0. AJUSTE RETROACTIVO (Si el SL es más ancho de lo que dice la configuración nueva)
         max_points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / p.volume
         dist_actual = abs(p.price_open - p.sl) / s_i.point if p.sl != 0 else 99999
