@@ -26,8 +26,14 @@ REINFORCE_PROFIT = 3.0     # Profit para buscar refuerzos (agrupado)
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
-    "GOLD": {"lot": 0.01, "sl_points": 2500, "trail": True, "burst": 2}, # SL $25 (Sniper-Shield)
-    "FX":   {"lot": 0.02, "sl_points": 1250, "trail": True, "burst": 3}  # SL $25 (Sniper-Shield)
+    "GOLD": {
+        "lot": 0.01, "sl_points": 2500, "trail": True, "burst": 2,
+        "h_trigger": 2.5, "h_lock": 1.0, "t_step": 2.0, "air": 2.5
+    },
+    "FX":   {
+        "lot": 0.02, "sl_points": 1250, "trail": True, "burst": 3,
+        "h_trigger": 0.35, "h_lock": 0.10, "t_step": 0.15, "air": 0.20
+    }
 }
 
 STATE = {
@@ -85,20 +91,20 @@ def manage_positions(positions):
         profit_usd = p.profit + p.commission + p.swap
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         
-        # 1. COSECHA INICIAL (1.50 -> 0.50)
-        if profit_usd >= HARVEST_TRIGGER and p.sl == 0:
-             # Calcular precio necesario para ganar $0.50
-             points_needed = (HARVEST_LOCK / (s_i.trade_tick_value / s_i.point)) / p.volume
+        # 1. COSECHA INICIAL (Lock de terreno positivo)
+        if profit_usd >= cfg["h_trigger"] and p.sl == 0:
+             # Calcular precio necesario para el lock inicial
+             points_needed = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
              target_sl = p.price_open + points_needed if p.type == 0 else p.price_open - points_needed
              mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
-             add_log_dash(f"💰 {p.symbol} COSECHA ${HARVEST_LOCK} LOCK")
+             add_log_dash(f"💰 {p.symbol} COSECHA ${cfg['h_lock']} LOCK")
         
-        # 2. TRAILING STOP (Después de la cosecha)
-        elif profit_usd >= (HARVEST_TRIGGER + TRAILING_STEP) and cfg["trail"]:
+        # 2. TRAILING STOP DINÁMICO
+        elif profit_usd >= (cfg["h_trigger"] + cfg["t_step"]) and cfg["trail"]:
              # Mover SL dinámico para seguir el precio con respiro
              current_sl_profit = (p.sl - p.price_open) * (s_i.trade_tick_value / s_i.point) * p.volume if p.type==0 else (p.price_open - p.sl) * (s_i.trade_tick_value / s_i.point) * p.volume
-             if profit_usd - current_sl_profit > (HARVEST_LOCK + TRAILING_STEP):
-                 new_lock = profit_usd - 2.50 # Pulmón de Oro: $2.50 de aire
+             if profit_usd - current_sl_profit > (cfg["h_lock"] + cfg["t_step"]):
+                 new_lock = profit_usd - cfg["air"] 
                  points_new = (new_lock / (s_i.trade_tick_value / s_i.point)) / p.volume
                  new_sl = p.price_open + points_new if p.type == 0 else p.price_open - points_new
                  
