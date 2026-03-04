@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.175 (SYNC DASHBOARD) ---
-VERSION = "v47.9.175"
-BRANDING = "🦅 TITAN ICT: VISION H1 + GATILLO M1"
+# --- CONFIGURACIÓN TITAN v47.9.180 (RADAR CALIBRADO) ---
+VERSION = "v47.9.180"
+BRANDING = "🦅 TITAN ICT: CALIBRACIÓN QUIRÚRGICA"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -29,13 +29,13 @@ BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
-        "h_trigger": 3.0, "h_lock": 0.5, "t_step": 1.0, "air": 2.5,
+        "h_trigger": 2.0, "h_lock": 0.5, "t_step": 1.0, "air": 1.5,
         "calculate_be": True, "strict_filter": True, "r_trigger": 5.0
     },
     "FX":   {
-        "lot": 0.02, "sl_usd": 15.0, "trail": True, "burst": 3,
-        "h_trigger": 1.0, "h_lock": 0.3, "t_step": 0.5, "air": 0.7,
-        "calculate_be": True, "strict_filter": False, "r_trigger": 3.0
+        "lot": 0.02, "sl_usd": 5.0, "trail": True, "burst": 3,
+        "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.2,
+        "calculate_be": True, "strict_filter": False, "r_trigger": 1.0
     }
 }
 
