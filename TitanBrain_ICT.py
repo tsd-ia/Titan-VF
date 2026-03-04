@@ -8,17 +8,17 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.380 (TELEGRAM EN VIVO) ---
-VERSION = "v47.9.380"
-BRANDING = "🦅 TITAN ICT: TELEGRAM SENTINEL 24/7"
+# --- CONFIGURACIÓN TITAN v47.9.390 (GATILLOS REPARADOS) ---
+VERSION = "v47.9.390"
+BRANDING = "🦅 TITAN ICT: TELEGRAM + ARTILLERÍA REPARADA"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
-# GESTIÓN DE RIESGO (ARTILLERÍA TOTAL)
-MAX_BULLETS = 6            # Capacidad de ataque restaurada
+# GESTIÓN DE RIESGO
+MAX_BULLETS = 6            
 MAGIC = 48105              
 COOLDOWN_TIME = 900        
-MAX_TOTAL_SYMBOLS = 10     # Modo Storm Activado
+MAX_TOTAL_SYMBOLS = 10     
 BYPASS_COOLDOWN = True    
 
 ASSET_CONFIG = {
@@ -36,7 +36,7 @@ ASSET_CONFIG = {
 
 STATE = {
     "is_running": True, "active_symbols": [], "symbols_data": {}, 
-    "last_logs": ["🚀 TELEGRAM ACTIVADO - INICIANDO MONITOREO"],
+    "last_logs": ["🚀 MOTOR REPARADO - ESCANEANDO BREAKOUTS"],
     "last_heartbeat": 0, "last_tg_monitor": 0, "tracked_positions": {}
 }
 
@@ -74,7 +74,6 @@ def manage_positions(positions):
         profit_usd = p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0)
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         
-        # LA GUILLOTINA
         if profit_usd <= -(cfg["sl_usd"] + 0.5):
              mt5.Close(p.symbol, ticket=p.ticket)
              add_log_dash(f"💀 EMERGENCY EXIT {p.symbol}")
@@ -107,7 +106,6 @@ def main_loop():
     
     while STATE["is_running"]:
         try:
-            # Heartbeat de Seguridad
             if time.time() - STATE["last_heartbeat"] > 30:
                 add_log_dash("💓 CEREBRO OK - ESCANEANDO BREAKOUT H1...")
                 STATE["last_heartbeat"] = time.time()
@@ -116,32 +114,29 @@ def main_loop():
             pos = mt5.positions_get()
             cur = [p for p in pos if p.magic == MAGIC] if pos else []
             
-            # DETECCIÓN DE CIERRES
+            # TRACKING PARA CIERRES
             current_tickets = {p.ticket: p for p in cur}
             for t_id, p_old in list(STATE["tracked_positions"].items()):
                 if t_id not in current_tickets:
-                    # El ticket se cerró
                     res_col = "🟢 PROFIT" if p_old.profit >= 0 else "🔴 LOSS"
                     msg = (f"🏁 *POSICIÓN CERRADA: {p_old.symbol}*\n"
                            f"━━━━━━━━━━━━━━━\n"
                            f"*Resultado:* {res_col} (${p_old.profit:+.2f})\n"
-                           f"*Tipo:* {'BUY' if p_old.type==0 else 'SELL'} | *Lote:* {p_old.volume}\n"
+                           f"*Lote:* {p_old.volume}\n"
                            f"*Balance:* ${acc.balance:.2f}\n"
                            f"*Equity:* ${acc.equity:.2f}\n"
-                           f"*PnL Total:* ${acc.profit:.2f}")
+                           f"*PnL Total:* ${acc.profit:+.2f}")
                     send_telegram(msg)
                     add_log_dash(f"🏁 CIERRE {p_old.symbol}: ${p_old.profit:+.2f}")
                     del STATE["tracked_positions"][t_id]
-            
-            # ACTUALIZAR TRACKING
             for p in cur: STATE["tracked_positions"][p.ticket] = p
 
-            # MONITOREO 10 SEGUNDOS
+            # MONITOREO 10 SEG
             if cur and (time.time() - STATE["last_tg_monitor"] > 10):
                 msg = f"📊 *MONITOREO EN VIVO*\n━━━━━━━━━━━━━━━\n"
                 for p in cur:
                     msg += f"• *{p.symbol}:* ${p.profit:+.2f} ({'BUY' if p.type==0 else 'SELL'} {p.volume})\n"
-                msg += f"━━━━━━━━━━━━━━━\n*Equity:* ${acc.equity:.2f} | *PnL:* ${acc.profit:.2f}"
+                msg += f"━━━━━━━━━━━━━━━\n*Equity:* ${acc.equity:.2f} | *PnL:* ${acc.profit:+.2f}"
                 send_telegram(msg)
                 STATE["last_tg_monitor"] = time.time()
 
@@ -154,62 +149,58 @@ def main_loop():
                 s_d = STATE["symbols_data"][sym]
                 sym_pos = [p for p in cur if p.symbol == sym]
                 cfg = ASSET_CONFIG[s_d["type"]]
-                
                 h_h, h_l = get_h1_liquidity(sym)
+                
                 s_d.update({"pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
-                # ESTRATEGIA ESPEJO BREAKOUT
+                # --- LÓGICA DE ENTRADA (BREAKOUT) ---
                 if len(sym_pos) == 0 and len(cur) < MAX_TOTAL_SYMBOLS:
+                    # COMPRA: ROMPE TECHO
+                    if h_h and tick.bid >= h_h:
+                        pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
+                        sl = tick.bid - pts_sl
                         res = mt5.order_send({
                             "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                             "type": 0, "price": tick.ask, "sl": float(round(sl, s_i.digits)), 
-                            "magic": MAGIC, "comment": "FENIX_UP", "type_filling": mt5.ORDER_FILLING_IOC
+                            "magic": MAGIC, "comment": "FENIX_BUY", "type_filling": mt5.ORDER_FILLING_IOC
                         })
                         if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                            add_log_dash(f"📈 {sym} COMPRA (BREAKOUT)")
-                            send_telegram(f"🚀 *NUEVA COMPRA: {sym}*\n*Lote:* {cfg['lot']}\n*Breakout:* Techo H1 roto.")
-                        s_d["last_trade"] = time.time()
+                            add_log_dash(f"� COMPRA {sym}")
+                            send_telegram(f"� *NUEVA COMPRA: {sym}*\n*Lote:* {cfg['lot']}\n*Breakout:* Techo H1 roto.")
+                    # VENTA: ROMPE SUELO
                     elif h_l and tick.bid <= h_l:
                         pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
                         sl = tick.bid + pts_sl
                         res = mt5.order_send({
                             "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                             "type": 1, "price": tick.bid, "sl": float(round(sl, s_i.digits)), 
-                            "magic": MAGIC, "comment": "FENIX_DOWN", "type_filling": mt5.ORDER_FILLING_IOC
+                            "magic": MAGIC, "comment": "FENIX_SELL", "type_filling": mt5.ORDER_FILLING_IOC
                         })
                         if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                            add_log_dash(f"📉 {sym} VENTA (BREAKOUT)")
+                            add_log_dash(f"� VENTA {sym}")
                             send_telegram(f"📉 *NUEVA VENTA: {sym}*\n*Lote:* {cfg['lot']}\n*Breakout:* Suelo H1 roto.")
-                        s_d["last_trade"] = time.time()
-                
-                # REFUERZOS (LLUVIA DE BALAS)
+
+                # --- REFUERZOS ---
                 elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
                     pnl = sum(p.profit for p in sym_pos)
-                    # Solo si todas las balas previas están protegidas
                     all_protected = all((p.type==0 and p.sl >= p.price_open) or (p.type==1 and p.sl <= p.price_open and p.sl != 0) for p in sym_pos)
-                    
                     if pnl >= cfg["r_trigger"] and all_protected:
                          side = "BUY" if sym_pos[0].type == 0 else "SELL"
-                         # Añadir dosis de balas (escalado simple por ahora para seguridad)
                          res = mt5.order_send({
                              "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot_reinf"],
                              "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
                              "sl": sym_pos[0].sl, "magic": MAGIC, "comment": "RAIN_BULLET", "type_filling": mt5.ORDER_FILLING_IOC
                          })
                          if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                            add_log_dash(f"🚀 {sym} REFUERZO +{cfg['lot_reinf']} (TOTAL: {len(sym_pos)+1})")
-                            send_telegram(f"🔥 *REFUERZO ENVIADO: {sym}*\n*Lote:* +{cfg['lot_reinf']}\n*Total Balas:* {len(sym_pos)+1}")
-                    elif not all_protected:
-                         s_d["status"] = "⏳ WAIT BE PROTECTION"
-                    elif pnl < cfg["r_trigger"]:
-                         s_d["status"] = f"⏳ WAIT PROFIT ${cfg['r_trigger']:.1f}"
+                            add_log_dash(f"� REFUERZO {sym}")
+                            send_telegram(f"🔥 *REFUERZO: {sym}*\n*Lote:* +{cfg['lot_reinf']}\n*Total Balas:* {len(sym_pos)+1}")
 
                 if len(sym_pos) == 0:
                     dist_h = (h_h - tick.bid)/s_i.point if h_h else 999
                     dist_l = (tick.bid - h_l)/s_i.point if h_l else 999
                     s_d["status"] = f"🔎 {('H' if dist_h < dist_l else 'L')} {min(dist_h, dist_l):.1f}"
                 else:
-                    s_d["status"] = f"� WAR {len(sym_pos)}B | {sum(p.profit for p in sym_pos):.2f}"
+                    s_d["status"] = f"🚀 WAR {len(sym_pos)}B | {sum(p.profit for p in sym_pos):.2f}"
 
             time.sleep(1)
         except Exception:
@@ -221,7 +212,7 @@ def draw_dashboard():
         acc = mt5.account_info()
         if not acc: continue
         print(f"{Fore.CYAN}{'═'*115}")
-        print(f"{Fore.RED}{Style.BRIGHT} 🦅 {BRANDING} | {VERSION} | JEFE: DIEGO (MODO STORM)")
+        print(f"{Fore.RED}{Style.BRIGHT} 🦅 {BRANDING} | {VERSION} | JEFE: DIEGO (MODO RECUPERACIÓN)")
         print(f"{Fore.WHITE} BALANCE: ${Fore.GREEN}{acc.balance:.2f} {Fore.WHITE}| EQUITY: ${Fore.CYAN}{acc.equity:.2f} {Fore.WHITE}| PnL: {Fore.YELLOW}${acc.profit:.2f}")
         print(f"{Fore.CYAN}{'─'*115}")
         print(f"{Fore.WHITE} {'ACTIVO':<10} | {'SPR':<4} | {'H1 HIGH':<10} | {'H1 LOW':<10} | {'BALAS':<4} | {'PnL' :<10} | {'STATUS'}")
