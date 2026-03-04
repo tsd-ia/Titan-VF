@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.140 (HÍBRIDO: SNIPER + GUERRILLA) ---
-VERSION = "v47.9.140"
-BRANDING = "🦅 TITAN ICT: SNIPER ORO + GUERRILLA FX"
+# --- CONFIGURACIÓN TITAN v47.9.145 (ORO OXÍGENO) ---
+VERSION = "v47.9.145"
+BRANDING = "🦅 TITAN ICT: MODO OXÍGENO (ORO LIBRE)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -29,8 +29,8 @@ BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
-        "h_trigger": 1.2, "h_lock": 0.5, "t_step": 0.5, "air": 0.8,
-        "calculate_be": True, "strict_filter": True, "r_trigger": 1.5
+        "h_trigger": 3.0, "h_lock": 0.5, "t_step": 1.0, "air": 2.5,
+        "calculate_be": True, "strict_filter": True, "r_trigger": 5.0
     },
     "FX":   {
         "lot": 0.02, "sl_usd": 15.0, "trail": True, "burst": 3,
@@ -95,6 +95,17 @@ def get_rsi(symbol, tf, period=14):
     loss = (-delta.where(delta < 0, 0)).rolling(window=period).mean()
     rs = gain / loss.replace(0, 0.001) # Evitar división por cero
     return float(100 - (100 / (1 + rs)).iloc[-1])
+
+def get_atr(symbol, tf, period=14):
+    """Calcula ATR para medir volatilidad real."""
+    rates = mt5.copy_rates_from_pos(symbol, tf, 0, period + 1)
+    if rates is None or len(rates) < period: return 1.0
+    df = pd.DataFrame(rates)
+    df['h-l'] = df['high'] - df['low']
+    df['h-pc'] = abs(df['high'] - df['close'].shift())
+    df['l-pc'] = abs(df['low'] - df['close'].shift())
+    tr = df[['h-l', 'h-pc', 'l-pc']].max(axis=1)
+    return float(tr.rolling(period).mean().iloc[-1])
 
 def get_h1_liquidity(sym):
     rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 1, 1)
