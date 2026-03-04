@@ -8,35 +8,35 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.350 (MODO FÉNIX - ESPEJO) ---
-VERSION = "v47.9.350"
-BRANDING = "🦅 TITAN ICT: ESTRATEGIA ESPEJO (BREAKOUT)"
+# --- CONFIGURACIÓN TITAN v47.9.360 (ARTILLERÍA PESADA) ---
+VERSION = "v47.9.360"
+BRANDING = "🦅 TITAN ICT: BREAKOUT + LLUVIA DE BALAS"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
-# GESTIÓN DE RIESGO (CONTROL DE DAÑOS)
-MAX_BULLETS = 1            # Solo 1 bala para recuperar con calma
+# GESTIÓN DE RIESGO (ARTILLERÍA TOTAL)
+MAX_BULLETS = 6            # Capacidad de ataque restaurada
 MAGIC = 48105              
-COOLDOWN_TIME = 1800       # 30 Minutos de enfriamiento tras pérdida
-MAX_TOTAL_SYMBOLS = 3      # Reducido de 10 a 3 para no saturar
-BYPASS_COOLDOWN = False    # Volvemos a activar la seguridad
+COOLDOWN_TIME = 900        
+MAX_TOTAL_SYMBOLS = 10     # Modo Storm Activado
+BYPASS_COOLDOWN = True    
 
 ASSET_CONFIG = {
     "GOLD": {
-        "lot": 0.01, "sl_usd": 10.0, "trail": True, 
+        "lot": 0.01, "lot_reinf": 0.01, "sl_usd": 10.0, "trail": True, 
         "h_trigger": 2.5, "h_lock": 0.5, "t_step": 0.5, "air": 2.0,
-        "calculate_be": True, "r_trigger": 3.0
+        "calculate_be": True, "r_trigger": 2.5
     },
     "FX":   {
-        "lot": 0.02, "sl_usd": 2.0, "trail": True, 
+        "lot": 0.02, "lot_reinf": 0.02, "sl_usd": 2.0, "trail": True, 
         "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.5,
-        "calculate_be": True, "r_trigger": 1.0
+        "calculate_be": True, "r_trigger": 0.6
     }
 }
 
 STATE = {
     "is_running": True, "active_symbols": [], "symbols_data": {}, 
-    "last_logs": ["� MODO RECUPERACIÓN ACTIVADO - ESTRATEGIA ESPEJO"],
+    "last_logs": ["🚀 ARTILLERÍA RESTAURADA - MODO CAZADOR AGRESIVO"],
     "last_heartbeat": 0
 }
 
@@ -60,10 +60,10 @@ def manage_positions(positions):
         profit_usd = p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0)
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         
-        # LA GUILLOTINA: PROTECCIÓN TOTAL
-        if profit_usd <= -(cfg["sl_usd"]):
+        # LA GUILLOTINA
+        if profit_usd <= -(cfg["sl_usd"] + 0.5):
              mt5.Close(p.symbol, ticket=p.ticket)
-             add_log_dash(f"💀 EMERGENCY CLOSE {p.symbol} (${profit_usd})")
+             add_log_dash(f"💀 EMERGENCY EXIT {p.symbol}")
              continue
 
         is_risky = (p.type == 0 and p.sl < p.price_open) or (p.type == 1 and (p.sl == 0 or p.sl > p.price_open))
@@ -71,7 +71,7 @@ def manage_positions(positions):
              pts = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
              target_sl = p.price_open + pts if p.type == 0 else p.price_open - pts
              mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
-             add_log_dash(f"✅ {p.symbol} PROTEGIDO")
+             add_log_dash(f"✅ {p.symbol} PROTEGIDO BE")
 
 def init_mt5():
     if not mt5.initialize(): return False
@@ -107,38 +107,51 @@ def main_loop():
                 h_h, h_l = get_h1_liquidity(sym)
                 s_d.update({"pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
-                # ESTRATEGIA ESPEJO (BREAKOUT TREND)
+                # ESTRATEGIA ESPEJO BREAKOUT
                 if len(sym_pos) == 0 and len(cur) < MAX_TOTAL_SYMBOLS:
-                    # ¿ROMPIÓ TECHO? -> COMPRAMOS (TENDENCIA)
                     if h_h and tick.bid >= h_h:
                         pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
                         sl = tick.bid - pts_sl
                         mt5.order_send({
                             "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                             "type": 0, "price": tick.ask, "sl": float(round(sl, s_i.digits)), 
-                            "magic": MAGIC, "comment": "FENIX_BREAK_UP", "type_filling": mt5.ORDER_FILLING_IOC
+                            "magic": MAGIC, "comment": "FENIX_UP", "type_filling": mt5.ORDER_FILLING_IOC
                         })
-                        add_log_dash(f"� {sym} COMPRA (ROMPIÓ TECHO)")
+                        add_log_dash(f"📈 {sym} COMPRA (BREAKOUT)")
                         s_d["last_trade"] = time.time()
-                    
-                    # ¿ROMPIÓ SUELO? -> VENDEMOS (TENDENCIA)
                     elif h_l and tick.bid <= h_l:
                         pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
                         sl = tick.bid + pts_sl
                         mt5.order_send({
                             "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                             "type": 1, "price": tick.bid, "sl": float(round(sl, s_i.digits)), 
-                            "magic": MAGIC, "comment": "FENIX_BREAK_DOWN", "type_filling": mt5.ORDER_FILLING_IOC
+                            "magic": MAGIC, "comment": "FENIX_DOWN", "type_filling": mt5.ORDER_FILLING_IOC
                         })
-                        add_log_dash(f"� {sym} VENTA (ROMPIÓ SUELO)")
+                        add_log_dash(f"📉 {sym} VENTA (BREAKOUT)")
                         s_d["last_trade"] = time.time()
                 
+                # REFUERZOS (LLUVIA DE BALAS)
+                elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
+                    pnl = sum(p.profit for p in sym_pos)
+                    # Solo si todas las balas previas están protegidas
+                    all_protected = all((p.type==0 and p.sl >= p.price_open) or (p.type==1 and p.sl <= p.price_open and p.sl != 0) for p in sym_pos)
+                    
+                    if pnl >= cfg["r_trigger"] and all_protected:
+                         side = "BUY" if sym_pos[0].type == 0 else "SELL"
+                         # Añadir dosis de balas (escalado simple por ahora para seguridad)
+                         mt5.order_send({
+                             "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot_reinf"],
+                             "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                             "sl": sym_pos[0].sl, "magic": MAGIC, "comment": "RAIN_BULLET", "type_filling": mt5.ORDER_FILLING_IOC
+                         })
+                         add_log_dash(f"🚀 {sym} REFUERZO +{cfg['lot_reinf']}")
+
                 if len(sym_pos) == 0:
                     dist_h = (h_h - tick.bid)/s_i.point if h_h else 999
                     dist_l = (tick.bid - h_l)/s_i.point if h_l else 999
                     s_d["status"] = f"🔎 {('H' if dist_h < dist_l else 'L')} {min(dist_h, dist_l):.1f}"
                 else:
-                    s_d["status"] = f"🚀 TRENDING {sum(p.profit for p in sym_pos):.2f}"
+                    s_d["status"] = f"� WAR {len(sym_pos)}B | {sum(p.profit for p in sym_pos):.2f}"
 
             time.sleep(1)
         except Exception:
@@ -150,16 +163,16 @@ def draw_dashboard():
         acc = mt5.account_info()
         if not acc: continue
         print(f"{Fore.CYAN}{'═'*115}")
-        print(f"{Fore.YELLOW}{Style.BRIGHT} 🔥 {BRANDING} | {VERSION} | JEFE: DIEGO (MODO RECUPERACIÓN)")
+        print(f"{Fore.RED}{Style.BRIGHT} 🦅 {BRANDING} | {VERSION} | JEFE: DIEGO (MODO STORM)")
         print(f"{Fore.WHITE} BALANCE: ${Fore.GREEN}{acc.balance:.2f} {Fore.WHITE}| EQUITY: ${Fore.CYAN}{acc.equity:.2f} {Fore.WHITE}| PnL: {Fore.YELLOW}${acc.profit:.2f}")
         print(f"{Fore.CYAN}{'─'*115}")
-        print(f"{Fore.WHITE} {'ACTIVO':<10} | {'SPR':<4} | {'H1 HIGH':<10} | {'H1 LOW':<10} | {'POS':<4} | {'PnL' :<10} | {'STATUS'}")
+        print(f"{Fore.WHITE} {'ACTIVO':<10} | {'SPR':<4} | {'H1 HIGH':<10} | {'H1 LOW':<10} | {'BALAS':<4} | {'PnL' :<10} | {'STATUS'}")
         print(f"{Fore.CYAN}{'─'*115}")
         for sym in STATE["active_symbols"]:
             d = STATE["symbols_data"][sym]
             pnl_col = f"{Fore.GREEN if d['pnl']>=0 else Fore.RED}${d['pnl']:+7.2f}{Style.RESET_ALL}"
             h1h, h1l = get_h1_liquidity(sym)
-            print(f" {sym:<10} | {d['spread']:<4} | {h1h if h1h else 0:<10.5f} | {h1l if h1l else 0:<10.5f} | {d['pos']}/1  | {pnl_col:<10} | {d['status']}")
+            print(f" {sym:<10} | {d['spread']:<4} | {h1h if h1h else 0:<10.5f} | {h1l if h1l else 0:<10.5f} | {d['pos']}/{MAX_BULLETS:<2} | {pnl_col:<10} | {d['status']}")
         print(f"{Fore.CYAN}{'─'*115}")
         for line in STATE["last_logs"]: print(f" > {line}")
         print(f"{Fore.CYAN}{'═'*115}")
