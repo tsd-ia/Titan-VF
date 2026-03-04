@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.145 (ORO OXÍGENO) ---
-VERSION = "v47.9.145"
-BRANDING = "🦅 TITAN ICT: MODO OXÍGENO (ORO LIBRE)"
+# --- CONFIGURACIÓN TITAN v47.9.150 (M15 SWEEPER) ---
+VERSION = "v47.9.150"
+BRANDING = "🦅 TITAN ICT: SEÑALES M15 (ALTA FRECUENCIA)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -107,8 +107,9 @@ def get_atr(symbol, tf, period=14):
     tr = df[['h-l', 'h-pc', 'l-pc']].max(axis=1)
     return float(tr.rolling(period).mean().iloc[-1])
 
-def get_h1_liquidity(sym):
-    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 1, 1)
+def get_m15_liquidity(sym):
+    """Obtiene la liquidez de la vela M15 anterior (más señales)."""
+    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 1, 1)
     if rates is not None and len(rates) > 0:
         return rates[0]['high'], rates[0]['low']
     return None, None
@@ -193,13 +194,13 @@ def main_loop(mode_24h=False):
                     s_d["status"] = "COOLDOWN" if on_cooldown else "OUT_CLOCK"
                     continue
 
-                # --- MODO ICT REAL (SWEEP H1 + MSS M1) ---
-                h_high, h_low = get_h1_liquidity(sym)
-                if h_high is None: continue
-                s_d.update({"h1_high": h_high, "h1_low": h_low})
+                # --- MODO ICT REAL (SWEEP M15 + MSS M1) ---
+                m15_h, m15_l = get_m15_liquidity(sym)
+                if m15_h is None: continue
+                s_d.update({"h1_high": m15_h, "h1_low": m15_l}) # Reutilizamos campos por dash
                 
-                sweep_buy = tick.ask < h_low
-                sweep_sell = tick.bid > h_high
+                sweep_buy = tick.ask < m15_l
+                sweep_sell = tick.bid > m15_h
                 
                 if (sweep_buy or sweep_sell) and len(sym_pos) == 0:
                     # VALIDACIÓN TRIPLE FILTRO (M1)
@@ -243,7 +244,7 @@ def main_loop(mode_24h=False):
                 
                 # ESTATUS DE COMBATE
                 if len(sym_pos) == 0:
-                    s_d["status"] = f"🔎 SCAN ICT: {h_low:.5f}-{h_high:.5f}"
+                    s_d["status"] = f"🔎 SCAN M15: {m15_l:.5f}-{m15_h:.5f}"
                 else:
                     current_pnl = sum(p.profit for p in sym_pos)
                     # REFUERZOS SOLO SI ESTÁN EN PROFIT BE
