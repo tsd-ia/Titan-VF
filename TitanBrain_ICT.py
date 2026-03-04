@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.110 (PULMÓN DE ORO) ---
-VERSION = "v47.9.110"
-BRANDING = "🦅 TITAN ICT: PULMÓN DE ORO (TRAILING $2)"
+# --- CONFIGURACIÓN TITAN v47.9.115 (FURIA THUNDER) ---
+VERSION = "v47.9.115"
+BRANDING = "🦅 TITAN ICT: FURIA THUNDER 24/7"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -41,12 +41,8 @@ def add_log_dash(msg):
     if len(STATE["last_logs"]) > 6: STATE["last_logs"].pop(0)
 
 def is_killzone():
-    tz_chile = pytz.timezone('America/Santiago')
-    now = datetime.now(tz_chile)
-    h, m = now.hour, now.minute
-    londres = (4 <= h < 8)
-    ny = (9 <= h < 13) and (h > 9 or m >= 30)
-    return londres or ny
+    # Desbloqueado 24h por solicitud del Comandante
+    return True
 
 def get_asset_type(sym):
     return "GOLD" if "XAU" in sym.upper() or "GOLD" in sym.upper() else "FX"
@@ -154,23 +150,23 @@ def main_loop(mode_24h=False):
                     s_d["status"] = "COOLDOWN" if on_cooldown else "OUT_CLOCK"
                     continue
 
-                # --- MODO METRALLETA ICT (CON MSS ADELANTADO) ---
-                sweep_buy = tick.ask < s_d["h1_low"]
-                sweep_sell = tick.bid > s_d["h1_high"]
+                # --- MODO THUNDER STORM (RUPTURA M1) ---
+                rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
+                if rates_m1 is None or len(rates_m1) < 2: continue
                 
-                if sweep_buy or sweep_sell:
-                    s_d["status"] = f"🎯 SWEEPING_{asset_type}"
-                    
-                    # VALIDACIÓN DE MSS (Giro del Cuchillo en M1)
-                    rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
-                    mss_ok = False
-                    if rates_m1 is not None and len(rates_m1) >= 2:
-                        if sweep_buy and tick.bid > rates_m1[-2]['high']: mss_ok = True
-                        elif sweep_sell and tick.ask < rates_m1[-2]['low']: mss_ok = True
+                m1_high = rates_m1[-2]['high']
+                m1_low = rates_m1[-2]['low']
+                
+                thunder_buy = tick.ask > m1_high
+                thunder_sell = tick.bid < m1_low
+                
+                if (thunder_buy or thunder_sell) and len(sym_pos) == 0:
+                    s_d["status"] = f"🎯 THUNDER_{asset_type}"
+                    mss_ok = True  # En este modo la ruptura de M1 es el MSS
                     
                     # A. VANGUARDIA (Disparo Inicial)
                     if mss_ok and len(sym_pos) == 0 and (time.time() - s_d["last_trade"] > 3):
-                        side = "BUY" if sweep_buy else "SELL"
+                        side = "BUY" if thunder_buy else "SELL"
                         sl_pts = cfg["sl_points"] * s_i.point
                         sl = tick.bid - sl_pts if side=="BUY" else tick.ask + sl_pts
                         tp_pts = sl_pts * (1.5 if asset_type=="FX" else RR_RATIO)
