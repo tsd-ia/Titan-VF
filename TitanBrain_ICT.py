@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.420 (REPORTE COMPLETO) ---
-VERSION = "v47.9.420"
-BRANDING = "🦅 TITAN ICT: LIVE REPORTS + BALANCE"
+# --- CONFIGURACIÓN TITAN v47.9.430 (BLINDAJE TOTAL) ---
+VERSION = "v47.9.430"
+BRANDING = "🦅 TITAN ICT: TRIPLE CONFIRMACIÓN + EMA/RSI"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -66,6 +66,27 @@ def get_h1_liquidity(sym):
     if rates is not None and len(rates) > 0:
         return rates[0]['high'], rates[0]['low']
     return None, None
+
+def get_ema(sym, timeframe, period):
+    rates = mt5.copy_rates_from_pos(sym, timeframe, 0, period + 2)
+    if rates is None or len(rates) < period: return None
+    closes = np.array([r['close'] for r in rates])
+    alpha = 2 / (period + 1)
+    ema = closes[0]
+    for c in closes[1:]: ema = (c * alpha) + (ema * (1 - alpha))
+    return ema
+
+def get_rsi(sym, timeframe, period):
+    rates = mt5.copy_rates_from_pos(sym, timeframe, 0, period + 20)
+    if rates is None or len(rates) < period + 1: return 50
+    closes = np.array([r['close'] for r in rates])
+    diff = np.diff(closes)
+    gains = diff[diff > 0]
+    losses = -diff[diff < 0]
+    avg_gain = np.mean(gains[-period:]) if len(gains) >= period else 0.0001
+    avg_loss = np.mean(losses[-period:]) if len(losses) >= period else 0.0001
+    rs = avg_gain / avg_loss
+    return 100 - (100 / (1 + rs))
 
 def manage_positions(positions):
     for p in positions:
@@ -153,54 +174,63 @@ def main_loop():
                 
                 s_d.update({"pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
-                # --- LÓGICA DE ENTRADA DIFERENCIADA ---
+                # --- LÓGICA DE ENTRADA TRIPLE CONFIRMACIÓN ---
                 if len(sym_pos) == 0 and len(cur) < MAX_TOTAL_SYMBOLS:
-                    is_gold = (s_d["type"] == "GOLD")
+                    h_h, h_l = get_h1_liquidity(sym)
+                    if not h_h or not h_l: continue
                     
-                    # DETECCIÓN DE BREAKOUT
-                    break_up = h_h and tick.bid >= h_h
-                    break_down = h_l and tick.bid <= h_l
+                    # FILTROS TÉCNICOS
+                    ema50 = get_ema(sym, mt5.TIMEFRAME_M1, 50)
+                    rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
                     
-                    if break_up or break_down:
-                        # Si es ORO, buscamos confirmación de vela M1 (MSS)
-                        if is_gold:
-                            rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
-                            if rates_m1 is not None and len(rates_m1) >= 2:
-                                last_m1 = rates_m1[-2]
-                                trigger_buy = (tick.bid > last_m1['high']) and break_up
-                                trigger_sell = (tick.ask < last_m1['low']) and break_down
-                                
-                                if trigger_buy or trigger_sell:
-                                    side = "BUY" if trigger_buy else "SELL"
-                                    pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
-                                    sl = tick.bid - pts_sl if side=="BUY" else tick.ask + pts_sl
-                                    res = mt5.order_send({
-                                        "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                                        "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                                        "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "ORO_CONF_H1",
-                                        "type_filling": mt5.ORDER_FILLING_IOC
-                                    })
-                                    if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                                        add_log_dash(f"🎯 ORO {side} CONFIRMADO")
-                                        send_telegram(f"🥇 *ORO: ENTRADA CONFIRMADA*\n*Tipo:* {side} | *Lote:* {cfg['lot']}\n*MSS M1:* Velas alineadas en breakout.")
-                                else:
-                                    target_p = last_m1['high'] if break_up else last_m1['low']
-                                    s_d["status"] = f"⏳ ORO WAIT M1 {('UP' if break_up else 'DOWN')} {target_p:.2f}"
+                    rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 4)
+                    if rates_m1 is not None and len(rates_m1) >= 4:
+                        # Ultimas 3 velas cerradas
+                        c1, c2, c3 = rates_m1[-4], rates_m1[-3], rates_m1[-2]
                         
-                        # Si es FX, entrada DIRECTA por contacto
-                        else:
-                            side = "BUY" if break_up else "SELL"
+                        # CONDICIÓN BUY: 3 Cierres > Techo + EMA + RSI
+                        conf_buy = all(c['close'] > h_h for c in [c1, c2, c3])
+                        trend_buy = ema50 and tick.ask > ema50
+                        safe_buy = rsi < 70
+                        
+                        # CONDICIÓN SELL: 3 Cierres < Suelo + EMA + RSI
+                        conf_sell = all(c['close'] < h_l for c in [c1, c2, c3])
+                        trend_sell = ema50 and tick.bid < ema50
+                        safe_sell = rsi > 30
+
+                        if conf_buy and trend_buy and safe_buy:
+                            side = "BUY"
                             pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
-                            sl = tick.bid - pts_sl if side=="BUY" else tick.bid + pts_sl
+                            sl = tick.bid - pts_sl
                             res = mt5.order_send({
                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                                "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                                "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "FX_DIRECT_H1",
-                                "type_filling": mt5.ORDER_FILLING_IOC
+                                "type": 0, "price": tick.ask, "sl": float(round(sl, s_i.digits)), 
+                                "magic": MAGIC, "comment": "TITAN_V430_B", "type_filling": mt5.ORDER_FILLING_IOC
                             })
                             if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                                add_log_dash(f"🚀 FX {sym} DISPARO DIRECTO")
-                                send_telegram(f"⚡ *FX: DISPARO DIRECTO {sym}*\n*Tipo:* {side} | *Breakout:* Contacto H1.")
+                                add_log_dash(f"🎯 TRIPLE BUY {sym}")
+                                send_telegram(f"🚀 *DISPARO CONFIRMADO: {sym}*\n*Tipo:* BUY | *Filtro:* 3-M1 + EMA50 + RSI")
+                        
+                        elif conf_sell and trend_sell and safe_sell:
+                            side = "SELL"
+                            pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
+                            sl = tick.bid + pts_sl
+                            res = mt5.order_send({
+                                "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                                "type": 1, "price": tick.bid, "sl": float(round(sl, s_i.digits)), 
+                                "magic": MAGIC, "comment": "TITAN_V430_S", "type_filling": mt5.ORDER_FILLING_IOC
+                            })
+                            if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                                add_log_dash(f"🎯 TRIPLE SELL {sym}")
+                                send_telegram(f"🚀 *DISPARO CONFIRMADO: {sym}*\n*Tipo:* SELL | *Filtro:* 3-M1 + EMA50 + RSI")
+                        else:
+                            # Feedback en dashboard
+                            if tick.bid >= h_h: s_d["status"] = "⏳ WAIT CONF BUY (3-M1)"
+                            elif tick.bid <= h_l: s_d["status"] = "⏳ WAIT CONF SELL (3-M1)"
+                            else:
+                                dist_h = (h_h - tick.bid)/s_i.point
+                                dist_l = (tick.bid - h_l)/s_i.point
+                                s_d["status"] = f"🔎 {('H' if dist_h < dist_l else 'L')} {min(dist_h, dist_l):.1f}"
 
                 # --- REFUERZOS ---
                 elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
