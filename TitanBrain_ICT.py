@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.250 (EL CAZADOR) ---
-VERSION = "v47.9.250"
+# --- CONFIGURACIÓN TITAN v47.9.255 (PULIDO VISUAL) ---
+VERSION = "v47.9.255"
 BRANDING = "🦅 TITAN ICT: ESTRATEGIA SWEEP (YOUTUBER)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
@@ -41,7 +41,7 @@ ASSET_CONFIG = {
 
 STATE = {
     "is_running": True, "active_symbols": [], "symbols_data": {}, 
-    "last_logs": ["Antivenganza Mode Active... Protocol 30m Load"],
+    "last_logs": ["Antivenganza Mode Active... Protocol 15m Load"],
     "cooldown_until": 0
 }
 
