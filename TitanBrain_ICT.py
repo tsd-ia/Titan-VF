@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.127 (ANTI-SPREAD) ---
-VERSION = "v47.9.127"
-BRANDING = "🦅 TITAN ICT: ESCUDO ANTI-SPREAD"
+# --- CONFIGURACIÓN TITAN v47.9.130 (ORO SNIPER) ---
+VERSION = "v47.9.130"
+BRANDING = "🦅 TITAN ICT: SEGURIDAD MÁXIMA (SL $10)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -28,12 +28,12 @@ BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
     "GOLD": {
-        "lot": 0.01, "sl_usd": 25.0, "trail": True, "burst": 2,
-        "h_trigger": 5.0, "h_lock": 1.5, "t_step": 1.0, "air": 1.5
+        "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
+        "h_trigger": 1.2, "h_lock": 0.5, "t_step": 0.5, "air": 0.8
     },
     "FX":   {
-        "lot": 0.02, "sl_usd": 25.0, "trail": True, "burst": 3,
-        "h_trigger": 1.5, "h_lock": 0.4, "t_step": 0.5, "air": 0.7
+        "lot": 0.02, "sl_usd": 15.0, "trail": True, "burst": 2,
+        "h_trigger": 1.0, "h_lock": 0.3, "t_step": 0.5, "air": 0.7
     }
 }
 
@@ -206,15 +206,15 @@ def main_loop(mode_24h=False):
                     
                     if len(sym_pos) < MAX_BULLETS and current_pnl >= REINFORCE_PROFIT and all_in_profit:
                          side = "BUY" if sym_pos[0].type == 0 else "SELL"
-                         for _ in range(2):
-                             mt5.order_send({
-                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                                 "sl": sym_pos[0].sl, "tp": sym_pos[0].tp,
-                                 "magic": MAGIC, "comment": "ICT_REINF",
-                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
-                             })
-                         add_log_dash(f"🚀 {sym} REFUERZOS +2 (PNL ${current_pnl:.2f})")
+                         # Solo añadimos DE A UNA bala para mayor seguridad
+                         mt5.order_send({
+                             "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                             "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                             "sl": sym_pos[0].sl, "tp": sym_pos[0].tp,
+                             "magic": MAGIC, "comment": "ICT_REINF",
+                             "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
+                         })
+                         add_log_dash(f"🚀 {sym} REFUERZO +1 (SEGURIDAD)")
                          s_d["last_reinf"] = time.time()
                     
                     s_d["status"] = f"⚔️ WAR: {current_pnl:+.2f} | REINF: {'OK' if all_in_profit else 'WAIT BE'}"
