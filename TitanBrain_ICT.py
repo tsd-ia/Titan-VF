@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.150 (M15 SWEEPER) ---
-VERSION = "v47.9.150"
-BRANDING = "🦅 TITAN ICT: SEÑALES M15 (ALTA FRECUENCIA)"
+# --- CONFIGURACIÓN TITAN v47.9.155 (H1 BIAS / M1 SNIPER) ---
+VERSION = "v47.9.155"
+BRANDING = "🦅 TITAN ICT: VISIÓN H1 + PRECISIÓN M1"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -107,12 +107,20 @@ def get_atr(symbol, tf, period=14):
     tr = df[['h-l', 'h-pc', 'l-pc']].max(axis=1)
     return float(tr.rolling(period).mean().iloc[-1])
 
+def get_h1_bias(symbol):
+    """Determina la visión/sesgo macro en H1 (1: Buy, -1: Sell, 0: Neutro)."""
+    ema_fast = get_ema(symbol, mt5.TIMEFRAME_H1, 10)
+    ema_slow = get_ema(symbol, mt5.TIMEFRAME_H1, 30)
+    if not ema_fast or not ema_slow: return 0
+    return 1 if ema_fast > ema_slow else -1
+
 def get_m15_liquidity(sym):
     """Obtiene la liquidez de la vela M15 anterior (más señales)."""
     rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 1, 1)
     if rates is not None and len(rates) > 0:
         return rates[0]['high'], rates[0]['low']
     return None, None
+
 
 def manage_positions(positions):
     """Cosecha 1.50 -> 0.50 + Trailing Stop por USD"""
@@ -194,57 +202,59 @@ def main_loop(mode_24h=False):
                     s_d["status"] = "COOLDOWN" if on_cooldown else "OUT_CLOCK"
                     continue
 
-                # --- MODO ICT REAL (SWEEP M15 + MSS M1) ---
-                m15_h, m15_l = get_m15_liquidity(sym)
-                if m15_h is None: continue
-                s_d.update({"h1_high": m15_h, "h1_low": m15_l}) # Reutilizamos campos por dash
+                # --- MODO ICT: VISIÓN H1 + EJECUCIÓN M1 ---
+                bias = get_h1_bias(sym)
+                if bias == 0: 
+                    s_d["status"] = "ESPERANDO BIAS H1"
+                    continue
                 
-                sweep_buy = tick.ask < m15_l
-                sweep_sell = tick.bid > m15_h
+                # Liquidez cercana (M15 para no asfixiar)
+                liqb_h, liqb_l = get_m15_liquidity(sym)
+                if liqb_h is None: continue
+                s_d.update({"h1_high": liqb_h, "h1_low": liqb_l})
                 
-                if (sweep_buy or sweep_sell) and len(sym_pos) == 0:
-                    # VALIDACIÓN TRIPLE FILTRO (M1)
-                    rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
-                    if rates_m1 is None or len(rates_m1) < 2: continue
-                    
-                    # A. Filtro Estructura (MSS)
-                    mss_ok = False
-                    if sweep_buy and tick.bid > rates_m1[-2]['high']: mss_ok = True
-                    elif sweep_sell and tick.ask < rates_m1[-2]['low']: mss_ok = True
-                    
-                    # B. Filtro Tendencia (Solo si strict_filter es True)
+                # Señales en M1 alineadas con H1
+                rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
+                if rates_m1 is None or len(rates_m1) < 2: continue
+                
+                # 1. ¿Hay Sweep local o MSS a favor del Bias?
+                m1_mss_buy = (tick.bid > rates_m1[-2]['high']) and bias == 1
+                m1_mss_sell = (tick.ask < rates_m1[-2]['low']) and bias == -1
+                
+                if (m1_mss_buy or m1_mss_sell) and len(sym_pos) == 0:
+                    # FILTROS DINÁMICOS
                     trend_ok = True
                     if cfg.get("strict_filter"):
                         ema9 = get_ema(sym, mt5.TIMEFRAME_M1, 9)
                         ema21 = get_ema(sym, mt5.TIMEFRAME_M1, 21)
-                        trend_ok = (sweep_buy and ema9 > ema21) or (sweep_sell and ema9 < ema21)
+                        trend_ok = (m1_mss_buy and ema9 > ema21) or (m1_mss_sell and ema9 < ema21)
                     
-                    # C. Filtro Impulso (Solo si strict_filter es True)
                     momentum_ok = True
                     if cfg.get("strict_filter"):
                         rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
-                        momentum_ok = (sweep_buy and rsi > 50) or (sweep_sell and rsi < 50)
+                        momentum_ok = (m1_mss_buy and rsi > 50) or (m1_mss_sell and rsi < 50)
                     
-                    if mss_ok and trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
-                        side = "BUY" if sweep_buy else "SELL"
+                    if trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
+                        side = "BUY" if m1_mss_buy else "SELL"
                         points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
                         sl = tick.bid - points_sl if side=="BUY" else tick.ask + points_sl
-                        tp = tick.bid + (points_sl * 2) if side=="BUY" else tick.ask - (points_sl * 2)
+                        tp = tick.bid + (points_sl * 4) if side=="BUY" else tick.ask - (points_sl * 4) # TP largo para dejar correr
                         
                         for _ in range(cfg['burst']):
                             mt5.order_send({
                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
                                 "sl": float(round(sl, s_i.digits)), "tp": float(round(tp, s_i.digits)),
-                                "magic": MAGIC, "comment": "TITAN_SNIPER",
+                                "magic": MAGIC, "comment": "TITAN_H1_M1",
                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
                             })
-                        add_log_dash(f"🎯 {sym} {side} TRIPLE FILTRO OK")
+                        add_log_dash(f"� {sym} {side} (H1 BIAS OK)")
                         s_d["last_trade"] = time.time()
                 
                 # ESTATUS DE COMBATE
                 if len(sym_pos) == 0:
-                    s_d["status"] = f"🔎 SCAN M15: {m15_l:.5f}-{m15_h:.5f}"
+                    status_bias = "BULL" if bias == 1 else "BEAR"
+                    s_d["status"] = f"🔎 {status_bias} M1-SCAN"
                 else:
                     current_pnl = sum(p.profit for p in sym_pos)
                     # REFUERZOS SOLO SI ESTÁN EN PROFIT BE
