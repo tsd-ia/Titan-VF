@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.230 (MURALLA DE ORO) ---
-VERSION = "v47.9.230"
-BRANDING = "🛡️ TITAN ICT: PROTECCIÓN INAMOVIBLE"
+# --- CONFIGURACIÓN TITAN v47.9.235 (AJUSTE RETROACTIVO) ---
+VERSION = "v47.9.235"
+BRANDING = "🛡️ TITAN ICT: BLINDAJE INMEDIATO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -136,6 +136,15 @@ def manage_positions(positions):
         
         # Detectar si el SL actual está en zona de riesgo (pérdida)
         is_risky = (p.type == 0 and p.sl < p.price_open) or (p.type == 1 and (p.sl == 0 or p.sl > p.price_open))
+        
+        # 0. AJUSTE RETROACTIVO (Si el SL es más ancho de lo que dice la configuración nueva)
+        max_points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / p.volume
+        dist_actual = abs(p.price_open - p.sl) / s_i.point if p.sl != 0 else 99999
+        
+        if is_risky and dist_actual > (max_points_sl + 5): # +5 de margen de error
+             new_tight_sl = p.price_open - (max_points_sl * s_i.point) if p.type == 0 else p.price_open + (max_points_sl * s_i.point)
+             mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_tight_sl, s_i.digits)), "tp": p.tp})
+             add_log_dash(f"🛡️ {p.symbol} SL AJUSTADO A ${cfg['sl_usd']}")
         
         # 1. COSECHA INICIAL (PRIORIDAD ABSOLUTA)
         if profit_usd >= cfg["h_trigger"] and is_risky:
