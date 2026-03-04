@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.215 (VERIFICACIÓN REAL) ---
-VERSION = "v47.9.215"
-BRANDING = "🛡️ TITAN ICT: PROTECCIÓN VERIFICADA"
+# --- CONFIGURACIÓN TITAN v47.9.220 (FUEGO TOTAL) ---
+VERSION = "v47.9.220"
+BRANDING = "🦅 TITAN ICT: MODO STORM (SIN LÍMITES)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -18,12 +18,11 @@ colorama_init(autoreset=True)
 HARVEST_TRIGGER = 2.5      # Gatillo de Cosecha Agresiva
 HARVEST_LOCK = 1.0         # Bloquear $1.00
 TRAILING_STEP = 1.0        # Mover SL cada $1.00 extra
-RR_RATIO = 1.5             # Mayor ratio
-MAX_BULLETS = 2            # Solo 1 refuerzo máximo
+MAX_BULLETS = 2            
 MAGIC = 48105              
 COOLDOWN_TIME = 1800       
-REINFORCE_PROFIT = 1.5     
-MAX_TOTAL_SYMBOLS = 6      # <--- NO MÁS DE 6 PARES A LA VEZ
+REINFORCE_PROFIT = 1.0     
+MAX_TOTAL_SYMBOLS = 10     # <--- MODO STORM ACTIVADO
 BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 
 # CONFIGURACIÓN POR ACTIVO
@@ -109,8 +108,8 @@ def get_atr(symbol, tf, period=14):
     return float(tr.rolling(period).mean().iloc[-1])
 
 def get_h1_bias(symbol):
-    """Radar de Visión H1: Basado en EMA 50 para Tendencia Fuerte."""
-    ema_trend = get_ema(symbol, mt5.TIMEFRAME_H1, 50)
+    """Radar de Visión H1: EMA 21 para detección rápida."""
+    ema_trend = get_ema(symbol, mt5.TIMEFRAME_H1, 21)
     tick = mt5.symbol_info_tick(symbol)
     if not ema_trend or not tick: return 0
     return 1 if tick.bid > ema_trend else -1
@@ -247,15 +246,11 @@ def main_loop(mode_24h=False):
                         rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
                         momentum_ok = (m1_mss_buy and rsi > 50) or (m1_mss_sell and rsi < 50)
                     
-                    # CONTROL DE MARGEN Y SATURACIÓN (MODO AGRESIVO)
+                    # CONTROL DE SATURACIÓN (MODO STORM)
                     active_pairs = len([s for s in STATE["symbols_data"] if STATE["symbols_data"][s]["pos"] > 0])
                     
-                    if acc.margin_level < 110:
-                        s_d["status"] = "⚠️ STOP OUT INMINENTE"
-                        continue
-                    
-                    if active_pairs >= 6 and len(sym_pos) == 0:
-                        s_d["status"] = "⚠️ SATURADO (MAX 6)"
+                    if active_pairs >= MAX_TOTAL_SYMBOLS and len(sym_pos) == 0:
+                        s_d["status"] = "⚠️ STORM FULL"
                         continue
 
                     if trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
