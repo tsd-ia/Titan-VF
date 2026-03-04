@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.225 (FILO QUIRÚRGICO) ---
-VERSION = "v47.9.225"
-BRANDING = "🦅 TITAN ICT: FX SL $2.00 (ULTRA-SNIPER)"
+# --- CONFIGURACIÓN TITAN v47.9.230 (MURALLA DE ORO) ---
+VERSION = "v47.9.230"
+BRANDING = "🛡️ TITAN ICT: PROTECCIÓN INAMOVIBLE"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -29,12 +29,12 @@ BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
-        "h_trigger": 2.0, "h_lock": 0.5, "t_step": 0.5, "air": 1.5,
+        "h_trigger": 2.5, "h_lock": 0.5, "t_step": 0.5, "air": 2.0,
         "calculate_be": True, "strict_filter": True, "r_trigger": 3.0
     },
     "FX":   {
         "lot": 0.02, "sl_usd": 2.0, "trail": True, "burst": 1,
-        "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.2,
+        "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.5,
         "calculate_be": True, "strict_filter": True, "r_trigger": 1.0
     }
 }
@@ -159,8 +159,16 @@ def manage_positions(positions):
                  points_new = (new_lock / (s_i.trade_tick_value / s_i.point)) / p.volume
                  new_sl = p.price_open + points_new if p.type == 0 else p.price_open - points_new
                  
+                 # --- CANDADO DE SEGURIDAD ANTIFANTASMA ---
+                 # El SL nunca puede retroceder a zona de pérdida si ya estaba en profit
                  is_better = (p.type==0 and new_sl > p.sl) or (p.type==1 and new_sl < p.sl)
-                 if is_better:
+                 
+                 # Calcular el precio del BE original (con h_lock) para el candado
+                 initial_be_points = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / p.volume
+                 initial_be_price = p.price_open + initial_be_points if p.type == 0 else p.price_open - initial_be_points
+
+                 # Asegurarse de que el nuevo SL no sea peor que el SL actual Y no sea peor que el BE original
+                 if is_better and ((p.type == 0 and new_sl >= initial_be_price) or (p.type == 1 and new_sl <= initial_be_price)):
                      mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_sl, s_i.digits)), "tp": p.tp})
 
 def init_mt5():
