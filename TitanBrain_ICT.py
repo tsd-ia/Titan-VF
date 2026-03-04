@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.160 (UNIFICADO H1-M1) ---
-VERSION = "v47.9.160"
-BRANDING = "🦅 TITAN ICT: RADAR H1 + EJECUCIÓN M1"
+# --- CONFIGURACIÓN TITAN v47.9.175 (SYNC DASHBOARD) ---
+VERSION = "v47.9.175"
+BRANDING = "🦅 TITAN ICT: VISION H1 + GATILLO M1"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -174,7 +174,7 @@ def init_mt5():
             mt5.symbol_select(found, True)
             STATE["active_symbols"].append(found)
             STATE["symbols_data"][found] = {
-                "status":"VIGIL", "h1_high":0, "h1_low":0, "m1_h":0, "m1_l":0,
+                "status":"VIGIL", "h1_high":0.0, "h1_low":0.0,
                 "pnl": 0.0, "pos": 0, "spread": 0, "sweep": False, 
                 "last_trade": 0, "last_reinf": 0, "type": get_asset_type(found)
             }
@@ -203,29 +203,35 @@ def main_loop(mode_24h=False):
                 asset_type = s_d["type"]
                 cfg = ASSET_CONFIG[asset_type]
                 
-                h_high, h_low = get_h1_liquidity(sym)
-                s_d.update({"h1_high": h_high, "h1_low": h_low, "pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
+                # RECARGA DE DATOS PARA EL DASHBOARD
+                h_h, h_l = get_m15_liquidity(sym)
+                s_d.update({
+                    "h1_high": h_h if h_h else 0.0, 
+                    "h1_low": h_l if h_l else 0.0,
+                    "pos": len(sym_pos), 
+                    "pnl": sum(p.profit for p in sym_pos), 
+                    "spread": s_i.spread
+                })
                 
                 if (not killzone or on_cooldown) and len(sym_pos) == 0: 
-                    s_d["status"] = "COOLDOWN" if on_cooldown else "OUT_CLOCK"
+                    s_d["status"] = "COOLDO" if on_cooldown else "FUERA_H"
                     continue
 
                 # --- MODO ICT: VISIÓN H1 + EJECUCIÓN M1 ---
                 bias = get_h1_bias(sym)
+                status_bias = "BULL" if bias == 1 else "BEAR" if bias == -1 else "NEUTRO"
+                
                 if bias == 0: 
-                    s_d["status"] = "ESPERANDO BIAS H1"
+                    s_d["status"] = "🔎 SCAN: SIN TENDENCIA"
                     continue
                 
-                # Liquidez cercana (M15 para no asfixiar)
-                liqb_h, liqb_l = get_m15_liquidity(sym)
-                if liqb_h is None: continue
-                s_d.update({"h1_high": liqb_h, "h1_low": liqb_l})
+                s_d["status"] = f"🔎 {status_bias} M1-SCAN"
                 
                 # Señales en M1 alineadas con H1
                 rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
                 if rates_m1 is None or len(rates_m1) < 2: continue
                 
-                # 1. ¿Hay Sweep local o MSS a favor del Bias?
+                # 1. ¿Hay MSS a favor del Bias?
                 m1_mss_buy = (tick.bid > rates_m1[-2]['high']) and bias == 1
                 m1_mss_sell = (tick.ask < rates_m1[-2]['low']) and bias == -1
                 
@@ -301,8 +307,8 @@ def draw_dashboard():
         for sym in STATE["active_symbols"]:
             d = STATE["symbols_data"][sym]
             pnl_col = f"{Fore.GREEN if d['pnl']>=0 else Fore.RED}${d['pnl']:+7.2f}{Style.RESET_ALL}"
-            # Mostrar niveles M1 en el dashboard si no hay posición
-            print(f" {sym:<10} | {d['type']:<5} | {d['spread']:<4} | {d['m1_high'] if 'm1_high' in d else d['h1_high']:<10.5f} | {d['m1_low'] if 'm1_low' in d else d['h1_low']:<10.5f} | {d['pos']}/{MAX_BULLETS:<2} | {pnl_col:<10} | {d['status']}")
+            # Mostrar niveles M15/Precio en el dashboard
+            print(f" {sym:<10} | {d['type']:<5} | {d['spread']:<4} | {d['h1_high']:<10.5f} | {d['h1_low']:<10.5f} | {d['pos']}/{MAX_BULLETS:<2} | {pnl_col:<10} | {d['status']}")
         print(f"{Fore.CYAN}{'─'*115}")
         for line in STATE["last_logs"]: print(f" > {line}")
         print(f"{Fore.CYAN}{'═'*115}")

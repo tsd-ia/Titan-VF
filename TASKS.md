@@ -1,19 +1,18 @@
-# 🗺️ TITAN ROADMAP - COMMANDER RELOADED (v47.9.95)
-**Estado:** MODO SNIPER-SHIELD - RECUPERACIÓN TÁCTICA ⚡🛡️
-**Equidad Actual:** $132.00 USD (Recuperando desde $90)
-**Misión:** Saturación ICT con SL de $25.00 (Breathing Room) y Cosecha Boss.
+# 🗺️ TITAN ROADMAP - COMMANDER RELOADED (v47.9.175)
+**Estado:** MODO H1-M1 UNIFICADO - PRECISIÓN TÁCTICA 🦅🛡️
+**Equidad Actual:** Recargando...
+**Misión:** Sesgo H1 + Gatillo M1 Sniper. SL Oro $10.00 / SL FX $15.00.
 
 ## 🏆 HITOS DE GUERRA
-- [x] **v47.9.95:** **TEST DE SUPERVIVENCIA** - $290 -> $402 (+38%) con SL $25. ✅
-- [x] **v47.9.99:** **PROTOCOLO ANTIVENGANZA** - Enfriamiento de 30 min tras SL confirmado (+ $552). ✅
-- [!] **v47.9.99:** **BLOQUEO MECÁNICO** - Implementado cese de fuego automático post-pérdida. 🛡️
-- [x] **v47.9.95:** **RECUPERACIÓN $132** - Iniciando contraataque con SL de respiro. 🏹
+- [x] **v47.9.130:** **ORO SNIPER** - SL fijo a $10.00 y ráfaga de 1. ✅
+- [x] **v47.9.160:** **VISIÓN H1** - Unificación de Sesgo macro H1 para todo el bot. ✅
+- [x] **v47.9.175:** **DASHBOARD DASH** - Sincronización completa de datos H1-M1 corregida. ✅
 
 ## 📋 TAREAS EN CURSO
-1. [x] **Blindaje Sniper:** Stop Loss de $25.00 para Gold (2500 pts) y FX (1250 pts). ✅
-2. [x] **Cosecha Boss:** Asegurar ráfagas en $0.50 profit cuando toquen los $1.50. ✅
-3. [ ] **Fuego Selectivo:** Ráfagas x2 Gold / x3 FX con validación MSS. 🔫
-4. [ ] **Vigilancia Dashboard:** Monitorear el respiro de las ráfagas en vivo. 🖥️
+1. [x] **H1-M1 Sniper:** Sesgo H1 (EMA 21 + Estructura) para guiar M1. ✅
+2. [x] **FX Guerrilla:** Ráfagas de 3 posiciones sin asfixia de filtros. ✅
+3. [x] **Reparación Dash:** Eliminación de ceros y visualización de Bias. ✅
+4. [ ] **Fuego Selectivo:** Monitorear ráfagas de Oro con triple filtro (EMA+RSI). 🔫
 
 ---
-*Reporte de Guerra: El Comandante confirma que el Oro necesita 25 de respiro. Implementamos el SNIPER-SHIELD: Permitir el movimiento pero cosechar rápido. No dejaremos que los $132 vuelvan a bajar.* 🦅🔥
+*Reporte de Guerra: El Comandante ordena H1 para visión y M1 para decisión. El bot ya no opera a ciegas. El Oro está bajo vigilancia estricta con triple filtro, mientras el FX hace el volumen.* 🦅🔥
