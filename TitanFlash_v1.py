@@ -17,9 +17,11 @@ colorama_init(autoreset=True)
 
 # GESTIÓN DE RIESGO CRÍTICA (Balance < $15)
 LOT_SIZE = 0.01
-MAX_BULLETS = 6            # User request: 6 simultáneas
+MAX_BULLETS = 6            # Comandante: Volvemos a las 6, pero con precisión quirúrgica
 MAGIC = 700700              
-MIN_PROFIT_TRIGGER = 1.00  # Objetivo: $1 USD neto total por señal
+MIN_PROFIT_TRIGGER = 1.00  # Volvemos a $1.00 para pagar el riesgo de 6 balas
+
+
 
 STATE = {
     "is_running": True,
@@ -142,22 +144,28 @@ def calculate_velocity(sym, current_price):
 
 def check_flash_signal(sym):
     """
-    Lógica de 95% Acertividad Sugerida: 
-    1. Filtro Tendencia (EMA 50).
-    2. Sweep (Barrido) + Confirmación de Re-ingreso.
-    3. Tick Velocity > Umbral.
+    SISTEMA DE PRECISIÓN QUIRÚRGICA:
+    1. Filtro Maestro M15: Solo operamos a favor de la tendencia macro (EMA 20 - M15).
+    2. Filtro Local M1: Precio debe estar del lado correcto de la EMA 50 (Confirmación de giro).
+    3. Sweep Real: Debemos romper el nivel y RE-INGRESAR con fuerza (Vela envolvente).
     """
-    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 60)
-    if rates is None or len(rates) < 60: return None
+    # 0. TENDENCIA MAESTRA (M15) - Nuestra brújula
+    rates_m15 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 0, 20)
+    if rates_m15 is None or len(rates_m15) < 20: return None
+    df_m15 = pd.DataFrame(rates_m15)
+    ema_m15 = df_m15['close'].ewm(span=20, adjust=False).mean().iloc[-1]
+    last_close_m15 = df_m15['close'].iloc[-1]
+    trend_m15 = "UP" if last_close_m15 > ema_m15 else "DOWN"
+
+    # 1. TENDENCIA LOCAL (M1)
+    rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 60)
+    if rates_m1 is None or len(rates_m1) < 60: return None
+    df_m1 = pd.DataFrame(rates_m1)
+    ema_m1 = df_m1['close'].ewm(span=50, adjust=False).mean().iloc[-1]
+    last_close_m1 = df_m1['close'].iloc[-1]
     
-    # 0. FILTRO DE TENDENCIA (EMA 50)
-    df = pd.DataFrame(rates)
-    ema50 = df['close'].ewm(span=50, adjust=False).mean().iloc[-1]
-    last_close = df['close'].iloc[-1]
-    
-    current_candle = rates[-1]
-    last_candle = rates[-2]
-    
+    current_candle = rates_m1[-1]
+    last_candle = rates_m1[-2]
     candle_id = current_candle['time']
     if STATE["processed_candles"].get(sym) == candle_id: return None
 
@@ -167,36 +175,33 @@ def check_flash_signal(sym):
     close_now = current_candle['close']
     open_now = current_candle['open']
     
-    # 1. SWEEP (¿Barrió el máximo o mínimo anterior?)
+    # 2. LÓGICA DE GIRO (Sweep + Confirmación)
     swept_low = current_candle['low'] < low_last
     swept_high = current_candle['high'] > high_last
     
-    # 2. VOLATILIDAD (¿Es una vela con cuerpo suficiente para valer la pena?)
+    # Cuerpo de vela mínimo para evitar "dojis" o trampas sin volumen
     c_range = abs(current_candle['high'] - current_candle['low'])
     body_size = abs(close_now - open_now)
     body_ratio = (body_size / c_range * 100) if c_range > 0 else 0
     
-    # 3. VELOCITY (Intensidad del impulso)
     velocity = calculate_velocity(sym, close_now)
     v_trigger = 0.05 if "XAU" in sym.upper() else 10.0 
 
-    # GATILLO COMPRA: Filtro Alcista (Solo Oro) + Sweep Low + Re-entry
-    trend_ok = True
-    if "XAU" in sym.upper():
-        trend_ok = (last_close > ema50) # Solo compramos ORO si es alcista
+    # --- DISPARO COMPRA ---
+    # Debe ser tendencia ALCISTA en M15 Y barrer el mínimo anterior en M1 Y cerrar arriba
+    if trend_m15 == "UP" and last_close_m1 > ema_m1:
+        if swept_low and close_now > low_last and body_ratio > 65 and velocity > v_trigger:
+            STATE["processed_candles"][sym] = candle_id
+            return mt5.ORDER_TYPE_BUY
+            
+    # --- DISPARO VENTA ---
+    # Debe ser tendencia BAJISTA en M15 Y barrer el máximo anterior en M1 Y cerrar abajo
+    if trend_m15 == "DOWN" and last_close_m1 < ema_m1:
+        if swept_high and close_now < high_last and body_ratio > 65 and velocity > v_trigger:
+            STATE["processed_candles"][sym] = candle_id
+            return mt5.ORDER_TYPE_SELL
         
-    if trend_ok and swept_low and close_now > low_last and close_now > open_now and body_ratio > 65 and velocity > v_trigger:
-        STATE["processed_candles"][sym] = candle_id
-        return mt5.ORDER_TYPE_BUY
-        
-    # GATILLO VENTA: Filtro Bajista (Solo Oro) + Sweep High + Re-entry
-    trend_ok_sell = True
-    if "XAU" in sym.upper():
-        trend_ok_sell = (last_close < ema50) # Solo vendemos ORO si es bajista
-        
-    if trend_ok_sell and swept_high and close_now < high_last and close_now < open_now and body_ratio > 65 and velocity > v_trigger:
-        STATE["processed_candles"][sym] = candle_id
-        return mt5.ORDER_TYPE_SELL
+    return None
 
         
     return None
