@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.310 (RADAR HUMANO) ---
-VERSION = "v47.9.310"
-BRANDING = "🦅 TITAN ICT: RADAR DE PROXIMIDAD"
+# --- CONFIGURACIÓN TITAN v47.9.320 (RADAR QUIRÚRGICO) ---
+VERSION = "v47.9.320"
+BRANDING = "🦅 TITAN ICT: CALIBRACIÓN PIPS/PTS"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -143,9 +143,10 @@ def main_loop():
                 
                 if bias == 0:
                     label = "H" if dist_to_high < dist_to_low else "L"
-                    val = min(dist_to_high, dist_to_low)
-                    s_d["status"] = f"🔎 SCAN {label} ({val:.2f})"
-                    if val < 0.5 and val > 0: s_d["status"] = f"🔥 PRESSURE {label} ({val:.2f})"
+                    raw_val = min(dist_to_high, dist_to_low)
+                    val_pts = raw_val / s_i.point
+                    s_d["status"] = f"🔎 SCAN {label} ({val_pts:.1f} pts)"
+                    if val_pts < 20 and val_pts > 0: s_d["status"] = f"🔥 PRESSURE {label} ({val_pts:.1f} pts)"
                     continue
                 
                 s_d["status"] = f"🎯 SNIPER {'BUY' if bias==1 else 'SELL'} ACTIVO"
