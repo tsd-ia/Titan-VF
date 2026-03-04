@@ -8,16 +8,16 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.105 (ESCUDO SINCRONIZADO) ---
-VERSION = "v47.9.105"
-BRANDING = "🦅 TITAN ICT: ESCUDO SINCRONIZADO (ANTI-MUERTE)"
+# --- CONFIGURACIÓN TITAN v47.9.110 (PULMÓN DE ORO) ---
+VERSION = "v47.9.110"
+BRANDING = "🦅 TITAN ICT: PULMÓN DE ORO (TRAILING $2)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
 # GESTIÓN DE RIESGO
 HARVEST_TRIGGER = 2.5      # Gatillo de Cosecha Agresiva
 HARVEST_LOCK = 1.0         # Bloquear $1.00
-TRAILING_STEP = 0.2        # Mover SL cada $0.20 extra
+TRAILING_STEP = 2.0        # Mover SL cada $2.00 extra (Más aire)
 RR_RATIO = 1.0             # Ratio para Profit de $25 (con SL de 2500 pts)
 MAX_BULLETS = 6            # Límite STORM
 MAGIC = 48105              # Magic v47.105
@@ -95,14 +95,14 @@ def manage_positions(positions):
              points_needed = (HARVEST_LOCK / (s_i.trade_tick_value / s_i.point)) / p.volume
              target_sl = p.price_open + points_needed if p.type == 0 else p.price_open - points_needed
              mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
-             add_log_dash(f"💰 {p.symbol} COSECHA $0.50 LOCK")
+             add_log_dash(f"💰 {p.symbol} COSECHA ${HARVEST_LOCK} LOCK")
         
         # 2. TRAILING STOP (Después de la cosecha)
         elif profit_usd >= (HARVEST_TRIGGER + TRAILING_STEP) and cfg["trail"]:
              # Mover SL dinámico para seguir el precio con respiro
              current_sl_profit = (p.sl - p.price_open) * (s_i.trade_tick_value / s_i.point) * p.volume if p.type==0 else (p.price_open - p.sl) * (s_i.trade_tick_value / s_i.point) * p.volume
              if profit_usd - current_sl_profit > (HARVEST_LOCK + TRAILING_STEP):
-                 new_lock = profit_usd - 0.70 # Dejamos $0.70 de respiro prudente
+                 new_lock = profit_usd - 2.50 # Pulmón de Oro: $2.50 de aire
                  points_new = (new_lock / (s_i.trade_tick_value / s_i.point)) / p.volume
                  new_sl = p.price_open + points_new if p.type == 0 else p.price_open - points_new
                  
