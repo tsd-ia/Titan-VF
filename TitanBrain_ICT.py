@@ -121,8 +121,9 @@ def init_mt5():
             mt5.symbol_select(found, True)
             STATE["active_symbols"].append(found)
             STATE["symbols_data"][found] = {
-                "status":"VIGIL", "h1_high":0, "h1_low":0, "pnl": 0.0, "pos": 0, "spread": 0,
-                "sweep": False, "last_trade": 0, "last_reinf": 0, "type": get_asset_type(found)
+                "status":"VIGIL", "h1_high":0, "h1_low":0, "m1_h":0, "m1_l":0,
+                "pnl": 0.0, "pos": 0, "spread": 0, "sweep": False, 
+                "last_trade": 0, "last_reinf": 0, "type": get_asset_type(found)
             }
     return len(STATE["active_symbols"]) > 0
 
@@ -158,20 +159,21 @@ def main_loop(mode_24h=False):
 
                 # --- MODO THUNDER STORM (RUPTURA M1) ---
                 rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
-                if rates_m1 is None or len(rates_m1) < 2: continue
+                if rates_m1 is None or len(rates_m1) < 2: 
+                    s_d["status"] = "BUSCANDO M1..."
+                    continue
                 
                 m1_high = rates_m1[-2]['high']
                 m1_low = rates_m1[-2]['low']
+                s_d.update({"m1_h": m1_high, "m1_l": m1_low})
                 
                 thunder_buy = tick.ask > m1_high
                 thunder_sell = tick.bid < m1_low
                 
                 if (thunder_buy or thunder_sell) and len(sym_pos) == 0:
-                    s_d["status"] = f"🎯 THUNDER_{asset_type}"
-                    mss_ok = True  # En este modo la ruptura de M1 es el MSS
-                    
+                    mss_ok = True
                     # A. VANGUARDIA (Disparo Inicial)
-                    if mss_ok and len(sym_pos) == 0 and (time.time() - s_d["last_trade"] > 3):
+                    if mss_ok and (time.time() - s_d["last_trade"] > 3):
                         side = "BUY" if thunder_buy else "SELL"
                         sl_pts = cfg["sl_points"] * s_i.point
                         sl = tick.bid - sl_pts if side=="BUY" else tick.ask + sl_pts
@@ -186,29 +188,37 @@ def main_loop(mode_24h=False):
                                 "magic": MAGIC, "comment": "STORM_VANG",
                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
                             })
-                        add_log_dash(f"🏹 {sym} VANGUARDIA SOLTADA")
+                        add_log_dash(f"🏹 {sym} {side} RÁFAGA M1")
                         s_d["last_trade"] = time.time()
-
-                    # B. REFUERZOS STORM (Sincronizados con BE)
-                    elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
-                        current_pnl = sum(p.profit for p in sym_pos)
-                        # SOLO REFORZAR SI: 1. Hay profit, 2. Ya pasaron 10s, 3. TODAS tienen SL (Están protegidas)
-                        all_protected = all(p.sl != 0 for p in sym_pos)
-                        
-                        if current_pnl >= REINFORCE_PROFIT and all_protected and (time.time() - s_d["last_reinf"] > 10):
-                            side = "BUY" if sym_pos[0].type == 0 else "SELL"
-                            for _ in range(2):
-                                mt5.order_send({
-                                    "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                                    "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                                    "sl": sym_pos[0].sl, "tp": sym_pos[0].tp,
-                                    "magic": MAGIC, "comment": "STORM_REINF",
-                                    "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
-                                })
-                            add_log_dash(f"🚀 {sym} REFUERZOS PROTEGIDOS (+2)")
-                            s_d["last_reinf"] = time.time()
+                
+                # ACTUALIZACIÓN DE ESTATUS DETALLADO
+                if len(sym_pos) == 0:
+                    if on_cooldown: s_d["status"] = "🛡️ BOZAL (30m)"
+                    else: s_d["status"] = f"🔎 SCAN M1: {m1_low:.5f}-{m1_high:.5f}"
                 else:
-                    s_d["status"] = "HUNTER" if len(sym_pos) == 0 else "WAR"
+                    current_pnl = sum(p.profit for p in sym_pos)
+                    # B. REFUERZOS STORM (Sincronizados con BE)
+                    if len(sym_pos) < MAX_BULLETS:
+                        all_protected = all(p.sl != 0 for p in sym_pos)
+                        if current_pnl >= REINFORCE_PROFIT and all_protected:
+                             # Lógica de refuerzo...
+                             side = "BUY" if sym_pos[0].type == 0 else "SELL"
+                             for _ in range(2):
+                                 mt5.order_send({
+                                     "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                                     "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                                     "sl": sym_pos[0].sl, "tp": sym_pos[0].tp,
+                                     "magic": MAGIC, "comment": "STORM_REINF",
+                                     "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
+                                 })
+                             add_log_dash(f"🚀 {sym} REFUERZOS +2 (PNL ${current_pnl:.2f})")
+                             s_d["last_reinf"] = time.time()
+                        
+                        status_war = f"⚔️ WAR: {current_pnl:+.2f} | REINF: {current_pnl:.1f}/{REINFORCE_PROFIT}"
+                        if not all_protected: status_war += " (WAIT BE)"
+                        s_d["status"] = status_war
+                    else:
+                        s_d["status"] = f"🔥 MAX BATTLE: {current_pnl:+.2f}"
 
             time.sleep(0.5) 
         except Exception as e:
@@ -228,7 +238,8 @@ def draw_dashboard():
         for sym in STATE["active_symbols"]:
             d = STATE["symbols_data"][sym]
             pnl_col = f"{Fore.GREEN if d['pnl']>=0 else Fore.RED}${d['pnl']:+7.2f}{Style.RESET_ALL}"
-            print(f" {sym:<10} | {d['type']:<5} | {d['spread']:<4} | {d['h1_high']:<10.5f} | {d['h1_low']:<10.5f} | {d['pos']}/{MAX_BULLETS:<2} | {pnl_col:<10} | {d['status']}")
+            # Mostrar niveles M1 en el dashboard si no hay posición
+            print(f" {sym:<10} | {d['type']:<5} | {d['spread']:<4} | {d['m1_high'] if 'm1_high' in d else d['h1_high']:<10.5f} | {d['m1_low'] if 'm1_low' in d else d['h1_low']:<10.5f} | {d['pos']}/{MAX_BULLETS:<2} | {pnl_col:<10} | {d['status']}")
         print(f"{Fore.CYAN}{'─'*115}")
         for line in STATE["last_logs"]: print(f" > {line}")
         print(f"{Fore.CYAN}{'═'*115}")
