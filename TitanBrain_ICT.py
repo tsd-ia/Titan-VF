@@ -4,14 +4,13 @@ import numpy as np
 import time
 import os
 import threading
-import psutil
 from datetime import datetime
 from colorama import Fore, Style, init as colorama_init
 import requests
 
-# --- CONFIGURACIÓN TITAN v47.9.530 (GATILLO DELATOR) ---
-VERSION = "v47.9.530"
-BRANDING = "🦅 TITAN ICT: TRIGGER AUDITOR"
+# --- CONFIGURACIÓN TITAN v47.9.540 (ARRANQUE GARANTIZADO) ---
+VERSION = "v47.9.540"
+BRANDING = "🦅 TITAN ICT: GATILLO REPARADO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -35,24 +34,13 @@ ASSET_CONFIG = {
 
 STATE = {
     "is_running": True, "active_symbols": [], "symbols_data": {}, 
-    "last_logs": ["🚀 AUDITOR DE GATILLO v530 ONLINE"],
+    "last_logs": ["🚀 MOTOR REINICIADO v540"],
     "last_heartbeat": 0, "last_tg_monitor": 0, "tracked_positions": {}
 }
 
 # CONFIGURACIÓN TELEGRAM
 TELEGRAM_TOKEN = '8217691336:AAFWduUGkO_f-QRF6MN338HY-MA46CjzHMg'
 TELEGRAM_CHAT_ID = '8339882349'
-
-def kill_previous_instances():
-    """Mata instancias previas para evitar conflictos de órdenes."""
-    try:
-        curr = os.getpid()
-        name = os.path.basename(__file__)
-        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
-            if proc.info['cmdline'] and any(name in arg for arg in proc.info['cmdline']):
-                if proc.info['pid'] != curr:
-                    proc.kill()
-    except Exception: pass
 
 def send_telegram(msg):
     def _send():
@@ -100,17 +88,20 @@ def manage_positions(positions):
             s_i = mt5.symbol_info(sym)
             if not s_i: continue
             cfg = ASSET_CONFIG[get_asset_type(sym)]
+            
             pnl = sum(p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0) for p in pos_list)
             
             if pnl <= -(cfg["sl_usd"] + 1.0):
                 for p in pos_list: mt5.Close(sym, ticket=p.ticket)
-                add_log_dash(f"💀 CLUSTER EXIT {sym}")
+                add_log_dash(f"💀 EXIT CLUSTER {sym}")
+                send_telegram(f"💀 *CLUSTER CERRADO:* {sym} (-${abs(pnl):.1f})")
                 continue
                 
             first = sorted(pos_list, key=lambda x: x.ticket)[0]
             is_p = (first.type == 0 and first.sl >= first.price_open) or (first.type == 1 and first.sl <= first.price_open and first.sl != 0)
+            
             if pnl >= cfg["h_trigger"] and not is_p:
-                pts = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / (first.volume * len(pos_list))
+                pts = (cfg["h_lock"] / (s_i.trade_tick_value / s_i.point)) / (0.01 * len(pos_list))
                 tsl = first.price_open + pts if first.type == 0 else first.price_open - pts
                 fsl = float(round(tsl, s_i.digits))
                 for p in pos_list:
@@ -120,11 +111,10 @@ def manage_positions(positions):
         except Exception: pass
 
 def init_mt5():
-    kill_previous_instances() 
     if not mt5.initialize(): return False
     acc = mt5.account_info()
     if acc:
-        send_telegram(f"📢 *CONEXIÓN EXITOSA*\nCuenta: {acc.login}\nBroker: {acc.company}\nArtillería lista.")
+        send_telegram(f"📢 *SISTEMA ONLINE v540*\nBalance: ${acc.balance:.2f}\nGatillos listos.")
     
     all_syms = [s.name for s in mt5.symbols_get()]
     for base in BASE_SYMBOLS:
@@ -159,9 +149,8 @@ def main_loop():
 
             if cur: manage_positions(cur)
             
-            if time.time() - STATE["last_tg_monitor"] > 15:
-                msg = f"📡 *RADAR v530*\nBalance: ${acc.balance:.2f} | PnL: ${acc.profit:+.2f}"
-                send_telegram(msg)
+            if time.time() - STATE["last_tg_monitor"] > 30:
+                send_telegram(f"📡 *TITAN v540 SCANNING*\nBal: ${acc.balance:.2f} | PnL: ${acc.profit:+.2f}")
                 STATE["last_tg_monitor"] = time.time()
 
             for sym in STATE["active_symbols"]:
@@ -181,47 +170,31 @@ def main_loop():
                 if rates is not None and len(rates) >= 2:
                     lc = rates[-2]
                     c_range = abs(lc['high'] - lc['low'])
-                    b_size = abs(lc['close'] - lc['open'])
-                    s_d["b_ratio"] = (b_size / c_range * 100) if c_range > 0 else 0
+                    b_ratio = (abs(lc['close'] - lc['open']) / c_range * 100) if c_range > 0 else 0
+                    s_d["b_ratio"] = b_ratio
                     s_d["ema_trend"] = "UP" if (e21 and e50 and e21 > e50) else "DOWN"
 
                     if len(sym_pos) == 0 and mh is not None:
-                        # LLAVE TRIPLE
+                        # TRIPLE FILTRO
                         p_up = (lc['close'] > mh)
                         p_dw = (lc['close'] < ml)
-                        s_ok = (s_d["b_ratio"] >= 70)
-                        t_up = (s_d["ema_trend"] == "UP")
-                        t_dw = (s_d["ema_trend"] == "DOWN")
+                        s_ok = (b_ratio >= 70)
+                        t_ok = (s_d["ema_trend"] == "UP" if p_up else (s_d["ema_trend"] == "DOWN" if p_dw else False))
 
-                        if p_up and s_ok and t_up:
-                            # DISPARA BUY
+                        if (p_up or p_dw) and s_ok and t_ok:
+                            side = 0 if p_up else 1
+                            price = tick.ask if side == 0 else tick.bid
                             v_tot = cfg["lot"] * MAX_BULLETS
                             pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / v_tot
-                            sl = tick.bid - pts_sl
-                            add_log_dash(f"🚀 GATILLO BUY {sym}")
-                            for i in range(MAX_BULLETS):
-                                res = mt5.order_send({"action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"], "type": 0, "price": tick.ask, "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "T_530_R", "type_filling": mt5.ORDER_FILLING_IOC})
-                                if res.retcode != mt5.TRADE_RETCODE_DONE:
-                                    msg = f"❌ ERR BALA {i+1}: {res.comment}"
-                                    add_log_dash(msg)
-                                    send_telegram(msg)
-                            send_telegram(f"🚀 *ARTILLERÍA BUY {sym}*")
-                        elif p_dw and s_ok and t_dw:
-                            # DISPARA SELL
-                            v_tot = cfg["lot"] * MAX_BULLETS
-                            pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / v_tot
-                            sl = tick.bid + pts_sl
-                            add_log_dash(f"🚀 GATILLO SELL {sym}")
-                            for i in range(MAX_BULLETS):
-                                res = mt5.order_send({"action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"], "type": 1, "price": tick.bid, "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "T_530_R", "type_filling": mt5.ORDER_FILLING_IOC})
-                                if res.retcode != mt5.TRADE_RETCODE_DONE:
-                                    msg = f"❌ ERR BALA {i+1}: {res.comment}"
-                                    add_log_dash(msg)
-                                    send_telegram(msg)
-                            send_telegram(f"🚀 *ARTILLERÍA SELL {sym}*")
+                            sl = price - pts_sl if side == 0 else price + pts_sl
+                            
+                            add_log_dash(f"🚀 FUEGO: {sym} (6 BALAS)")
+                            send_telegram(f"� *RAFAGA LIBERADA: {sym}*")
+                            for _ in range(MAX_BULLETS):
+                                mt5.order_send({"action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"], "type": side, "price": price, "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "T_540_R", "type_filling": mt5.ORDER_FILLING_IOC})
                         else:
                             if p_up or p_dw:
-                                filtrado = f"{'B:OK' if s_ok else f'B:{s_d['b_ratio']:.0f}%'} | {'E:OK' if (t_up if p_up else t_dw) else 'E:WAIT'}"
+                                filtrado = f"{'B:OK' if s_ok else f'B:{b_ratio:.0f}%'} | {'E:OK' if t_ok else 'E:WAIT'}"
                                 s_d["status"] = f"⏳ GATILLO: {filtrado}"
                             else:
                                 dh = (mh - tick.bid)/s_i.point
@@ -231,7 +204,7 @@ def main_loop():
                 if len(sym_pos) > 0: s_d["status"] = f"🚀 WAR {len(sym_pos)}B | ${sum(p.profit for p in sym_pos):.2f}"
 
             time.sleep(1)
-        except Exception as e:
+        except Exception:
             time.sleep(1)
 
 def draw_dashboard():
