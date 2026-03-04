@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.320 (RADAR QUIRÚRGICO) ---
-VERSION = "v47.9.320"
-BRANDING = "🦅 TITAN ICT: CALIBRACIÓN PIPS/PTS"
+# --- CONFIGURACIÓN TITAN v47.9.330 (CAZADOR DESATADO) ---
+VERSION = "v47.9.330"
+BRANDING = "🦅 TITAN ICT: GATILLO SNIPER AGRESIVO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -124,16 +124,17 @@ def main_loop():
                 h_h, h_l = get_h1_liquidity(sym)
                 s_d.update({"h1_high": h_h if h_h else 0.0, "h1_low": h_l if h_l else 0.0, "pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
-                # DETECCIÓN DE SWEEP (LOG DETALLADO)
+                # DETECCIÓN DE SWEEP (CON TOLERANCIA DE 2 PUNTOS)
                 dist_to_high = h_h - tick.bid if h_h else 999
                 dist_to_low = tick.bid - h_l if h_l else 999
                 
-                if h_h and tick.bid >= h_h:
-                    if s_d["sweep_type"] != -1: add_log_dash(f"👀 {sym} TECHO H1 ROTO! BUSCANDO SELL")
+                # Sensibilidad extrema: Activa bias si está a menos de 2 puntos
+                if h_h and (tick.bid >= h_h - (2 * s_i.point)):
+                    if s_d["sweep_type"] != -1: add_log_dash(f"🎯 {sym} BIAS SELL ACTIVO (NEAR H1)")
                     s_d["sweep_type"] = -1 
                     s_d["sweep_time"] = time.time()
-                elif h_l and tick.bid <= h_l:
-                    if s_d["sweep_type"] != 1: add_log_dash(f"👀 {sym} SUELO H1 ROTO! BUSCANDO BUY")
+                elif h_l and (tick.bid <= h_l + (2 * s_i.point)):
+                    if s_d["sweep_type"] != 1: add_log_dash(f"🎯 {sym} BIAS BUY ACTIVO (NEAR H1)")
                     s_d["sweep_type"] = 1 
                     s_d["sweep_time"] = time.time()
                 
@@ -159,27 +160,25 @@ def main_loop():
                 m1_mss_sell = (tick.ask < rates_m1[-2]['low']) and bias == -1
                 
                 if (m1_mss_buy or m1_mss_sell) and len(sym_pos) == 0:
-                     rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
-                     mom_ok = (m1_mss_buy and rsi > 45) or (m1_mss_sell and rsi < 55) # Filtro más relajado
-                     
-                     if mom_ok:
-                          side = "BUY" if m1_mss_buy else "SELL"
-                          pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
-                          sl = tick.bid - pts_sl if side=="BUY" else tick.ask + pts_sl
-                          res = mt5.order_send({
-                              "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                              "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
-                              "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "SWEEP_M1",
-                              "type_filling": mt5.ORDER_FILLING_IOC
-                          })
-                          if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                               add_log_dash(f"🎯 {sym} DISPARO {side} EXITOSO")
-                               s_d["last_trade"] = time.time()
-                               s_d["sweep_time"] = 0 
-                          else:
-                               add_log_dash(f"⚠️ {sym} DISPARO FALLIDO: {res.comment if res else 'Error'}")
-                     else:
-                          s_d["status"] = f"⚠️ ESPERANDO MOMENTUM RSI ({rsi:.1f})"
+                      side = "BUY" if m1_mss_buy else "SELL"
+                      pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
+                      sl = tick.bid - pts_sl if side=="BUY" else tick.ask + pts_sl
+                      res = mt5.order_send({
+                          "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                          "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                          "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "SNIPER_V330",
+                          "type_filling": mt5.ORDER_FILLING_IOC
+                      })
+                      if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                           add_log_dash(f"🚀 {sym} DISPARO {side} (SWEEP OK)")
+                           s_d["last_trade"] = time.time()
+                           s_d["sweep_time"] = 0 
+                      else:
+                           add_log_dash(f"⚠️ {sym} DISPARO FALLIDO: {res.comment if res else 'Error'}")
+                elif bias != 0 and len(sym_pos) == 0:
+                     # Log de espera táctica
+                     target_price = rates_m1[-2]['high'] if bias == 1 else rates_m1[-2]['low']
+                     s_d["status"] = f"⏳ WAITING M1 {('UP' if bias==1 else 'DOWN')} {target_price:.5f}"
 
             time.sleep(1)
         except Exception as e:
