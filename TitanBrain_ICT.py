@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.120 (RIESGO EN DÓLARES) ---
-VERSION = "v47.9.120"
-BRANDING = "🦅 TITAN ICT: RIESGO EN DÓLARES REALES"
+# --- CONFIGURACIÓN TITAN v47.9.121 (NITRO BYPASS) ---
+VERSION = "v47.9.121"
+BRANDING = "🦅 TITAN ICT: NITRO BYPASS ACTIVADO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -23,6 +23,7 @@ MAX_BULLETS = 6            # Límite STORM
 MAGIC = 48105              # Magic v47.105
 COOLDOWN_TIME = 1800       # 30 minutos
 REINFORCE_PROFIT = 3.0     # Profit para buscar refuerzos (agrupado)
+BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
@@ -55,6 +56,7 @@ def get_asset_type(sym):
 
 def check_cooldown():
     """Detecta pérdidas recientes y activa el bloqueo de 30 minutos."""
+    if BYPASS_COOLDOWN: return False
     if time.time() < STATE["cooldown_until"]: return True
     
     # Revisar historial de la última hora
