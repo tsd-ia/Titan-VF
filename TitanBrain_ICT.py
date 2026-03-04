@@ -88,7 +88,8 @@ def manage_positions(positions):
         tick = mt5.symbol_info_tick(p.symbol)
         if not s_i or not tick: continue
         
-        profit_usd = p.profit + p.commission + p.swap
+        # Lectura segura de Profit (Evita el error de 'commission' que colgó el bot)
+        profit_usd = p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0)
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         
         # 1. COSECHA INICIAL (Lock de terreno positivo)
