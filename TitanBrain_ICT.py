@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.180 (RADAR CALIBRADO) ---
-VERSION = "v47.9.180"
-BRANDING = "🦅 TITAN ICT: CALIBRACIÓN QUIRÚRGICA"
+# --- CONFIGURACIÓN TITAN v47.9.185 (CERO SANGRÍA) ---
+VERSION = "v47.9.185"
+BRANDING = "🦅 TITAN ICT: ESCUDO DE MARGEN ACTIVADO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -33,9 +33,9 @@ ASSET_CONFIG = {
         "calculate_be": True, "strict_filter": True, "r_trigger": 5.0
     },
     "FX":   {
-        "lot": 0.02, "sl_usd": 5.0, "trail": True, "burst": 3,
+        "lot": 0.02, "sl_usd": 5.0, "trail": True, "burst": 1,
         "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.2,
-        "calculate_be": True, "strict_filter": False, "r_trigger": 1.0
+        "calculate_be": True, "strict_filter": True, "r_trigger": 2.0
     }
 }
 
@@ -248,6 +248,11 @@ def main_loop(mode_24h=False):
                         rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
                         momentum_ok = (m1_mss_buy and rsi > 50) or (m1_mss_sell and rsi < 50)
                     
+                    # CONTROL DE MARGEN DE SEGURIDAD
+                    if acc.margin_level < 250:
+                        s_d["status"] = "⚠️ MARGEN BAJO"
+                        continue
+
                     if trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
                         side = "BUY" if m1_mss_buy else "SELL"
                         points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
