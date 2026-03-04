@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.440 (IMPULSE DISPLACEMENT) ---
-VERSION = "v47.9.440"
-BRANDING = "🦅 TITAN ICT: 1-M1 SOLID CANDLE + ATR EXPANSION"
+# --- CONFIGURACIÓN TITAN v47.9.450 (M15 BREAKOUT) ---
+VERSION = "v47.9.450"
+BRANDING = "🦅 TITAN ICT: M15 RANGE + SOLID M1"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -61,8 +61,8 @@ def add_log_dash(msg):
 def get_asset_type(sym):
     return "GOLD" if "XAU" in sym.upper() or "GOLD" in sym.upper() else "FX"
 
-def get_h1_liquidity(sym):
-    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_H1, 1, 1)
+def get_m15_range(sym):
+    rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 1, 1)
     if rates is not None and len(rates) > 0:
         return rates[0]['high'], rates[0]['low']
     return None, None
@@ -128,7 +128,7 @@ def main_loop():
     while STATE["is_running"]:
         try:
             if time.time() - STATE["last_heartbeat"] > 30:
-                add_log_dash("💓 CEREBRO OK - ESCANEANDO BREAKOUT H1...")
+                add_log_dash("💓 CEREBRO OK - ESCANEANDO MICRO-RANGO M15...")
                 STATE["last_heartbeat"] = time.time()
 
             acc = mt5.account_info()
@@ -174,10 +174,10 @@ def main_loop():
                 
                 s_d.update({"pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
-                # --- LÓGICA DE ENTRADA IMPULSE DISPLACEMENT ---
+                # --- LÓGICA DE ENTRADA IMPULSE DISPLACEMENT (M15 BASED) ---
                 if len(sym_pos) == 0 and len(cur) < MAX_TOTAL_SYMBOLS:
-                    h_h, h_l = get_h1_liquidity(sym)
-                    if not h_h or not h_l: continue
+                    m15_h, m15_l = get_m15_range(sym)
+                    if not m15_h or not m15_l: continue
                     
                     # FILTROS TÉCNICOS RAPIDOS
                     ema21 = get_ema(sym, mt5.TIMEFRAME_M1, 21)
@@ -193,10 +193,10 @@ def main_loop():
                         body_ratio = (body_size / candle_range) if candle_range > 0 else 0
                         
                         # GATILLO BUY: Cierre > Techo + Cuerpo Sólido (>70%) + EMA Slope
-                        trigger_buy = (last_c['close'] > h_h) and (body_ratio > 0.7) and (ema21 > ema50) and (tick.ask > ema21)
+                        trigger_buy = (last_c['close'] > m15_h) and (body_ratio > 0.7) and (ema21 > ema50) and (tick.ask > ema21)
                         
                         # GATILLO SELL: Cierre < Suelo + Cuerpo Sólido (>70%) + EMA Slope
-                        trigger_sell = (last_c['close'] < h_l) and (body_ratio > 0.7) and (ema21 < ema50) and (tick.bid < ema21)
+                        trigger_sell = (last_c['close'] < m15_l) and (body_ratio > 0.7) and (ema21 < ema50) and (tick.bid < ema21)
 
                         if trigger_buy:
                             pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
@@ -223,11 +223,11 @@ def main_loop():
                                 send_telegram(f"� *IMPULSE SELL: {sym}*\n*Filtro:* 1-M1 Solid Candle (Body: {body_ratio:.1%})\n*EMA:* Trend Down Confirmada.")
                         else:
                             # Feedback en dashboard
-                            if tick.bid >= h_h: s_d["status"] = f"⏳ WAIT SOLID M1 (B:{body_ratio:.1%})"
-                            elif tick.bid <= h_l: s_d["status"] = f"⏳ WAIT SOLID M1 (B:{body_ratio:.1%})"
+                            if tick.bid >= m15_h: s_d["status"] = f"⏳ WAIT SOLID M1 (B:{body_ratio:.1%})"
+                            elif tick.bid <= m15_l: s_d["status"] = f"⏳ WAIT SOLID M1 (B:{body_ratio:.1%})"
                             else:
-                                dist_h = (h_h - tick.bid)/s_i.point
-                                dist_l = (tick.bid - h_l)/s_i.point
+                                dist_h = (m15_h - tick.bid)/s_i.point
+                                dist_l = (tick.bid - m15_l)/s_i.point
                                 s_d["status"] = f"🔎 {('H' if dist_h < dist_l else 'L')} {min(dist_h, dist_l):.1f}"
 
                 # --- REFUERZOS ---
@@ -265,13 +265,13 @@ def draw_dashboard():
         print(f"{Fore.RED}{Style.BRIGHT} 🦅 {BRANDING} | {VERSION} | JEFE: DIEGO (MODO RECUPERACIÓN)")
         print(f"{Fore.WHITE} BALANCE: ${Fore.GREEN}{acc.balance:.2f} {Fore.WHITE}| EQUITY: ${Fore.CYAN}{acc.equity:.2f} {Fore.WHITE}| PnL: {Fore.YELLOW}${acc.profit:.2f}")
         print(f"{Fore.CYAN}{'─'*115}")
-        print(f"{Fore.WHITE} {'ACTIVO':<10} | {'SPR':<4} | {'H1 HIGH':<10} | {'H1 LOW':<10} | {'BALAS':<4} | {'PnL' :<10} | {'STATUS'}")
+        print(f"{Fore.WHITE} {'ACTIVO':<10} | {'SPR':<4} | {'M15 HIGH':<10} | {'M15 LOW':<10} | {'BALAS':<4} | {'PnL' :<10} | {'STATUS'}")
         print(f"{Fore.CYAN}{'─'*115}")
         for sym in STATE["active_symbols"]:
             d = STATE["symbols_data"][sym]
             pnl_col = f"{Fore.GREEN if d['pnl']>=0 else Fore.RED}${d['pnl']:+7.2f}{Style.RESET_ALL}"
-            h1h, h1l = get_h1_liquidity(sym)
-            print(f" {sym:<10} | {d['spread']:<4} | {h1h if h1h else 0:<10.5f} | {h1l if h1l else 0:<10.5f} | {d['pos']}/{MAX_BULLETS:<2} | {pnl_col:<10} | {d['status']}")
+            m15h, m15l = get_m15_range(sym)
+            print(f" {sym:<10} | {d['spread']:<4} | {m15h if m15h else 0:<10.5f} | {m15l if m15l else 0:<10.5f} | {d['pos']}/{MAX_BULLETS:<2} | {pnl_col:<10} | {d['status']}")
         print(f"{Fore.CYAN}{'─'*115}")
         for line in STATE["last_logs"]: print(f" > {line}")
         print(f"{Fore.CYAN}{'═'*115}")
