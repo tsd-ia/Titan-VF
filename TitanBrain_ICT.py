@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.210 (REBORDE DORADO) ---
-VERSION = "v47.9.210"
-BRANDING = "🦅 TITAN ICT: PROTECCIÓN $3 -> $1.5"
+# --- CONFIGURACIÓN TITAN v47.9.215 (VERIFICACIÓN REAL) ---
+VERSION = "v47.9.215"
+BRANDING = "🛡️ TITAN ICT: PROTECCIÓN VERIFICADA"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -30,11 +30,11 @@ BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
-        "h_trigger": 2.0, "h_lock": 0.5, "t_step": 0.1, "air": 1.5,
+        "h_trigger": 2.0, "h_lock": 0.5, "t_step": 0.5, "air": 1.5,
         "calculate_be": True, "strict_filter": True, "r_trigger": 3.0
     },
     "FX":   {
-        "lot": 0.01, "sl_usd": 5.0, "trail": True, "burst": 1,
+        "lot": 0.02, "sl_usd": 5.0, "trail": True, "burst": 1,
         "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.2,
         "calculate_be": True, "strict_filter": True, "r_trigger": 1.0
     }
@@ -147,9 +147,10 @@ def manage_positions(positions):
              # Envío de orden de protección (BE)
              res = mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(target_sl, s_i.digits)), "tp": p.tp})
              if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                 add_log_dash(f"💰 {p.symbol} BE PROTEGIDO ${cfg['h_lock']}")
+                 add_log_dash(f"✅ {p.symbol} BE OK ${cfg['h_lock']}")
              else:
-                 add_log_dash(f"⚠️ ERR BE {p.symbol}: {res.comment if res else 'Fail'}")
+                 reason = res.comment if res else "Error de Red"
+                 add_log_dash(f"❌ RECHAZO {p.symbol}: {reason}")
         
         # 2. TRAILING STOP DINÁMICO (Solo si ya NO es arriesgado/BE activo)
         elif profit_usd >= (cfg["h_trigger"] + cfg["t_step"]) and not is_risky:
