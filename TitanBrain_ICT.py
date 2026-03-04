@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.410 (MASTER LOCK & TRAILING) ---
-VERSION = "v47.9.410"
-BRANDING = "🦅 TITAN ICT: MASTER LOCK + CLUSTER TRAILING"
+# --- CONFIGURACIÓN TITAN v47.9.420 (REPORTE COMPLETO) ---
+VERSION = "v47.9.420"
+BRANDING = "🦅 TITAN ICT: LIVE REPORTS + BALANCE"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -136,7 +136,7 @@ def main_loop():
                 msg = f"📊 *MONITOREO EN VIVO*\n━━━━━━━━━━━━━━━\n"
                 for p in cur:
                     msg += f"• *{p.symbol}:* ${p.profit:+.2f} ({'BUY' if p.type==0 else 'SELL'} {p.volume})\n"
-                msg += f"━━━━━━━━━━━━━━━\n*Equity:* ${acc.equity:.2f} | *PnL:* ${acc.profit:+.2f}"
+                msg += f"━━━━━━━━━━━━━━━\n*Balance:* ${acc.balance:.2f} | *Equity:* ${acc.equity:.2f}\n*PnL Total:* ${acc.profit:+.2f}"
                 send_telegram(msg)
                 STATE["last_tg_monitor"] = time.time()
 
