@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.135 (TRIPLE SNIPER) ---
-VERSION = "v47.9.135"
-BRANDING = "🦅 TITAN ICT: TRIPLE FILTRO (EMA+RSI+ICT)"
+# --- CONFIGURACIÓN TITAN v47.9.140 (HÍBRIDO: SNIPER + GUERRILLA) ---
+VERSION = "v47.9.140"
+BRANDING = "🦅 TITAN ICT: SNIPER ORO + GUERRILLA FX"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -30,12 +30,12 @@ ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
         "h_trigger": 1.2, "h_lock": 0.5, "t_step": 0.5, "air": 0.8,
-        "r_trigger": 1.5  # Refuerzo a partir de $1.50 profit
+        "calculate_be": True, "strict_filter": True, "r_trigger": 1.5
     },
     "FX":   {
-        "lot": 0.02, "sl_usd": 15.0, "trail": True, "burst": 2,
+        "lot": 0.02, "sl_usd": 15.0, "trail": True, "burst": 3,
         "h_trigger": 1.0, "h_lock": 0.3, "t_step": 0.5, "air": 0.7,
-        "r_trigger": 3.0  # Refuerzo a partir de $3.00 profit
+        "calculate_be": True, "strict_filter": False, "r_trigger": 3.0
     }
 }
 
@@ -200,14 +200,18 @@ def main_loop(mode_24h=False):
                     if sweep_buy and tick.bid > rates_m1[-2]['high']: mss_ok = True
                     elif sweep_sell and tick.ask < rates_m1[-2]['low']: mss_ok = True
                     
-                    # B. Filtro Tendencia (EMA 9 vs 21)
-                    ema9 = get_ema(sym, mt5.TIMEFRAME_M1, 9)
-                    ema21 = get_ema(sym, mt5.TIMEFRAME_M1, 21)
-                    trend_ok = (sweep_buy and ema9 > ema21) or (sweep_sell and ema9 < ema21)
+                    # B. Filtro Tendencia (Solo si strict_filter es True)
+                    trend_ok = True
+                    if cfg.get("strict_filter"):
+                        ema9 = get_ema(sym, mt5.TIMEFRAME_M1, 9)
+                        ema21 = get_ema(sym, mt5.TIMEFRAME_M1, 21)
+                        trend_ok = (sweep_buy and ema9 > ema21) or (sweep_sell and ema9 < ema21)
                     
-                    # C. Filtro Impulso (RSI 14)
-                    rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
-                    momentum_ok = (sweep_buy and rsi > 50) or (sweep_sell and rsi < 50)
+                    # C. Filtro Impulso (Solo si strict_filter es True)
+                    momentum_ok = True
+                    if cfg.get("strict_filter"):
+                        rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
+                        momentum_ok = (sweep_buy and rsi > 50) or (sweep_sell and rsi < 50)
                     
                     if mss_ok and trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
                         side = "BUY" if sweep_buy else "SELL"
