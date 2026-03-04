@@ -8,30 +8,30 @@ from datetime import datetime
 from colorama import Fore, Style, init as colorama_init
 import requests
 
-# --- CONFIGURACIÓN TITAN v47.9.570 (AUDITORÍA Y RE-BLINDAJE) ---
-VERSION = "v47.9.570"
-BRANDING = "🦅 TITAN ICT: PRECISION BALLISTIC"
+# --- CONFIGURACIÓN TITAN v47.9.580 (RE-CALIBRACIÓN PROFESIONAL) ---
+VERSION = "v47.9.580"
+BRANDING = "🦅 TITAN ICT: PROFESSIONAL BALLISTIC"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
-# GESTIÓN DE RIESGO PROFESIONAL
+# GESTIÓN DE RIESGO SOLICITADA POR EL JEFE
 MAX_BULLETS = 3            
 MAGIC = 48105              
 
 ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, 
-        "sl_usd": 4.5,      # $4.5 para que el Spread de $3.6 no lo mate
-        "trail_trig": 1.2,  # Gatillo a $1.2
-        "trail_lock": 0.8,  # Asegura $0.8
-        "trail_step": 0.4
+        "sl_usd": 10.0,     # $10 para el Oro (Blindado)
+        "trail_trig": 1.5,  # Gatillo $1.5
+        "trail_lock": 1.0,  # Asegura $1.0
+        "trail_step": 0.5
     },
     "FX": {
         "lot": 0.02, 
-        "sl_usd": 4.0,      # $4 (~20 pips) para que el precio respire
-        "trail_trig": 1.0,  
-        "trail_lock": 0.7,  
-        "trail_step": 0.3
+        "sl_usd": 2.0,      # $2 para FX (Rápido)
+        "trail_trig": 0.5,  # Gatillo a 50 centavos para cashflow rápido
+        "trail_lock": 0.3,  # Asegura 30 centavos
+        "trail_step": 0.1   # Persecución cada 10 centavos
     }
 }
 
@@ -39,7 +39,7 @@ STATE = {
     "is_running": True, 
     "active_symbols": [], 
     "symbols_data": {}, 
-    "last_logs": ["🚀 BALÍSTICA BLINDADA - v570"],
+    "last_logs": ["🚀 BALÍSTICA SERIA v580"],
     "last_heartbeat": 0, 
     "last_tg_monitor": 0, 
     "tracked_positions": {}
@@ -65,23 +65,18 @@ def add_log_dash(msg):
 def get_asset_type(sym):
     return "GOLD" if "XAU" in sym.upper() or "GOLD" in sym.upper() else "FX"
 
-def get_m15_range(sym):
-    try:
-        rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 1, 1)
-        if rates is not None and len(rates) > 0:
-            return float(rates[0]['high']), float(rates[0]['low'])
-    except Exception: pass
-    return None, None
-
-def get_rsi(sym, period=14):
+def get_rsi(sym, period=7): # Periodo corto para detectar agotamiento instantáneo
     try:
         rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, period + 1)
         if rates is None or len(rates) < period: return 50
-        deltas = np.diff([r['close'] for r in rates])
-        up = deltas[deltas >= 0].sum() / period
-        down = -deltas[deltas < 0].sum() / period
-        if down == 0: return 100
-        rs = up / down
+        closes = np.array([r['close'] for r in rates])
+        diffs = np.diff(closes)
+        ups = diffs[diffs > 0]
+        dns = -diffs[diffs < 0]
+        avg_up = ups.sum() / period if len(ups) > 0 else 0
+        avg_dn = dns.sum() / period if len(dns) > 0 else 0
+        if avg_dn == 0: return 100
+        rs = avg_up / avg_dn
         return 100 - (100 / (1 + rs))
     except Exception: return 50
 
@@ -103,11 +98,11 @@ def individual_trailing(p):
         cfg = ASSET_CONFIG[get_asset_type(p.symbol)]
         profit = p.profit + getattr(p, 'commission', 0.0) + getattr(p, 'swap', 0.0)
         
-        # SL inicial más amplio
+        # SL inicial forzado según pedido del jefe
         if p.sl == 0:
             pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / p.volume
             new_sl = p.price_open - pts_sl if p.type == 0 else p.price_open + pts_sl
-            mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_sl, s_i.digits)), "tp": 0.0})
+            mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_sl, s_i.digits))})
             return
 
         tick = mt5.symbol_info_tick(p.symbol)
@@ -121,15 +116,23 @@ def individual_trailing(p):
                 target_sl = p.price_open + pts_lock
                 trail_sl = tick.bid - pts_step
                 new_sl = max(target_sl, trail_sl)
-                if new_sl > p.sl + (pts_step * 0.2):
+                if new_sl > p.sl + (pts_step * 0.1): # Mueve cada 10 centavos
                     mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_sl, s_i.digits))})
             else: # SELL
                 target_sl = p.price_open - pts_lock
                 trail_sl = tick.ask + pts_step
                 new_sl = min(target_sl, trail_sl)
-                if p.sl == 0 or new_sl < p.sl - (pts_step * 0.2):
+                if p.sl == 0 or new_sl < p.sl - (pts_step * 0.1):
                     mt5.order_send({"action": mt5.TRADE_ACTION_SLTP, "position": p.ticket, "sl": float(round(new_sl, s_i.digits))})
     except Exception: pass
+
+def get_m15_range(sym):
+    try:
+        rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M15, 1, 1)
+        if rates is not None and len(rates) > 0:
+            return float(rates[0]['high']), float(rates[0]['low'])
+    except Exception: pass
+    return None, None
 
 def main_loop():
     if not mt5.initialize(): return
@@ -141,7 +144,7 @@ def main_loop():
         if found:
             mt5.symbol_select(found, True)
             STATE["active_symbols"].append(found)
-            STATE["symbols_data"][found] = {"pnl":0, "pos":0, "spread":0, "b_ratio":0, "ema_trend":"WAIT", "status":"VIGIL", "rsi": 50}
+            STATE["symbols_data"][found] = {"pnl":0, "pos":0, "spread":0, "b_ratio":0, "ema_trend":"WAIT", "status":"VIGIL", "rsi": 50, "type": get_asset_type(found)}
 
     while STATE["is_running"]:
         try:
@@ -160,23 +163,19 @@ def main_loop():
 
             for p in cur: individual_trailing(p)
             
-            if time.time() - STATE["last_tg_monitor"] > 60:
-                send_telegram(f"📡 *ESTADO v570*\nEquity: ${acc.equity:.2f}\nMargen: {acc.margin_level:.0f}%")
-                STATE["last_tg_monitor"] = time.time()
-
             for sym in STATE["active_symbols"]:
                 s_i = mt5.symbol_info(sym)
                 tick = mt5.symbol_info_tick(sym)
                 if not s_i or not tick: continue
                 s_d = STATE["symbols_data"][sym]
                 sym_pos = [p for p in cur if p.symbol == sym]
-                cfg = ASSET_CONFIG[get_asset_type(sym)]
+                cfg = ASSET_CONFIG[s_d["type"]]
                 s_d.update({"pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
                 mh, ml = get_m15_range(sym)
                 e21 = get_ema(sym, mt5.TIMEFRAME_M1, 21)
                 e50 = get_ema(sym, mt5.TIMEFRAME_M1, 50)
-                rsi = get_rsi(sym)
+                rsi = get_rsi(sym, 7) # RSI rápido para atrapar falsos breakouts
                 s_d["rsi"] = rsi
                 rates = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
                 
@@ -193,8 +192,8 @@ def main_loop():
                         s_ok = (b_ratio >= 70)
                         t_ok = (s_d["ema_trend"] == "UP" if p_up else (s_d["ema_trend"] == "DOWN" if p_dw else False))
                         
-                        # FILTRO RSI ANTI-TRAMPA
-                        rsi_ok = (rsi < 80 if p_up else (rsi > 20 if p_dw else True))
+                        # FILTRO RSI ANTI-AGOTAMIENTO (MÁXIMA SERIEDAD)
+                        rsi_ok = (rsi < 70 if p_up else (rsi > 30 if p_dw else True))
 
                         if (p_up or p_dw) and s_ok and t_ok and rsi_ok:
                             side = 0 if p_up else 1
@@ -204,18 +203,20 @@ def main_loop():
                             for _ in range(MAX_BULLETS):
                                 mt5.order_send({
                                     "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                                    "type": side, "price": price, "magic": MAGIC, "comment": "T_570", "type_filling": mt5.ORDER_FILLING_IOC
+                                    "type": side, "price": price, "magic": MAGIC, "comment": "T_580", "type_filling": mt5.ORDER_FILLING_IOC
                                 })
                         else:
                             if p_up or p_dw:
-                                rsi_msg = f"RSI:{rsi:.0f}(OK)" if rsi_ok else f"RSI:{rsi:.0f}(OVER)"
+                                rsi_msg = f"RSI:{rsi:.0f}(OK)" if rsi_ok else f"{Fore.RED}RSI:{rsi:.0f}(OVER)"
                                 s_d["status"] = f"⏳ GAT: {'B:OK' if s_ok else 'B:WAIT'} | {rsi_msg}"
                             else:
-                                s_d["status"] = f"🔎 SCANNING ICT"
+                                dh = (mh - tick.bid)/s_i.point
+                                dl = (tick.bid - ml)/s_i.point
+                                s_d["status"] = f"🔎 VIGIL {min(dh, dl):.0f}p"
                 
                 if len(sym_pos) > 0: 
                     pnl_tot = sum(p.profit for p in sym_pos)
-                    s_d["status"] = f"🚀 WAR {len(sym_pos)}B | ${pnl_tot:.2f}"
+                    s_d["status"] = f"🚀 WAR {len(sym_pos)}B | PnL: ${pnl_tot:.2f}"
 
             time.sleep(1)
         except Exception:
@@ -237,7 +238,7 @@ def draw_dashboard():
                 d = STATE["symbols_data"][sym]
                 pnl_col = f"{Fore.GREEN if d['pnl']>=0 else Fore.RED}${d['pnl']:+7.2f}{Style.RESET_ALL}"
                 b_col = Fore.GREEN if d['b_ratio']>=70 else Fore.YELLOW
-                r_col = Fore.RED if (d['rsi']>80 or d['rsi']<20) else Fore.CYAN
+                r_col = Fore.RED if (d['rsi']>70 or d['rsi']<30) else Fore.CYAN
                 print(f" {sym:<10} | {d['spread']:<4} | {b_col}{d['b_ratio']:>4.0f}%{Style.RESET_ALL} | {r_col}{d['rsi']:>4.0f}{Style.RESET_ALL} | {d['ema_trend']:<6} | {pnl_col:<10} | {d['status']}")
             print(f"{Fore.CYAN}{'─'*115}")
             for l in STATE["last_logs"]: print(f" > {l}")
