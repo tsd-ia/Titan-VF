@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.300 (MODO AGITADOR) ---
-VERSION = "v47.9.300"
-BRANDING = "🦅 TITAN ICT: CAZADOR CON TELEMETRÍA TOTAL"
+# --- CONFIGURACIÓN TITAN v47.9.310 (RADAR HUMANO) ---
+VERSION = "v47.9.310"
+BRANDING = "🦅 TITAN ICT: RADAR DE PROXIMIDAD"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -127,14 +127,14 @@ def main_loop():
                 # DETECCIÓN DE SWEEP (LOG DETALLADO)
                 dist_to_high = h_h - tick.bid if h_h else 999
                 dist_to_low = tick.bid - h_l if h_l else 999
-
-                if h_h and tick.bid > h_h:
+                
+                if h_h and tick.bid >= h_h:
                     if s_d["sweep_type"] != -1: add_log_dash(f"👀 {sym} TECHO H1 ROTO! BUSCANDO SELL")
-                    s_d["sweep_type"] = -1 # Se activa el Sniper de Venta
+                    s_d["sweep_type"] = -1 
                     s_d["sweep_time"] = time.time()
-                elif h_l and tick.bid < h_l:
+                elif h_l and tick.bid <= h_l:
                     if s_d["sweep_type"] != 1: add_log_dash(f"👀 {sym} SUELO H1 ROTO! BUSCANDO BUY")
-                    s_d["sweep_type"] = 1 # Se activa el Sniper de Compra
+                    s_d["sweep_type"] = 1 
                     s_d["sweep_time"] = time.time()
                 
                 # ¿Está el sniper en espera? (20 min de persistencia)
@@ -142,7 +142,10 @@ def main_loop():
                 bias = s_d["sweep_type"] if is_sweep_active else 0
                 
                 if bias == 0:
-                    s_d["status"] = f"🔎 SCAN ({min(dist_to_high, dist_to_low):.1f})"
+                    label = "H" if dist_to_high < dist_to_low else "L"
+                    val = min(dist_to_high, dist_to_low)
+                    s_d["status"] = f"🔎 SCAN {label} ({val:.2f})"
+                    if val < 0.5 and val > 0: s_d["status"] = f"🔥 PRESSURE {label} ({val:.2f})"
                     continue
                 
                 s_d["status"] = f"🎯 SNIPER {'BUY' if bias==1 else 'SELL'} ACTIVO"
