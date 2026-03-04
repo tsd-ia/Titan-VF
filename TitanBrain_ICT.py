@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.200 (SALTO AL VACÍO) ---
-VERSION = "v47.9.200"
-BRANDING = "🦅 TITAN ICT: REFUERZOS AGRESIVOS ACTIVADOS"
+# --- CONFIGURACIÓN TITAN v47.9.205 (REFUERZO $3) ---
+VERSION = "v47.9.205"
+BRANDING = "🦅 TITAN ICT: REFUERZO ORO A $3.00"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -23,7 +23,7 @@ MAX_BULLETS = 2            # Solo 1 refuerzo máximo
 MAGIC = 48105              
 COOLDOWN_TIME = 1800       
 REINFORCE_PROFIT = 1.5     
-MAX_TOTAL_SYMBOLS = 3      # <--- NO MÁS DE 3 PARES A LA VEZ
+MAX_TOTAL_SYMBOLS = 6      # <--- NO MÁS DE 6 PARES A LA VEZ
 BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 
 # CONFIGURACIÓN POR ACTIVO
@@ -31,7 +31,7 @@ ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
         "h_trigger": 2.0, "h_lock": 0.5, "t_step": 1.0, "air": 1.5,
-        "calculate_be": True, "strict_filter": True, "r_trigger": 1.5
+        "calculate_be": True, "strict_filter": True, "r_trigger": 3.0
     },
     "FX":   {
         "lot": 0.01, "sl_usd": 5.0, "trail": True, "burst": 1,
