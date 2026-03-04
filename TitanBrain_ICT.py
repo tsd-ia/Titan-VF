@@ -8,8 +8,8 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.450 (M15 BREAKOUT) ---
-VERSION = "v47.9.450"
+# --- CONFIGURACIÓN TITAN v47.9.451 (M15 BUGFIX) ---
+VERSION = "v47.9.451"
 BRANDING = "🦅 TITAN ICT: M15 RANGE + SOLID M1"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
@@ -246,9 +246,11 @@ def main_loop():
                             send_telegram(f"🔥 *REFUERZO: {sym}*\n*Lote:* +{cfg['lot_reinf']}\n*Total Balas:* {len(sym_pos)+1}")
 
                 if len(sym_pos) == 0:
-                    dist_h = (h_h - tick.bid)/s_i.point if h_h else 999
-                    dist_l = (tick.bid - h_l)/s_i.point if h_l else 999
-                    s_d["status"] = f"🔎 {('H' if dist_h < dist_l else 'L')} {min(dist_h, dist_l):.1f}"
+                    m15_h, m15_l = get_m15_range(sym)
+                    if m15_h:
+                        dist_h = (m15_h - tick.bid)/s_i.point
+                        dist_l = (tick.bid - m15_l)/s_i.point
+                        s_d["status"] = f"🔎 {('H' if dist_h < dist_l else 'L')} {min(dist_h, dist_l):.1f}"
                 else:
                     s_d["status"] = f"🚀 WAR {len(sym_pos)}B | {sum(p.profit for p in sym_pos):.2f}"
 
