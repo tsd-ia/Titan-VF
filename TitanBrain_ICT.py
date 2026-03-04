@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.390 (GATILLOS REPARADOS) ---
-VERSION = "v47.9.390"
-BRANDING = "🦅 TITAN ICT: TELEGRAM + ARTILLERÍA REPARADA"
+# --- CONFIGURACIÓN TITAN v47.9.400 (FILTRO ORO SELECTIVO) ---
+VERSION = "v47.9.400"
+BRANDING = "🦅 TITAN ICT: FX DIRECTO + ORO CONFIRMADO"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -153,32 +153,54 @@ def main_loop():
                 
                 s_d.update({"pos": len(sym_pos), "pnl": sum(p.profit for p in sym_pos), "spread": s_i.spread})
                 
-                # --- LÓGICA DE ENTRADA (BREAKOUT) ---
+                # --- LÓGICA DE ENTRADA DIFERENCIADA ---
                 if len(sym_pos) == 0 and len(cur) < MAX_TOTAL_SYMBOLS:
-                    # COMPRA: ROMPE TECHO
-                    if h_h and tick.bid >= h_h:
-                        pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
-                        sl = tick.bid - pts_sl
-                        res = mt5.order_send({
-                            "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                            "type": 0, "price": tick.ask, "sl": float(round(sl, s_i.digits)), 
-                            "magic": MAGIC, "comment": "FENIX_BUY", "type_filling": mt5.ORDER_FILLING_IOC
-                        })
-                        if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                            add_log_dash(f"� COMPRA {sym}")
-                            send_telegram(f"� *NUEVA COMPRA: {sym}*\n*Lote:* {cfg['lot']}\n*Breakout:* Techo H1 roto.")
-                    # VENTA: ROMPE SUELO
-                    elif h_l and tick.bid <= h_l:
-                        pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
-                        sl = tick.bid + pts_sl
-                        res = mt5.order_send({
-                            "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
-                            "type": 1, "price": tick.bid, "sl": float(round(sl, s_i.digits)), 
-                            "magic": MAGIC, "comment": "FENIX_SELL", "type_filling": mt5.ORDER_FILLING_IOC
-                        })
-                        if res and res.retcode == mt5.TRADE_RETCODE_DONE:
-                            add_log_dash(f"� VENTA {sym}")
-                            send_telegram(f"📉 *NUEVA VENTA: {sym}*\n*Lote:* {cfg['lot']}\n*Breakout:* Suelo H1 roto.")
+                    is_gold = (s_d["type"] == "GOLD")
+                    
+                    # DETECCIÓN DE BREAKOUT
+                    break_up = h_h and tick.bid >= h_h
+                    break_down = h_l and tick.bid <= h_l
+                    
+                    if break_up or break_down:
+                        # Si es ORO, buscamos confirmación de vela M1 (MSS)
+                        if is_gold:
+                            rates_m1 = mt5.copy_rates_from_pos(sym, mt5.TIMEFRAME_M1, 0, 2)
+                            if rates_m1 is not None and len(rates_m1) >= 2:
+                                last_m1 = rates_m1[-2]
+                                trigger_buy = (tick.bid > last_m1['high']) and break_up
+                                trigger_sell = (tick.ask < last_m1['low']) and break_down
+                                
+                                if trigger_buy or trigger_sell:
+                                    side = "BUY" if trigger_buy else "SELL"
+                                    pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
+                                    sl = tick.bid - pts_sl if side=="BUY" else tick.ask + pts_sl
+                                    res = mt5.order_send({
+                                        "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                                        "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                                        "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "ORO_CONF_H1",
+                                        "type_filling": mt5.ORDER_FILLING_IOC
+                                    })
+                                    if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                                        add_log_dash(f"🎯 ORO {side} CONFIRMADO")
+                                        send_telegram(f"🥇 *ORO: ENTRADA CONFIRMADA*\n*Tipo:* {side} | *Lote:* {cfg['lot']}\n*MSS M1:* Velas alineadas en breakout.")
+                                else:
+                                    target_p = last_m1['high'] if break_up else last_m1['low']
+                                    s_d["status"] = f"⏳ ORO WAIT M1 {('UP' if break_up else 'DOWN')} {target_p:.2f}"
+                        
+                        # Si es FX, entrada DIRECTA por contacto
+                        else:
+                            side = "BUY" if break_up else "SELL"
+                            pts_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
+                            sl = tick.bid - pts_sl if side=="BUY" else tick.bid + pts_sl
+                            res = mt5.order_send({
+                                "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
+                                "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
+                                "sl": float(round(sl, s_i.digits)), "magic": MAGIC, "comment": "FX_DIRECT_H1",
+                                "type_filling": mt5.ORDER_FILLING_IOC
+                            })
+                            if res and res.retcode == mt5.TRADE_RETCODE_DONE:
+                                add_log_dash(f"🚀 FX {sym} DISPARO DIRECTO")
+                                send_telegram(f"⚡ *FX: DISPARO DIRECTO {sym}*\n*Tipo:* {side} | *Breakout:* Contacto H1.")
 
                 # --- REFUERZOS ---
                 elif len(sym_pos) > 0 and len(sym_pos) < MAX_BULLETS:
