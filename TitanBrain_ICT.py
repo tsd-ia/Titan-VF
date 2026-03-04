@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.115 (FURIA THUNDER) ---
-VERSION = "v47.9.115"
-BRANDING = "🦅 TITAN ICT: FURIA THUNDER 24/7"
+# --- CONFIGURACIÓN TITAN v47.9.120 (RIESGO EN DÓLARES) ---
+VERSION = "v47.9.120"
+BRANDING = "🦅 TITAN ICT: RIESGO EN DÓLARES REALES"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -27,11 +27,11 @@ REINFORCE_PROFIT = 3.0     # Profit para buscar refuerzos (agrupado)
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
     "GOLD": {
-        "lot": 0.01, "sl_points": 2500, "trail": True, "burst": 2,
+        "lot": 0.01, "sl_usd": 25.0, "trail": True, "burst": 2,
         "h_trigger": 2.5, "h_lock": 1.0, "t_step": 2.0, "air": 2.5
     },
     "FX":   {
-        "lot": 0.02, "sl_points": 1250, "trail": True, "burst": 3,
+        "lot": 0.02, "sl_usd": 25.0, "trail": True, "burst": 3,
         "h_trigger": 0.35, "h_lock": 0.10, "t_step": 0.15, "air": 0.20
     }
 }
@@ -173,20 +173,24 @@ def main_loop(mode_24h=False):
                 
                 if (thunder_buy or thunder_sell) and len(sym_pos) == 0:
                     mss_ok = True
-                    # A. VANGUARDIA (Disparo Inicial)
+                    # A. VANGUARDIA (Calculando Riesgo en USD Reales)
                     if mss_ok and (time.time() - s_d["last_trade"] > 3):
                         side = "BUY" if thunder_buy else "SELL"
-                        sl_pts = cfg["sl_points"] * s_i.point
-                        sl = tick.bid - sl_pts if side=="BUY" else tick.ask + sl_pts
-                        tp_pts = sl_pts * (1.5 if asset_type=="FX" else RR_RATIO)
-                        tp = tick.bid + tp_pts if side=="BUY" else tick.ask - tp_pts
+                        
+                        # Cálculo de SL exacto para perder cfg["sl_usd"]
+                        # points = (usd_loss / (tick_value / point)) / volume
+                        points_sl = (cfg["sl_usd"] / (s_i.trade_tick_value / s_i.point)) / cfg["lot"]
+                        sl = tick.bid - points_sl if side=="BUY" else tick.ask + points_sl
+                        
+                        # TP inicial optimizado (1.5x el riesgo)
+                        tp = tick.bid + (points_sl * 1.5) if side=="BUY" else tick.ask - (points_sl * 1.5)
                         
                         for _ in range(cfg['burst']):
                             mt5.order_send({
                                 "action": mt5.TRADE_ACTION_DEAL, "symbol": sym, "volume": cfg["lot"],
                                 "type": 0 if side=="BUY" else 1, "price": tick.ask if side=="BUY" else tick.bid,
                                 "sl": float(round(sl, s_i.digits)), "tp": float(round(tp, s_i.digits)),
-                                "magic": MAGIC, "comment": "STORM_VANG",
+                                "magic": MAGIC, "comment": "THUNDER_VANG",
                                 "deviation": 100, "type_filling": mt5.ORDER_FILLING_IOC
                             })
                         add_log_dash(f"🏹 {sym} {side} RÁFAGA M1")
