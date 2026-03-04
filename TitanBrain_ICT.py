@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.220 (FUEGO TOTAL) ---
-VERSION = "v47.9.220"
-BRANDING = "🦅 TITAN ICT: MODO STORM (SIN LÍMITES)"
+# --- CONFIGURACIÓN TITAN v47.9.225 (FILO QUIRÚRGICO) ---
+VERSION = "v47.9.225"
+BRANDING = "🦅 TITAN ICT: FX SL $2.00 (ULTRA-SNIPER)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -33,7 +33,7 @@ ASSET_CONFIG = {
         "calculate_be": True, "strict_filter": True, "r_trigger": 3.0
     },
     "FX":   {
-        "lot": 0.02, "sl_usd": 5.0, "trail": True, "burst": 1,
+        "lot": 0.02, "sl_usd": 2.0, "trail": True, "burst": 1,
         "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.2,
         "calculate_be": True, "strict_filter": True, "r_trigger": 1.0
     }
