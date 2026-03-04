@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.205 (REFUERZO $3) ---
-VERSION = "v47.9.205"
-BRANDING = "🦅 TITAN ICT: REFUERZO ORO A $3.00"
+# --- CONFIGURACIÓN TITAN v47.9.210 (REBORDE DORADO) ---
+VERSION = "v47.9.210"
+BRANDING = "🦅 TITAN ICT: PROTECCIÓN $3 -> $1.5"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -30,7 +30,7 @@ BYPASS_COOLDOWN = True    # <--- DÉLO EN TRUE PARA SALTAR EL BLOQUEO AHORA
 ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
-        "h_trigger": 2.0, "h_lock": 0.5, "t_step": 1.0, "air": 1.5,
+        "h_trigger": 2.0, "h_lock": 0.5, "t_step": 0.1, "air": 1.5,
         "calculate_be": True, "strict_filter": True, "r_trigger": 3.0
     },
     "FX":   {
