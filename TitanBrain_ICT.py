@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.195 (COSECHA BLINDADA) ---
-VERSION = "v47.9.195"
-BRANDING = "🦅 TITAN ICT: SEPARACIÓN BE/TRAILING"
+# --- CONFIGURACIÓN TITAN v47.9.200 (SALTO AL VACÍO) ---
+VERSION = "v47.9.200"
+BRANDING = "🦅 TITAN ICT: REFUERZOS AGRESIVOS ACTIVADOS"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -31,12 +31,12 @@ ASSET_CONFIG = {
     "GOLD": {
         "lot": 0.01, "sl_usd": 10.0, "trail": True, "burst": 1,
         "h_trigger": 2.0, "h_lock": 0.5, "t_step": 1.0, "air": 1.5,
-        "calculate_be": True, "strict_filter": True, "r_trigger": 5.0
+        "calculate_be": True, "strict_filter": True, "r_trigger": 1.5
     },
     "FX":   {
         "lot": 0.01, "sl_usd": 5.0, "trail": True, "burst": 1,
         "h_trigger": 0.3, "h_lock": 0.1, "t_step": 0.2, "air": 0.2,
-        "calculate_be": True, "strict_filter": True, "r_trigger": 2.0
+        "calculate_be": True, "strict_filter": True, "r_trigger": 1.0
     }
 }
 
@@ -246,15 +246,15 @@ def main_loop(mode_24h=False):
                         rsi = get_rsi(sym, mt5.TIMEFRAME_M1, 14)
                         momentum_ok = (m1_mss_buy and rsi > 50) or (m1_mss_sell and rsi < 50)
                     
-                    # CONTROL DE MARGEN Y SATURACIÓN
+                    # CONTROL DE MARGEN Y SATURACIÓN (MODO AGRESIVO)
                     active_pairs = len([s for s in STATE["symbols_data"] if STATE["symbols_data"][s]["pos"] > 0])
                     
-                    if acc.margin_level < 500:
-                        s_d["status"] = "⚠️ MARGEN BAJO"
+                    if acc.margin_level < 110:
+                        s_d["status"] = "⚠️ STOP OUT INMINENTE"
                         continue
                     
-                    if active_pairs >= MAX_TOTAL_SYMBOLS and len(sym_pos) == 0:
-                        s_d["status"] = "⚠️ SATURADO (MAX 3)"
+                    if active_pairs >= 6 and len(sym_pos) == 0:
+                        s_d["status"] = "⚠️ SATURADO (MAX 6)"
                         continue
 
                     if trend_ok and momentum_ok and (time.time() - s_d["last_trade"] > 3):
