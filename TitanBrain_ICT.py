@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 import pytz
 from colorama import Fore, Style, init as colorama_init
 
-# --- CONFIGURACIÓN TITAN v47.9.245 (BOZAL DE ORO) ---
-VERSION = "v47.9.245"
-BRANDING = "🛡️ TITAN ICT: BOZAL SOLO PARA ORO"
+# --- CONFIGURACIÓN TITAN v47.9.250 (EL CAZADOR) ---
+VERSION = "v47.9.250"
+BRANDING = "🦅 TITAN ICT: ESTRATEGIA SWEEP (YOUTUBER)"
 BASE_SYMBOLS = ["XAUUSD", "GBPUSD", "EURUSD", "USDJPY", "AUDUSD"]
 colorama_init(autoreset=True)
 
@@ -20,10 +20,10 @@ HARVEST_LOCK = 1.0         # Bloquear $1.00
 TRAILING_STEP = 1.0        # Mover SL cada $1.00 extra
 MAX_BULLETS = 2            
 MAGIC = 48105              
-COOLDOWN_TIME = 1800       
+COOLDOWN_TIME = 900        # <--- 15 MINUTOS SEGÚN MANDO
 REINFORCE_PROFIT = 1.0     
-MAX_TOTAL_SYMBOLS = 10     # <--- MODO STORM ACTIVADO
-BYPASS_COOLDOWN = False   # <--- ACTIVADO: Solo frenará si el ORO falla
+MAX_TOTAL_SYMBOLS = 10     
+BYPASS_COOLDOWN = False   
 
 # CONFIGURACIÓN POR ACTIVO
 ASSET_CONFIG = {
@@ -108,11 +108,17 @@ def get_atr(symbol, tf, period=14):
     return float(tr.rolling(period).mean().iloc[-1])
 
 def get_h1_bias(symbol):
-    """Radar de Visión H1: EMA 21 para detección rápida."""
-    ema_trend = get_ema(symbol, mt5.TIMEFRAME_H1, 21)
+    """Radar de Visión H1: Estrategia SWEEP (Cazador de Liquidez)."""
+    # M15 Liquidity como referencia táctica rápida
+    h1_high, h1_low = get_m15_liquidity(symbol)
     tick = mt5.symbol_info_tick(symbol)
-    if not ema_trend or not tick: return 0
-    return 1 if tick.bid > ema_trend else -1
+    if not h1_high or not tick: return 0
+    
+    # SI ROMPE TECHO -> SE PREPARA PARA VENDER (BEAR)
+    if tick.bid > h1_high: return -1
+    # SI ROMPE SUELO -> SE PREPARA PARA COMPRAR (BULL)
+    if tick.bid < h1_low: return 1
+    return 0
 
 def get_m15_liquidity(sym):
     """Obtiene la liquidez de la vela M15 anterior (más señales)."""
